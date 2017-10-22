@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
+import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,6 +16,21 @@ import android.widget.ImageView;
 import com.koushikdutta.ion.Ion;
 
 public class MainActivity extends FragmentActivity {
+
+    static final SparseArray<TabDescriptor> tabs = new SparseArray<>(); static {
+        tabs.put(0, new TabDescriptor(
+                "Lisca",
+                "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif"
+        ));
+        tabs.put(1, new TabDescriptor(
+                "Puntijarka-Bilogora-Osijek",
+                "http://vrijeme.hr/kradar-anim.gif"
+        ));
+        tabs.put(2, new TabDescriptor(
+                "Dubrovnik",
+                "http://vrijeme.hr/dradar-anim.gif"
+        ));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,37 +48,21 @@ public class MainActivity extends FragmentActivity {
 
         @Override
         public CharSequence getPageTitle(int position) {
-            return titleFor(position);
-        }
-
-        @Override
-        public int getCount() {
-            return 2;
+            return tabs.get(position).title;
         }
 
         @Override
         public Fragment getItem(int i) {
             RadarImageFragment frag = new RadarImageFragment();
             Bundle args = new Bundle();
-            args.putString("url", urlFor(i));
+            args.putInt("index", i);
             frag.setArguments(args);
             return frag;
         }
 
-        private static String titleFor(int i) {
-            return i == 0 ? "Radar Lisca"
-                 : i == 1 ? "Rader Bilogora"
-                 : throwIllegalArgument(i);
-        }
-
-        private static String urlFor(int i) {
-            return i == 0 ? "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif"
-                 : i == 1 ? "http://vrijeme.hr/bradar-anim.gif"
-                 : throwIllegalArgument(i);
-        }
-
-        private static String throwIllegalArgument(int i) {
-            throw new IllegalArgumentException("Fragment index out of range: " + i);
+        @Override
+        public int getCount() {
+            return 3;
         }
     }
 
@@ -72,13 +73,24 @@ public class MainActivity extends FragmentActivity {
                                  @Nullable ViewGroup container,
                                  @Nullable Bundle savedInstanceState
         ) {
-            View rootView = inflater.inflate(R.layout.radar_image, container, false);
+            TabDescriptor desc = tabs.get(getArguments().getInt("index"));
+            Log.i("RadarImageFragment", desc.title);
+            View rootView = inflater.inflate(R.layout.image_radar, container, false);
             ImageView imgView = rootView.findViewById(R.id.image_view_radar);
-            Bundle args = getArguments();
             Ion.with(imgView)
                     .placeholder(R.drawable.rectangle)
-                    .load(args.getString("url"));
-            return imgView;
+                    .load(desc.url);
+            return rootView;
+        }
+    }
+
+    private static final class TabDescriptor {
+        final String title;
+        final String url;
+
+        TabDescriptor(String title, String url) {
+            this.title = title;
+            this.url = url;
         }
     }
 }
