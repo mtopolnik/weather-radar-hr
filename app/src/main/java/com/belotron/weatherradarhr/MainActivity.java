@@ -13,7 +13,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import com.koushikdutta.async.future.TransformFuture;
 import com.koushikdutta.ion.Ion;
+
+import java.nio.ByteBuffer;
+
+import static com.belotron.weatherradarhr.ModifyGifFramerate.editGif;
 
 public class MainActivity extends FragmentActivity {
 
@@ -77,10 +82,21 @@ public class MainActivity extends FragmentActivity {
             Log.i("RadarImageFragment", desc.title);
             View rootView = inflater.inflate(R.layout.image_radar, container, false);
             ImageView imgView = rootView.findViewById(R.id.image_view_radar);
+            Ion.with(getContext())
+                    .load(desc.url)
+                    .asByteArray()
+                    .setCallback(new ModifyGifFuture());
             Ion.with(imgView)
                     .placeholder(R.drawable.rectangle)
                     .load(desc.url);
             return rootView;
+        }
+
+        private static class ModifyGifFuture extends TransformFuture<byte[], byte[]> {
+            @Override
+            protected void transform(byte[] result) {
+                editGif(ByteBuffer.wrap(result), 10, 120, 200);
+            }
         }
     }
 
