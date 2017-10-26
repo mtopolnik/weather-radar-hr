@@ -1,9 +1,10 @@
 package com.belotron.weatherradarhr;
 
+import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
-import android.os.Bundle;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
@@ -13,9 +14,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.async.future.TransformFuture;
 import com.koushikdutta.ion.Ion;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import static com.belotron.weatherradarhr.ModifyGifFramerate.editGif;
@@ -78,25 +84,31 @@ public class MainActivity extends FragmentActivity {
                                  @Nullable ViewGroup container,
                                  @Nullable Bundle savedInstanceState
         ) {
-            TabDescriptor desc = tabs.get(getArguments().getInt("index"));
+            final TabDescriptor desc = tabs.get(getArguments().getInt("index"));
             Log.i("RadarImageFragment", desc.title);
             View rootView = inflater.inflate(R.layout.image_radar, container, false);
-            ImageView imgView = rootView.findViewById(R.id.image_view_radar);
+            final ImageView imgView = rootView.findViewById(R.id.image_view_radar);
+            final File gifFile = new File(getContext().getNoBackupFilesDir(), desc.title + ".gif");
             Ion.with(getContext())
                     .load(desc.url)
                     .asByteArray()
-                    .setCallback(new ModifyGifFuture());
-            Ion.with(imgView)
-                    .placeholder(R.drawable.rectangle)
-                    .load(desc.url);
+                    .setCallback(new FutureCallback<byte[]>() {
+                        @Override
+                        public void onCompleted(Exception e, byte[] result) {
+                            editGif(ByteBuffer.wrap(result), 10, 120, 200);
+                            try (OutputStream out = new FileOutputStream(gifFile)) {
+                                Log.i("RadarImageFragment", "out.write(result)");
+                                out.write(result);
+                                Log.i("RadarImageFragment", "out.write(result) success");
+                            } catch (IOException e1) {
+                                throw new RuntimeException(e1);
+                            }
+                            Ion.with(RadarImageFragment.this)
+                                    .load(gifFile)
+                                    .intoImageView(imgView);
+                        }
+                    });
             return rootView;
-        }
-
-        private static class ModifyGifFuture extends TransformFuture<byte[], byte[]> {
-            @Override
-            protected void transform(byte[] result) {
-                editGif(ByteBuffer.wrap(result), 10, 120, 200);
-            }
         }
     }
 
