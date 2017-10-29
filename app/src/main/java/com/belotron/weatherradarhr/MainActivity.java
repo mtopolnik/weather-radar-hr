@@ -8,24 +8,27 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
-import static com.belotron.weatherradarhr.ModifyGifFramerate.modifyGifFramerate;
+import static com.belotron.weatherradarhr.GifEditor.editGif;
 
 public class MainActivity extends FragmentActivity {
+
+    static final String LOGTAG = "WeatherRadar";
+    private static final int BUFSIZ = 512;
+    private static final int ANIMATION_COVERS_MINUTES = 150;
 
     private static final TabDescriptor[] tabs = {
             new TabDescriptor("Lisca",
@@ -36,11 +39,9 @@ public class MainActivity extends FragmentActivity {
                     15),
             new TabDescriptor("Dubrovnik",
                     "http://vrijeme.hr/dradar-anim.gif",
-                    15)
+                    15),
     };
 
-    private static final int BUFSIZ = 512;
-    private static final String LOGTAG = "WeatherRadar";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,7 +123,7 @@ public class MainActivity extends FragmentActivity {
 
         @Override
         public int getCount() {
-            return 3;
+            return tabs.length;
         }
     }
 
@@ -135,7 +136,6 @@ public class MainActivity extends FragmentActivity {
         ) {
             final int tabIndex = getArguments().getInt("index");
             final TabDescriptor desc = tabs[tabIndex];
-            Log.i(LOGTAG, desc.title);
             View rootView = inflater.inflate(R.layout.image_radar, container, false);
             final WebView webView = rootView.findViewById(R.id.web_view_radar);
             WebSettings s = webView.getSettings();
@@ -151,14 +151,16 @@ public class MainActivity extends FragmentActivity {
                     .setCallback(new FutureCallback<byte[]>() {
                         @Override
                         public void onCompleted(Exception e, byte[] result) {
-                            modifyGifFramerate(result, (int) (1.2 * tabs[tabIndex].minutesPerFrame), 120, 200);
+                            TabDescriptor tabDesc = tabs[tabIndex];
+                            int frameDelay = (int) (1.2 * tabDesc.minutesPerFrame);
+                            ByteBuffer buf = ByteBuffer.wrap(result);
+                            editGif(buf, frameDelay, tabDesc.framesToKeep);
                             try (OutputStream out = new FileOutputStream(gifFile)) {
-                                out.write(result);
+                                out.write(buf.array(), buf.position(), buf.limit());
                             } catch (IOException e1) {
                                 throw new RuntimeException(e1);
                             }
                             String url = htmlFileForTab(tabIndex, getContext()).toURI().toString();
-                            Log.i(LOGTAG, url);
                             webView.loadUrl(url);
                         }
                     });
@@ -170,11 +172,13 @@ public class MainActivity extends FragmentActivity {
         final String title;
         final String url;
         final int minutesPerFrame;
+        final int framesToKeep;
 
         TabDescriptor(String title, String url, int minutesPerFrame) {
             this.title = title;
             this.url = url;
             this.minutesPerFrame = minutesPerFrame;
+            this.framesToKeep = (int) Math.ceil((double) ANIMATION_COVERS_MINUTES / minutesPerFrame);
         }
 
         String filename() {
