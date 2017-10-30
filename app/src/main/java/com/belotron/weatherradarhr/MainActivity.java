@@ -8,6 +8,7 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +19,7 @@ import com.koushikdutta.ion.Ion;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,7 +30,7 @@ public class MainActivity extends FragmentActivity {
 
     static final String LOGTAG = "WeatherRadar";
     private static final int BUFSIZ = 512;
-    private static final int ANIMATION_COVERS_MINUTES = 150;
+    private static final int ANIMATION_COVERS_MINUTES = 100;
 
     private static final TabDescriptor[] tabs = {
             new TabDescriptor("Lisca",
@@ -37,9 +39,9 @@ public class MainActivity extends FragmentActivity {
             new TabDescriptor("Puntijarka-Bilogora-Osijek",
                     "http://vrijeme.hr/kradar-anim.gif",
                     15),
-            new TabDescriptor("Dubrovnik",
-                    "http://vrijeme.hr/dradar-anim.gif",
-                    15),
+//            new TabDescriptor("Dubrovnik",
+//                    "http://vrijeme.hr/dradar-anim.gif",
+//                    15),
     };
 
 
@@ -73,8 +75,11 @@ public class MainActivity extends FragmentActivity {
                 case "title":
                     m.appendReplacement(sb, tab.title);
                     break;
-                case "imageFilename":
-                    m.appendReplacement(sb, tab.filename());
+                case "imageFilename0":
+                    m.appendReplacement(sb, tabs[0].filename());
+                    break;
+                case "imageFilename1":
+                    m.appendReplacement(sb, tabs[1].filename());
                     break;
                 default:
             }
@@ -123,7 +128,7 @@ public class MainActivity extends FragmentActivity {
 
         @Override
         public int getCount() {
-            return tabs.length;
+            return 1; //tabs.length;
         }
     }
 
@@ -135,7 +140,6 @@ public class MainActivity extends FragmentActivity {
                                  @Nullable Bundle savedInstanceState
         ) {
             final int tabIndex = getArguments().getInt("index");
-            final TabDescriptor desc = tabs[tabIndex];
             View rootView = inflater.inflate(R.layout.image_radar, container, false);
             final WebView webView = rootView.findViewById(R.id.web_view_radar);
             WebSettings s = webView.getSettings();
@@ -144,26 +148,39 @@ public class MainActivity extends FragmentActivity {
             s.setDisplayZoomControls(false);
             s.setUseWideViewPort(true);
             s.setLoadWithOverviewMode(true);
-            final File gifFile = new File(getContext().getNoBackupFilesDir(), desc.filename());
-            Ion.with(getContext())
-                    .load(desc.url)
-                    .asByteArray()
-                    .setCallback(new FutureCallback<byte[]>() {
-                        @Override
-                        public void onCompleted(Exception e, byte[] result) {
-                            TabDescriptor tabDesc = tabs[tabIndex];
-                            int frameDelay = (int) (1.2 * tabDesc.minutesPerFrame);
-                            ByteBuffer buf = ByteBuffer.wrap(result);
-                            editGif(buf, frameDelay, tabDesc.framesToKeep);
-                            try (OutputStream out = new FileOutputStream(gifFile)) {
-                                out.write(buf.array(), buf.position(), buf.limit());
-                            } catch (IOException e1) {
-                                throw new RuntimeException(e1);
+            final AtomicInteger countdown = new AtomicInteger(tabs.length);
+            for (final TabDescriptor desc : tabs) {
+                Ion.with(getContext())
+                        .load(desc.url)
+                        .asByteArray()
+                        .setCallback(new FutureCallback<byte[]>() {
+                            @Override
+                            public void onCompleted(Exception e, byte[] result) {
+                                if (result == null) {
+                                    Log.e(LOGTAG, "Couldn't load URL " + desc.url);
+                                    return;
+                                }
+                                try {
+                                    int frameDelay = (int) (1.2 * desc.minutesPerFrame);
+                                    ByteBuffer buf = ByteBuffer.wrap(result);
+                                    editGif(buf, frameDelay, desc.framesToKeep);
+                                    final File gifFile = new File(getContext().getNoBackupFilesDir(), desc.filename());
+                                    try (OutputStream out = new FileOutputStream(gifFile)) {
+                                        out.write(buf.array(), buf.position(), buf.remaining());
+                                    } catch (IOException e1) {
+                                        throw new RuntimeException(e1);
+                                    }
+                                    if (countdown.addAndGet(-1) == 0) {
+                                        String url = htmlFileForTab(tabIndex, getContext()).toURI().toString();
+                                        webView.loadUrl(url);
+                                    }
+                                } catch (Throwable t) {
+                                    Log.e(LOGTAG, "Error loading GIF " + desc.filename(), t);
+//                                    throw t;
+                                }
                             }
-                            String url = htmlFileForTab(tabIndex, getContext()).toURI().toString();
-                            webView.loadUrl(url);
-                        }
-                    });
+                        });
+            }
             return rootView;
         }
     }

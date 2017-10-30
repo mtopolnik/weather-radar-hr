@@ -1,22 +1,25 @@
 package com.belotron.weatherradarhr;
 
+import android.util.Log;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.Deque;
 
+import static com.belotron.weatherradarhr.MainActivity.LOGTAG;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 @SuppressWarnings("MagicNumber")
 class GifEditor {
 
-    private static final int LAST_FRAME_HOLD_TIME = 125;
-    private static final int LOOP_COUNT = 200;
+    private static final int LOOP_COUNT = 50;
     private static final int BLOCK_TYPE_EXTENSION = 0x21;
     private static final int BLOCK_TYPE_IMAGE = 0x2c;
     private static final int BLOCK_TYPE_TRAILER = 0x3b;
     private static final int EXT_TYPE_GRAPHIC_CONTROL = 0xf9;
     private static final int EXT_TYPE_APPLICATION = 0xff;
+    private static final int ANIMATION_DURATION = 350;
 
     private final ByteBuffer buf;
     private final int delayTime;
@@ -34,104 +37,104 @@ class GifEditor {
 
     private void go() {
         buf.order(LITTLE_ENDIAN);
+        FrameList frameList = parseGif();
+//        Log.i(LOGTAG, "***************** rewrite buffer **************");
+        rewriteFramesInBuffer(frameList);
+//        buf.rewind();
+//        parseGif();
+        buf.rewind();
+    }
+
+    private void rewriteFramesInBuffer(FrameList frameList) {
+        ByteBuffer sourceBuf = buf.duplicate();
+        sourceBuf.order(LITTLE_ENDIAN);
+        ByteBuffer destBuf = buf.duplicate();
+        destBuf.order(LITTLE_ENDIAN);
+        destBuf.position(frameList.firstFrameOffset());
+        writeLoopingExtension(destBuf);
+        for (FrameDescriptor frame; (frame = frameList.popNextFrame()) != null;) {
+            boolean onLastFrame = frameList.peekLastFrame() == null;
+            frame.writeGraphicControlExt(destBuf, (onLastFrame? frameList.lastFrameDelay() : delayTime));
+            copy(sourceBuf, frame.imageDescStart, frame.end, destBuf);
+        }
+        destBuf.put((byte) BLOCK_TYPE_TRAILER);
+        buf.limit(destBuf.position());
+    }
+
+    private static void copy(ByteBuffer src, int srcPos, int srcLimit, ByteBuffer dest) {
+        if (srcPos == dest.position()) {
+            return;
+        }
+        int len = srcLimit - srcPos;
+        System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len);
+        dest.position(dest.position() + len);
+    }
+
+    private FrameList parseGif() {
         String gifVersion = getString(6);
         if (!gifVersion.equals("GIF87a") && !gifVersion.equals("GIF89a")) {
             throw new AssertionError("Not a GIF file");
         }
-        FrameIndex frameIndex = traverseAndEdit(delayTime, framesToKeep);
-        deleteExcessLeadingFrames(frameIndex);
-    }
-
-    private void deleteExcessLeadingFrames(FrameIndex frameIndex) {
-        int srcOffset = frameIndex.offsetOfFirstFrameToKeep();
-        int destOffset = frameIndex.firstFrameOffset();
-        if (srcOffset == destOffset) {
-            return;
-        }
-        byte[] bytes = buf.array();
-        System.arraycopy(bytes, srcOffset, bytes, destOffset, bytes.length - srcOffset);
-        buf.limit(bytes.length - (srcOffset - destOffset));
-    }
-
-    private FrameIndex traverseAndEdit(int delayTime, int framesToKeep) {
         skipLogicalScreenDescriptorAndGlobalColorTable();
-        final FrameIndex frameIndex = new FrameIndex(framesToKeep);
-        boolean loopingExtSeen = false;
+        final FrameList frameList = new FrameList(framesToKeep);
         readingLoop:
         while (buf.hasRemaining()) {
-            if (loopingExtSeen) {
-                frameIndex.acceptBlock(buf);
-            }
+            frameList.acceptBlockStart();
+            int blockPos = buf.position();
             int blockType = nextByte();
             switch (blockType) {
                 case BLOCK_TYPE_EXTENSION:
                     int extensionLabel = nextByte();
                     switch (extensionLabel) {
+//                        case EXT_TYPE_APPLICATION:
+//                            Log.i(LOGTAG, "Application extension at " + blockPos);
+//                            parseApplicationExtension();
+//                            break;
                         case EXT_TYPE_GRAPHIC_CONTROL:
-                            editGraphicControlExtension(delayTime);
-                            break;
-                        case EXT_TYPE_APPLICATION:
-                            loopingExtSeen |= editIfLoopingExtension(LOOP_COUNT);
+                            Log.i(LOGTAG, "Graphic control ext at " + blockPos);
+                            frameList.acceptGraphicControlExt();
                             break;
                         default:
-                            skipSubBlocks();
+                            Log.i(LOGTAG, String.format("Ext 0x%02x at %d", extensionLabel, blockPos));
+                            logSubBlocks();
                     }
                     break;
                 case BLOCK_TYPE_IMAGE:
-                    skipImageDescriptor();
+                    Log.i(LOGTAG, "Image desc at " + blockPos);
+                    frameList.acceptImageDescriptor();
                     break;
                 case BLOCK_TYPE_TRAILER:
+                    Log.i(LOGTAG, "Trailer at " + blockPos);
                     buf.limit(buf.position());
-                    buf.reset(); // restore the position of last frame's delay time
-                    buf.putChar((char) (LAST_FRAME_HOLD_TIME));
                     break readingLoop;
                 default:
-                    throw new AssertionError(String.format("Unrecognized block type: 0x%02x", blockType));
+                    throw new AssertionError(String.format("Unrecognized block type 0x%02x at %d",
+                            blockType, blockPos));
             }
         }
-        buf.rewind();
-        return frameIndex;
+        return frameList;
     }
 
-    private boolean editIfLoopingExtension(int loopCount) {
+    private void parseApplicationExtension() {
         int blockSize = nextByte();
-        if (blockSize != 11) {
-            throw new AssertionError("Invalid Application Extension block size: " + blockSize);
-        }
+        if (blockSize != 11) throw new AssertionError("Invalid Application Extension block size: " + blockSize);
         String appId = getString(11);
-        if (!appId.equals("NETSCAPE2.0")) {
-            skipSubBlocks();
-            return false;
-        }
-        int len = nextByte();
-        int subBlockId = nextByte();
-        if (subBlockId != 1) {
-            return false;
-        }
-        // Netscape Looping Extension
-        if (len != 3) {
-            throw new AssertionError("Invalid Netscape Looping Extension block size: " + len);
-        }
-        buf.putChar((char) loopCount);
-        int terminatorByte = nextByte();
-        if (terminatorByte != 0) {
-            throw new AssertionError("Invalid terminator byte " + terminatorByte);
-        }
-        return true;
-    }
-
-    private void editGraphicControlExtension(int delayTime) {
-        int blockSize = nextByte();
-        if (blockSize != 4) {
-            throw new AssertionError("Invalid Graphic Control Extension block size: " + blockSize);
-        }
-        skip(1); // Packed Fields
-        buf.mark(); // will be used to modify the delay time of the final frame
-        buf.putChar((char) delayTime);
-        skip(1); // transparentColorIndex
-        int blockTerminator = nextByte();
-        if (blockTerminator != 0) {
-            throw new AssertionError(String.format("Invalid block terminator byte: 0x%02x", blockTerminator));
+        switch (appId) {
+            case "NETSCAPE2.0": {
+                int len = nextByte();
+                int subBlockId = nextByte();
+                if (subBlockId == 1) {
+                    if (len != 3) throw new AssertionError("Invalid Netscape Looping Extension block size: " + len);
+                    int loopCount = buf.getChar();
+                    Log.i(LOGTAG, "Netscape Extension Loop Count " + loopCount);
+                    int terminatorByte = nextByte();
+                    if (terminatorByte != 0) throw new AssertionError("Invalid terminator byte " + terminatorByte);
+                }
+                return;
+            }
+            default:
+                Log.i(LOGTAG, "Application Identifier: " + appId);
+                skipSubBlocks();
         }
     }
 
@@ -142,16 +145,8 @@ class GifEditor {
         skipColorTable(packedFields);
     }
 
-    private void skipImageDescriptor() {
-        skip(8); // image position and size
-        int packedFields = nextByte();
-        skipColorTable(packedFields);
-        skip(1); // LZW Minimum Code Size
-        skipSubBlocks();
-    }
-
     private void skipColorTable(int packedFields) {
-        boolean colorTablePresent = (packedFields & 0b1000_000) != 0;
+        boolean colorTablePresent = (packedFields & 0b1000_0000) != 0;
         if (!colorTablePresent) {
             return;
         }
@@ -162,6 +157,12 @@ class GifEditor {
     private void skipSubBlocks() {
         for (int len; (len = nextByte()) != 0; ) {
             skip(len);
+        }
+    }
+
+    private void logSubBlocks() {
+        for (int len; (len = nextByte()) != 0; ) {
+            Log.i(LOGTAG, "sub-block " + getString(len));
         }
     }
 
@@ -178,51 +179,160 @@ class GifEditor {
     }
 
     private String getString(int len) {
-        buf.limit(buf.position() + len);
         try {
-            return Charset.forName("ISO-8859-1").decode(buf.slice()).toString();
+            ByteBuffer slice = buf.slice();
+            slice.limit(len);
+            return Charset.forName("US-ASCII").decode(slice).toString();
         } finally {
-            buf.position(buf.limit());
-            buf.limit(buf.capacity());
+            skip(len);
         }
     }
 
-    private static class FrameIndex {
-        private final int trailingFrameCount;
-        private final Queue<Integer> trailingFrameOffsets;
+    private static void writeLoopingExtension(ByteBuffer buf) {
+        buf.put((byte) BLOCK_TYPE_EXTENSION);
+        buf.put((byte) EXT_TYPE_APPLICATION);
+        buf.put((byte) 11); // Application Extension block size
+        buf.put("NETSCAPE2.0".getBytes(Charset.forName("US-ASCII")));
+        buf.put((byte) 3); // Netscape Looping Extension block size
+        buf.put((byte) 1); // Looping Sub-Block ID
+        buf.putChar((char) LOOP_COUNT);
+        buf.put((byte) 0); // Terminator byte
+    }
+
+    private class FrameList {
+        private final int frameCountToKeep;
+        private final Deque<FrameDescriptor> framesToKeep;
         private int firstFrameOffset = -1;
         private boolean frameInProgress = false;
+        private int distinctFrameCount;
+        private int keptFrameCount;
+        private FrameDescriptor currFrame;
 
-        FrameIndex(int trailingFrameCount) {
-            this.trailingFrameCount = trailingFrameCount;
-            this.trailingFrameOffsets = new ArrayDeque<>(trailingFrameCount);
+        FrameList(int frameCountToKeep) {
+            this.frameCountToKeep = frameCountToKeep;
+            this.framesToKeep = new ArrayDeque<>(frameCountToKeep);
         }
 
-        void acceptBlock(ByteBuffer buf) {
+        void acceptBlockStart() {
             int offset = buf.position();
-            int blockType = toUnsignedInt(buf.get(offset));
-            if (!frameInProgress) {
-                addFrame(offset);
-            }
-            frameInProgress = blockType != BLOCK_TYPE_IMAGE;
-        }
-
-        private void addFrame(int offset) {
             if (firstFrameOffset == -1) {
                 firstFrameOffset = offset;
             }
-            if (trailingFrameOffsets.size() == trailingFrameCount) {
-                trailingFrameOffsets.remove();
+            if (!frameInProgress) {
+                currFrame = new FrameDescriptor(offset);
             }
-            trailingFrameOffsets.add(offset);
+            int blockType = toUnsignedInt(buf.get(offset));
+            frameInProgress = blockType != BLOCK_TYPE_IMAGE;
+        }
+
+        void acceptGraphicControlExt() {
+            int blockSize = nextByte();
+            if (blockSize != 4) {
+                throw new AssertionError("Invalid Graphic Control Extension block size: " + blockSize);
+            }
+            currFrame.gcExtPackedFields = buf.get();
+            skip(2); // delayTime
+            currFrame.gcExtTransparentColorIndex = buf.get();
+            int blockTerminator = nextByte();
+            if (blockTerminator != 0) {
+                throw new AssertionError(String.format("Invalid block terminator byte: 0x%02x", blockTerminator));
+            }
+        }
+
+        void acceptImageDescriptor() {
+            currFrame.imageDescStart = buf.position() - 1;
+            skip(8); // image position and size
+            int packedFields = nextByte();
+            skipColorTable(packedFields);
+            skip(1); // LZW Minimum Code Size
+            currFrame.imageDataStart = buf.position();
+            skipSubBlocks();
+            currFrame.end = buf.position();
+            if (currFrameDifferentFromPrev()) {
+                addFrame();
+                distinctFrameCount++;
+            } else {
+                Log.i(LOGTAG, "Dropping identical frame");
+            }
+            currFrame = null;
+        }
+
+        FrameDescriptor popNextFrame() {
+            return framesToKeep.poll();
+        }
+
+        FrameDescriptor peekLastFrame() {
+            return framesToKeep.peekLast();
+        }
+
+        private void addFrame() {
+            if (framesToKeep.size() == frameCountToKeep) {
+                framesToKeep.remove();
+            } else {
+                keptFrameCount++;
+            }
+            framesToKeep.add(currFrame);
+        }
+
+        private boolean currFrameDifferentFromPrev() {
+            FrameDescriptor prevFrame = peekLastFrame();
+            return prevFrame == null
+                    || prevFrame.imageDataLength() != currFrame.imageDataLength()
+                    || !equalBlocks(buf, prevFrame.imageDataStart, currFrame.imageDataStart,
+                        currFrame.imageDataLength());
+        }
+
+        private boolean equalBlocks(ByteBuffer buf, int start1, int start2, int count) {
+            ByteBuffer block1 = buf.duplicate();
+            ByteBuffer block2 = buf.duplicate();
+            block1.position(start1);
+            block2.position(start2);
+            block1.limit(count);
+            block2.limit(count);
+            return block1.equals(block2);
+        }
+
+        int frameCount() {
+            return distinctFrameCount;
+        }
+
+        int keptFrameCount() {
+            return framesToKeep.size();
         }
 
         int firstFrameOffset() {
             return firstFrameOffset;
         }
 
-        int offsetOfFirstFrameToKeep() {
-            return trailingFrameOffsets.peek();
+        int lastFrameDelay() {
+            return delayTime + ANIMATION_DURATION - (keptFrameCount * delayTime);
+        }
+    }
+
+    private static class FrameDescriptor {
+        final int start;
+        byte gcExtPackedFields;
+        byte gcExtTransparentColorIndex;
+        int imageDescStart;
+        int imageDataStart;
+        int end;
+
+        FrameDescriptor(int start) {
+            this.start = start;
+        }
+
+        int imageDataLength() {
+            return end - imageDataStart;
+        }
+
+        void writeGraphicControlExt(ByteBuffer buf, int delayTime) {
+            buf.put((byte) BLOCK_TYPE_EXTENSION);
+            buf.put((byte) EXT_TYPE_GRAPHIC_CONTROL);
+            buf.put((byte) 4); // Graphic Control Extension block size
+            buf.put(gcExtPackedFields);
+            buf.putChar((char) delayTime);
+            buf.put(gcExtTransparentColorIndex);
+            buf.put((byte) 0); // Block Terminator
         }
     }
 }
