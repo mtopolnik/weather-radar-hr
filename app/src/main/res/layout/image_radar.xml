@@ -7,6 +7,5 @@
         android:id="@+id/web_view_radar"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:src="@mipmap/ic_launcher"
     />
 </LinearLayout>

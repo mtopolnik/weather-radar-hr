@@ -31,7 +31,7 @@ public class MainActivity extends FragmentActivity {
 
     static final String LOGTAG = "WeatherRadar";
 
-    static final int LOOP_COUNT = 2;
+    static final int LOOP_COUNT = 20;
     static final int ANIMATION_DURATION = 300;
 
     private static final int BUFSIZ = 512;
@@ -140,6 +140,7 @@ public class MainActivity extends FragmentActivity {
                                }
                                if (countdown.addAndGet(-1) == 0) {
                                    String url = tabHtmlFile(getContext()).toURI().toString();
+                                   webView.clearCache(true);
                                    webView.loadUrl(url);
                                }
                            } catch (Throwable t) {
