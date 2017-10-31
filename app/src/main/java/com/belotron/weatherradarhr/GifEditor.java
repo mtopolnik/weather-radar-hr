@@ -7,19 +7,19 @@ import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import static com.belotron.weatherradarhr.MainActivity.ANIMATION_DURATION;
 import static com.belotron.weatherradarhr.MainActivity.LOGTAG;
+import static com.belotron.weatherradarhr.MainActivity.LOOP_COUNT;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 @SuppressWarnings("MagicNumber")
 class GifEditor {
 
-    private static final int LOOP_COUNT = 50;
     private static final int BLOCK_TYPE_EXTENSION = 0x21;
     private static final int BLOCK_TYPE_IMAGE = 0x2c;
     private static final int BLOCK_TYPE_TRAILER = 0x3b;
     private static final int EXT_TYPE_GRAPHIC_CONTROL = 0xf9;
     private static final int EXT_TYPE_APPLICATION = 0xff;
-    private static final int ANIMATION_DURATION = 350;
 
     private final ByteBuffer buf;
     private final int delayTime;
