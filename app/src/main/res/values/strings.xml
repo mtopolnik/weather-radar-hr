@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Vrijeme na radaru</string>
+    <string name="app_name">aVrijeme na radaru</string>
+    <string name="add_widget">Add widget</string>
 </resources>

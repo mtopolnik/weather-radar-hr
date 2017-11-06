@@ -10,15 +10,55 @@ import java.nio.charset.Charset
 import java.util.*
 
 internal class GifEditor
-private constructor(private val buf: ByteBuffer, private val delayTime: Int, private val framesToKeep: Int) {
+private constructor(
+        private val buf: ByteBuffer,
+        private val delayTime: Int,
+        private val framesToKeep: Int
+) {
+    companion object {
+        private val BLOCK_TYPE_EXTENSION = 0x21
+        private val BLOCK_TYPE_IMAGE = 0x2c
+        private val BLOCK_TYPE_TRAILER = 0x3b
+        private val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
+        private val EXT_TYPE_APPLICATION = 0xff
+
+        fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
+            GifEditor(buf, delayTime, framesToKeep).go()
+        }
+
+        fun checkGif(buf: ByteBuffer) {
+            GifEditor(buf, 0, 1).parseGif()
+        }
+
+        private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
+            if (srcPos == dest.position()) {
+                return
+            }
+            val len = srcLimit - srcPos
+            System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
+            dest.position(dest.position() + len)
+        }
+
+        private fun toUnsignedInt(b: Int): Int {
+            return b and 0xff
+        }
+
+        private fun writeLoopingExtension(buf: ByteBuffer) {
+            buf.put(BLOCK_TYPE_EXTENSION.toByte())
+            buf.put(EXT_TYPE_APPLICATION.toByte())
+            buf.put(11.toByte()) // Application Extension block size
+            buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
+            buf.put(3.toByte()) // Netscape Looping Extension block size
+            buf.put(1.toByte()) // Looping Sub-Block ID
+            buf.putChar(LOOP_COUNT.toChar())
+            buf.put(0.toByte()) // Terminator byte
+        }
+    }
 
     private fun go() {
         buf.order(LITTLE_ENDIAN)
         val frameList = parseGif()
-//        Log.i(LOGTAG, "***************** rewrite buffer **************")
         rewriteFramesInBuffer(frameList)
-//        buf.rewind();
-//        parseGif();
         buf.rewind()
     }
 
@@ -55,25 +95,25 @@ private constructor(private val buf: ByteBuffer, private val delayTime: Int, pri
                     val extensionLabel = nextByte()
                     when (extensionLabel) {
                         EXT_TYPE_APPLICATION -> {
-                            Log.i(LOGTAG, "Application extension at " + blockPos)
+                            MyLog.d("Application extension at %d", blockPos)
                             parseApplicationExtension()
                         }
                         EXT_TYPE_GRAPHIC_CONTROL -> {
-                            Log.i(LOGTAG, "Graphic control ext at " + blockPos)
+                            MyLog.d("Graphic control ext at %d", blockPos)
                             frameList.acceptGraphicControlExt()
                         }
                         else -> {
-                            Log.i(LOGTAG, String.format("Ext 0x%02x at %d", extensionLabel, blockPos))
+                            MyLog.d("Ext 0x%02x at %d", extensionLabel, blockPos)
                             logSubBlocks()
                         }
                     }
                 }
                 BLOCK_TYPE_IMAGE -> {
-                    Log.i(LOGTAG, "Image desc at " + blockPos)
+                    MyLog.d("Image desc at %d", blockPos)
                     frameList.acceptImageDescriptor()
                 }
                 BLOCK_TYPE_TRAILER -> {
-                    Log.i(LOGTAG, "Trailer at " + blockPos)
+                    MyLog.d("Trailer at %d", blockPos)
                     buf.limit(buf.position())
                     break@readingLoop
                 }
@@ -95,14 +135,14 @@ private constructor(private val buf: ByteBuffer, private val delayTime: Int, pri
                 if (subBlockId == 1) {
                     if (len != 3) throw AssertionError("Invalid Netscape Looping Extension block size: " + len)
                     val loopCount = buf.char.toInt()
-                    Log.i(LOGTAG, "Netscape Extension Loop Count " + loopCount)
+                    MyLog.d("Netscape Extension Loop Count %d", loopCount)
                     val terminatorByte = nextByte()
                     if (terminatorByte != 0) throw AssertionError("Invalid terminator byte " + terminatorByte)
                 }
                 return
             }
             else -> {
-                Log.i(LOGTAG, "Application Identifier: " + appId)
+                MyLog.d("Application Identifier %d", appId)
                 skipSubBlocks()
             }
         }
@@ -136,7 +176,7 @@ private constructor(private val buf: ByteBuffer, private val delayTime: Int, pri
         while (true) {
             val len = nextByte();
             if (len == 0) break
-            Log.i(LOGTAG, "sub-block " + getString(len))
+            MyLog.d("sub-block ", getString(len))
         }
     }
 
@@ -209,7 +249,7 @@ private constructor(private val buf: ByteBuffer, private val delayTime: Int, pri
                 addFrame()
                 distinctFrameCount++
             } else {
-                Log.i(LOGTAG, "Dropping identical frame")
+                MyLog.d("Dropping identical frame")
             }
             currFrame = null
         }
@@ -285,43 +325,6 @@ private constructor(private val buf: ByteBuffer, private val delayTime: Int, pri
             buf.putChar(delayTime.toChar())
             buf.put(gcExtTransparentColorIndex)
             buf.put(0.toByte()) // Block Terminator
-        }
-    }
-
-    companion object {
-
-        private val BLOCK_TYPE_EXTENSION = 0x21
-        private val BLOCK_TYPE_IMAGE = 0x2c
-        private val BLOCK_TYPE_TRAILER = 0x3b
-        private val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
-        private val EXT_TYPE_APPLICATION = 0xff
-
-        fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
-            GifEditor(buf, delayTime, framesToKeep).go()
-        }
-
-        private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
-            if (srcPos == dest.position()) {
-                return
-            }
-            val len = srcLimit - srcPos
-            System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
-            dest.position(dest.position() + len)
-        }
-
-        private fun toUnsignedInt(b: Int): Int {
-            return b and 0xff
-        }
-
-        private fun writeLoopingExtension(buf: ByteBuffer) {
-            buf.put(BLOCK_TYPE_EXTENSION.toByte())
-            buf.put(EXT_TYPE_APPLICATION.toByte())
-            buf.put(11.toByte()) // Application Extension block size
-            buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
-            buf.put(3.toByte()) // Netscape Looping Extension block size
-            buf.put(1.toByte()) // Looping Sub-Block ID
-            buf.putChar(LOOP_COUNT.toChar())
-            buf.put(0.toByte()) // Terminator byte
         }
     }
 }

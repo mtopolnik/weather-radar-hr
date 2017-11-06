@@ -1,13 +1,15 @@
 package com.belotron.weatherradarhr
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
 import android.support.v4.app.FragmentManager
 import android.support.v4.app.FragmentPagerAdapter
 import android.support.v4.view.ViewPager
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,15 +17,42 @@ import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
 import com.belotron.weatherradarhr.GifEditor.Companion.editGif
-import com.koushikdutta.async.future.FutureCallback
-import com.koushikdutta.ion.Ion
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions.signatureOf
+import com.bumptech.glide.request.target.SimpleTarget
+import com.bumptech.glide.request.transition.Transition
+import com.bumptech.glide.signature.ObjectKey
 import java.io.*
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
 class MainActivity : FragmentActivity() {
+    companion object {
 
+        internal val LOGTAG = "WeatherRadar"
+
+        internal val LOOP_COUNT = 20
+        internal val ANIMATION_DURATION = 250
+
+        private val BUFSIZ = 512
+        private val ANIMATION_COVERS_MINUTES = 100
+
+        private val images = arrayOf(
+                ImgDescriptor("Lisca",
+                        "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
+                        10)
+                ,
+                ImgDescriptor("Puntijarka-Bilogora-Osijek",
+                        "http://vrijeme.hr/kradar-anim.gif",
+                        15)
+//                ,
+//                ImgDescriptor("Dubrovnik",
+//                        "http://vrijeme.hr/dradar-anim.gif",
+//                        15)
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,36 +104,47 @@ class MainActivity : FragmentActivity() {
 
         override fun onResume() {
             super.onResume()
+            MyLog.w("onResume")
+            triggerWidgetUpdate()
             reloadImages()
+        }
+
+        private fun triggerWidgetUpdate() {
+            val intent = Intent(context, MyWidgetProvider::class.java)
+            intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val widgetIDs = AppWidgetManager.getInstance(context)
+                    .getAppWidgetIds(ComponentName(context, MyWidgetProvider::class.java))
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIDs)
+            context.sendBroadcast(intent)
         }
 
         private fun reloadImages() {
             val countdown = AtomicInteger(images.size)
             for (desc in images) {
-                Ion.with(context)
-                        .load(desc.url)
-                        .asByteArray()
-                        .setCallback(FutureCallback { _, result ->
-                            if (result == null) {
-                                Log.e(LOGTAG, "Couldn't load URL " + desc.url)
-                                return@FutureCallback
-                            }
-                            try {
-                                val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
-                                val buf = ByteBuffer.wrap(result)
-                                editGif(buf, frameDelay, desc.framesToKeep)
-                                val gifFile = File(context.noBackupFilesDir, desc.filename())
-                                    FileOutputStream(gifFile).use { out ->
-                                        out.write(buf.array(), buf.position(), buf.remaining()) }
-                                if (countdown.addAndGet(-1) == 0) {
-                                    val url = tabHtmlFile(context).toURI().toString()
-                                    webView!!.clearCache(true)
-                                    webView!!.loadUrl(url)
+                    Glide.with(context)
+                            .downloadOnly()
+                            .load(desc.url)
+                            .apply(signatureOf(ObjectKey(TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()))))
+                            .into(object : SimpleTarget<File>() {
+                                override fun onResourceReady(resource: File, transition: Transition<in File>?) {
+                                    try {
+                                        val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
+                                        val bytes = FileInputStream(resource).readBytes()
+                                        val buf = ByteBuffer.wrap(bytes)
+                                        editGif(buf, frameDelay, desc.framesToKeep)
+                                        val gifFile = File(context.noBackupFilesDir, desc.filename())
+                                        FileOutputStream(gifFile).use { out ->
+                                            out.write(buf.array(), buf.position(), buf.remaining()) }
+                                        if (countdown.addAndGet(-1) == 0) {
+                                            val url = tabHtmlFile(context).toURI().toString()
+                                            webView!!.clearCache(true)
+                                            webView!!.loadUrl(url)
+                                        }
+                                    } catch (t: Throwable) {
+                                        MyLog.e("Error loading GIF " + desc.filename(), t)
+                                    }
                                 }
-                            } catch (t: Throwable) {
-                                Log.e(LOGTAG, "Error loading GIF " + desc.filename(), t)
-                            }
-                        })
+                            })
             }
         }
 
@@ -155,30 +195,5 @@ class MainActivity : FragmentActivity() {
         internal fun filename(): String {
             return url.substring(url.lastIndexOf('/') + 1, url.length)
         }
-    }
-
-    companion object {
-
-        internal val LOGTAG = "WeatherRadar"
-
-        internal val LOOP_COUNT = 20
-        internal val ANIMATION_DURATION = 300
-
-        private val BUFSIZ = 512
-        private val ANIMATION_COVERS_MINUTES = 100
-
-        private val images = arrayOf(
-                ImgDescriptor("Lisca",
-                        "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
-                        10)
-                ,
-                ImgDescriptor("Puntijarka-Bilogora-Osijek",
-                        "http://vrijeme.hr/kradar-anim.gif",
-                        15)
-//                ,
-//                ImgDescriptor("Dubrovnik",
-//                        "http://vrijeme.hr/dradar-anim.gif",
-//                        15)
-        )
     }
 }
