@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr
 
 import android.util.Log
-import com.belotron.weatherradarhr.MainActivity.Companion.LOGTAG
 
 object MyLog {
     fun d(arg : String) {

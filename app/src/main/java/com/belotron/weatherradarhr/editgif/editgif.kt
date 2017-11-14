@@ -1,82 +1,43 @@
-package com.belotron.weatherradarhr
+package com.belotron.weatherradarhr.editgif
 
-import android.util.Log
-import com.belotron.weatherradarhr.MainActivity.Companion.ANIMATION_DURATION
-import com.belotron.weatherradarhr.MainActivity.Companion.LOGTAG
-import com.belotron.weatherradarhr.MainActivity.Companion.LOOP_COUNT
+import com.belotron.weatherradarhr.ANIMATION_DURATION
+import com.belotron.weatherradarhr.LOOP_COUNT
+import com.belotron.weatherradarhr.MyLog
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
 import java.nio.charset.Charset
 import java.util.*
 
-internal class GifEditor
-private constructor(
+fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
+    GifEditor(buf, delayTime, framesToKeep).go()
+}
+
+fun checkGif(buf: ByteBuffer) {
+    GifEditor(buf, 0, 1).checkGif()
+}
+
+private const val BLOCK_TYPE_EXTENSION = 0x21
+private const val BLOCK_TYPE_IMAGE = 0x2c
+private const val BLOCK_TYPE_TRAILER = 0x3b
+private const val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
+private const val EXT_TYPE_APPLICATION = 0xff
+
+private class GifEditor
+constructor(
         private val buf: ByteBuffer,
         private val delayTime: Int,
         private val framesToKeep: Int
 ) {
-    companion object {
-        private val BLOCK_TYPE_EXTENSION = 0x21
-        private val BLOCK_TYPE_IMAGE = 0x2c
-        private val BLOCK_TYPE_TRAILER = 0x3b
-        private val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
-        private val EXT_TYPE_APPLICATION = 0xff
 
-        fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
-            GifEditor(buf, delayTime, framesToKeep).go()
-        }
-
-        fun checkGif(buf: ByteBuffer) {
-            GifEditor(buf, 0, 1).parseGif()
-        }
-
-        private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
-            if (srcPos == dest.position()) {
-                return
-            }
-            val len = srcLimit - srcPos
-            System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
-            dest.position(dest.position() + len)
-        }
-
-        private fun toUnsignedInt(b: Int): Int {
-            return b and 0xff
-        }
-
-        private fun writeLoopingExtension(buf: ByteBuffer) {
-            buf.put(BLOCK_TYPE_EXTENSION.toByte())
-            buf.put(EXT_TYPE_APPLICATION.toByte())
-            buf.put(11.toByte()) // Application Extension block size
-            buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
-            buf.put(3.toByte()) // Netscape Looping Extension block size
-            buf.put(1.toByte()) // Looping Sub-Block ID
-            buf.putChar(LOOP_COUNT.toChar())
-            buf.put(0.toByte()) // Terminator byte
-        }
-    }
-
-    private fun go() {
+    fun go() {
         buf.order(LITTLE_ENDIAN)
         val frameList = parseGif()
         rewriteFramesInBuffer(frameList)
         buf.rewind()
     }
 
-    private fun rewriteFramesInBuffer(frameList: FrameList) {
-        val sourceBuf = buf.duplicate()
-        sourceBuf.order(LITTLE_ENDIAN)
-        val destBuf = buf.duplicate()
-        destBuf.order(LITTLE_ENDIAN)
-        destBuf.position(frameList.firstFrameOffset())
-        writeLoopingExtension(destBuf)
-        while (true) {
-            val frame = frameList.popNextFrame() ?: break
-            val onLastFrame = frameList.peekLastFrame() == null
-            frame.writeGraphicControlExt(destBuf, if (onLastFrame) frameList.lastFrameDelay() else delayTime)
-            copy(sourceBuf, frame.imageDescStart, frame.end, destBuf)
-        }
-        destBuf.put(BLOCK_TYPE_TRAILER.toByte())
-        buf.limit(destBuf.position())
+    fun checkGif() {
+        parseGif()
     }
 
     private fun parseGif(): FrameList {
@@ -122,6 +83,23 @@ private constructor(
             }
         }
         return frameList
+    }
+
+    private fun rewriteFramesInBuffer(frameList: FrameList) {
+        val sourceBuf = buf.duplicate()
+        sourceBuf.order(LITTLE_ENDIAN)
+        val destBuf = buf.duplicate()
+        destBuf.order(LITTLE_ENDIAN)
+        destBuf.position(frameList.firstFrameOffset())
+        writeLoopingExtension(destBuf)
+        while (true) {
+            val frame = frameList.popNextFrame() ?: break
+            val onLastFrame = frameList.peekLastFrame() == null
+            frame.writeGraphicControlExt(destBuf, if (onLastFrame) frameList.lastFrameDelay() else delayTime)
+            copy(sourceBuf, frame.imageDescStart, frame.end, destBuf)
+        }
+        destBuf.put(BLOCK_TYPE_TRAILER.toByte())
+        buf.limit(destBuf.position())
     }
 
     private fun parseApplicationExtension() {
@@ -198,7 +176,31 @@ private constructor(
         }
     }
 
-    private inner class FrameList internal constructor(private val frameCountToKeep: Int) {
+    private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
+        if (srcPos == dest.position()) {
+            return
+        }
+        val len = srcLimit - srcPos
+        System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
+        dest.position(dest.position() + len)
+    }
+
+    private fun toUnsignedInt(b: Int): Int {
+        return b and 0xff
+    }
+
+    private fun writeLoopingExtension(buf: ByteBuffer) {
+        buf.put(BLOCK_TYPE_EXTENSION.toByte())
+        buf.put(EXT_TYPE_APPLICATION.toByte())
+        buf.put(11.toByte()) // Application Extension block size
+        buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
+        buf.put(3.toByte()) // Netscape Looping Extension block size
+        buf.put(1.toByte()) // Looping Sub-Block ID
+        buf.putChar(LOOP_COUNT.toChar())
+        buf.put(0.toByte()) // Terminator byte
+    }
+
+    private inner class FrameList constructor(private val frameCountToKeep: Int) {
         private val framesToKeep: Deque<FrameDescriptor>
         private var firstFrameOffset = -1
         private var frameInProgress = false
@@ -210,7 +212,7 @@ private constructor(
             this.framesToKeep = ArrayDeque(frameCountToKeep)
         }
 
-        internal fun acceptBlockStart() {
+        fun acceptBlockStart() {
             val offset = buf.position()
             if (firstFrameOffset == -1) {
                 firstFrameOffset = offset
@@ -222,7 +224,7 @@ private constructor(
             frameInProgress = blockType != BLOCK_TYPE_IMAGE
         }
 
-        internal fun acceptGraphicControlExt() {
+        fun acceptGraphicControlExt() {
             val blockSize = nextByte()
             if (blockSize != 4) {
                 throw AssertionError("Invalid Graphic Control Extension block size: " + blockSize)
@@ -236,7 +238,7 @@ private constructor(
             }
         }
 
-        internal fun acceptImageDescriptor() {
+        fun acceptImageDescriptor() {
             currFrame!!.imageDescStart = buf.position() - 1
             skip(8) // image position and size
             val packedFields = nextByte()
@@ -254,11 +256,11 @@ private constructor(
             currFrame = null
         }
 
-        internal fun popNextFrame(): FrameDescriptor? {
+        fun popNextFrame(): FrameDescriptor? {
             return framesToKeep.poll()
         }
 
-        internal fun peekLastFrame(): FrameDescriptor? {
+        fun peekLastFrame(): FrameDescriptor? {
             return framesToKeep.peekLast()
         }
 
@@ -289,35 +291,35 @@ private constructor(
             return block1 == block2
         }
 
-        internal fun frameCount(): Int {
+        fun frameCount(): Int {
             return distinctFrameCount
         }
 
-        internal fun keptFrameCount(): Int {
+        fun keptFrameCount(): Int {
             return framesToKeep.size
         }
 
-        internal fun firstFrameOffset(): Int {
+        fun firstFrameOffset(): Int {
             return firstFrameOffset
         }
 
-        internal fun lastFrameDelay(): Int {
+        fun lastFrameDelay(): Int {
             return delayTime + ANIMATION_DURATION - keptFrameCount * delayTime
         }
     }
 
-    private class FrameDescriptor internal constructor(internal val start: Int) {
-        internal var gcExtPackedFields: Byte = 0
-        internal var gcExtTransparentColorIndex: Byte = 0
-        internal var imageDescStart: Int = 0
-        internal var imageDataStart: Int = 0
-        internal var end: Int = 0
+    private class FrameDescriptor constructor(internal val start: Int) {
+        var gcExtPackedFields: Byte = 0
+        var gcExtTransparentColorIndex: Byte = 0
+        var imageDescStart: Int = 0
+        var imageDataStart: Int = 0
+        var end: Int = 0
 
-        internal fun imageDataLength(): Int {
+        fun imageDataLength(): Int {
             return end - imageDataStart
         }
 
-        internal fun writeGraphicControlExt(buf: ByteBuffer, delayTime: Int) {
+        fun writeGraphicControlExt(buf: ByteBuffer, delayTime: Int) {
             buf.put(BLOCK_TYPE_EXTENSION.toByte())
             buf.put(EXT_TYPE_GRAPHIC_CONTROL.toByte())
             buf.put(4.toByte()) // Graphic Control Extension block size
@@ -327,4 +329,29 @@ private constructor(
             buf.put(0.toByte()) // Block Terminator
         }
     }
+}
+
+
+private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
+    if (srcPos == dest.position()) {
+        return
+    }
+    val len = srcLimit - srcPos
+    System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
+    dest.position(dest.position() + len)
+}
+
+private fun toUnsignedInt(b: Int): Int {
+    return b and 0xff
+}
+
+private fun writeLoopingExtension(buf: ByteBuffer) {
+    buf.put(BLOCK_TYPE_EXTENSION.toByte())
+    buf.put(EXT_TYPE_APPLICATION.toByte())
+    buf.put(11.toByte()) // Application Extension block size
+    buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
+    buf.put(3.toByte()) // Netscape Looping Extension block size
+    buf.put(1.toByte()) // Looping Sub-Block ID
+    buf.putChar(LOOP_COUNT.toChar())
+    buf.put(0.toByte()) // Terminator byte
 }

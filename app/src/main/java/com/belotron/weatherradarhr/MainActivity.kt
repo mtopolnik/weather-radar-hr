@@ -16,44 +16,14 @@ import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
-import com.belotron.weatherradarhr.GifEditor.Companion.editGif
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.RequestOptions.signatureOf
-import com.bumptech.glide.request.target.SimpleTarget
-import com.bumptech.glide.request.transition.Transition
-import com.bumptech.glide.signature.ObjectKey
+import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
+import com.belotron.weatherradarhr.editgif.editGif
 import java.io.*
 import java.nio.ByteBuffer
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
 class MainActivity : FragmentActivity() {
-    companion object {
-
-        internal val LOGTAG = "WeatherRadar"
-
-        internal val LOOP_COUNT = 20
-        internal val ANIMATION_DURATION = 250
-
-        private val BUFSIZ = 512
-        private val ANIMATION_COVERS_MINUTES = 100
-
-        private val images = arrayOf(
-                ImgDescriptor("Lisca",
-                        "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
-                        10)
-                ,
-                ImgDescriptor("Puntijarka-Bilogora-Osijek",
-                        "http://vrijeme.hr/kradar-anim.gif",
-                        15)
-//                ,
-//                ImgDescriptor("Dubrovnik",
-//                        "http://vrijeme.hr/dradar-anim.gif",
-//                        15)
-        )
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
@@ -121,30 +91,22 @@ class MainActivity : FragmentActivity() {
         private fun reloadImages() {
             val countdown = AtomicInteger(images.size)
             for (desc in images) {
-                    Glide.with(context)
-                            .downloadOnly()
-                            .load(desc.url)
-                            .apply(signatureOf(ObjectKey(TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()))))
-                            .into(object : SimpleTarget<File>() {
-                                override fun onResourceReady(resource: File, transition: Transition<in File>?) {
-                                    try {
-                                        val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
-                                        val bytes = FileInputStream(resource).readBytes()
-                                        val buf = ByteBuffer.wrap(bytes)
-                                        editGif(buf, frameDelay, desc.framesToKeep)
-                                        val gifFile = File(context.noBackupFilesDir, desc.filename())
-                                        FileOutputStream(gifFile).use { out ->
-                                            out.write(buf.array(), buf.position(), buf.remaining()) }
-                                        if (countdown.addAndGet(-1) == 0) {
-                                            val url = tabHtmlFile(context).toURI().toString()
-                                            webView!!.clearCache(true)
-                                            webView!!.loadUrl(url)
-                                        }
-                                    } catch (t: Throwable) {
-                                        MyLog.e("Error loading GIF " + desc.filename(), t)
-                                    }
-                                }
-                            })
+                sendImageRequest(context, desc.url, onSuccess = {
+                    val buf = ByteBuffer.wrap(it)
+                    val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
+                    editGif(buf, frameDelay, desc.framesToKeep)
+                    val gifFile = File(context.noBackupFilesDir, desc.filename())
+                    FileOutputStream(gifFile).use { out ->
+                        out.write(buf.array(), buf.position(), buf.remaining())
+                    }
+                }, onCompletion = lambda@ {
+                    if (countdown.addAndGet(-1) != 0) {
+                        return@lambda
+                    }
+                    val url = tabHtmlFile(context).toURI().toString()
+                    webView!!.clearCache(true)
+                    webView!!.loadUrl(url)
+                })
             }
         }
 
@@ -185,15 +147,6 @@ class MainActivity : FragmentActivity() {
 
         private fun tabHtmlFile(context: Context): File {
             return File(context.noBackupFilesDir, "tab0.html")
-        }
-    }
-
-    private class ImgDescriptor
-    internal constructor(internal val title: String, internal val url: String, internal val minutesPerFrame: Int) {
-        internal val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
-
-        internal fun filename(): String {
-            return url.substring(url.lastIndexOf('/') + 1, url.length)
         }
     }
 }
