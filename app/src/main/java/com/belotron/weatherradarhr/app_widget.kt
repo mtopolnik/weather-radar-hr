@@ -1,7 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.app.job.JobInfo
+import android.app.job.JobParameters
 import android.app.job.JobScheduler
+import android.app.job.JobService
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
@@ -19,7 +21,7 @@ class MyWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         MyLog.w("onUpdate")
-        sendImageRequest(context.applicationContext, APPWIDGET_IMG_URL,
+        sendImageRequest(context.applicationContext, APPWIDGET_IMG_URL, useIfModifiedSince = false,
                 onSuccess = { updateRemoteViews(context, it) })
         val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
         jobScheduler.schedule(JobInfo.Builder(SCHEDULED_JOB_ID,
@@ -30,3 +32,17 @@ class MyWidgetProvider : AppWidgetProvider() {
     }
 }
 
+class UpdateWidgetService : JobService() {
+    override fun onStartJob(params: JobParameters): Boolean {
+        MyLog.i("UpdateWidgetService start job")
+        sendImageRequest(applicationContext, APPWIDGET_IMG_URL,
+                onSuccess = { updateRemoteViews(applicationContext, it) },
+                onCompletion = { jobFinished(params, false) })
+        return true
+    }
+
+    override fun onStopJob(params: JobParameters): Boolean {
+        MyLog.i("UpdateWidgetService stop job")
+        return true;
+    }
+}

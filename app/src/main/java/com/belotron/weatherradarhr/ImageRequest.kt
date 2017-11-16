@@ -16,11 +16,14 @@ object ImageRequest {
 
     fun sendImageRequest(context : Context,
                          url : String,
+                         useIfModifiedSince : Boolean = true,
                          onSuccess : (ByteArray) -> Unit = {},
                          onCompletion : () -> Unit = {}
     ) {
-        client.get(context, url, arrayOf(BasicHeader("If-Modified-Since", findLastModified(url))),
-                RequestParams(), ResponseHandler(url, onSuccess, onCompletion))
+        val headers =
+                if (useIfModifiedSince) arrayOf(BasicHeader("If-Modified-Since", findLastModified(url)))
+                else arrayOf()
+        client.get(context, url, headers, RequestParams(), ResponseHandler(url, onSuccess, onCompletion))
     }
 
     class ResponseHandler(
@@ -29,10 +32,10 @@ object ImageRequest {
             private val onCompletion: () -> Unit
     ) : AsyncHttpResponseHandler() {
         override fun onSuccess(statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?) {
-            MyLog.i("""Modified since ${findLastModified(url)}""")
             headers.find { it.name == "Last-Modified" }?.apply {
                 urlToLastModified[url] = value
             }
+            MyLog.i("""Last modified ${urlToLastModified[url]}""")
             onSuccess(responseBody!!)
             onCompletion()
         }

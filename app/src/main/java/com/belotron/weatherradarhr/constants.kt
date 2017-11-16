@@ -34,10 +34,7 @@ val images = arrayOf(
 
 class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
-
-    fun filename(): String {
-        return url.substring(url.lastIndexOf('/') + 1, url.length)
-    }
+    val filename = url.substring(url.lastIndexOf('/') + 1, url.length)
 }
 
 

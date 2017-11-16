@@ -23,6 +23,8 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
+const val LOADING_HTML = "loading.html"
+
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,9 +36,9 @@ class MainActivity : FragmentActivity() {
 
     private class FlipThroughRadarImages internal constructor(fm: FragmentManager) : FragmentPagerAdapter(fm) {
 
-        override fun getPageTitle(position: Int): CharSequence {
-            return images[position].title
-        }
+        override fun getCount() = 1
+
+        override fun getPageTitle(position: Int) = "Radar"
 
         override fun getItem(i: Int): Fragment {
             when (i) {
@@ -44,31 +46,29 @@ class MainActivity : FragmentActivity() {
                 else -> throw AssertionError("Invalid tab index: " + i)
             }
         }
-
-        override fun getCount(): Int {
-            return 1
-        }
     }
 
     class RadarImageFragment : Fragment() {
 
         private var webView: WebView? = null
 
-        override fun onCreateView(inflater: LayoutInflater,
-                                  container: ViewGroup?,
-                                  savedInstanceState: Bundle?
+        override fun onCreateView(
+                inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
         ): View {
             val rootView = inflater.inflate(R.layout.image_radar, container, false)
-            webView = rootView.findViewById(R.id.web_view_radar)
-            val s = webView!!.settings
+            webView = rootView.findViewById(R.id.web_view_radar)!!
+            val webView = webView!!
+            val s = webView.settings
             s.setSupportZoom(true)
             s.builtInZoomControls = true
             s.displayZoomControls = false
             s.useWideViewPort = true
             s.loadWithOverviewMode = true
             s.cacheMode = LOAD_NO_CACHE
+            val loadingHtml = File(context.noBackupFilesDir, LOADING_HTML)
+            context.assets.open(LOADING_HTML).use { it.copyTo(FileOutputStream(loadingHtml)) }
+            webView.loadUrl(loadingHtml.toURI().toString())
             writeTabHtml()
-            reloadImages()
             return rootView
         }
 
@@ -95,7 +95,7 @@ class MainActivity : FragmentActivity() {
                     val buf = ByteBuffer.wrap(it)
                     val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
                     editGif(buf, frameDelay, desc.framesToKeep)
-                    val gifFile = File(context.noBackupFilesDir, desc.filename())
+                    val gifFile = File(context.noBackupFilesDir, desc.filename)
                     FileOutputStream(gifFile).use { out ->
                         out.write(buf.array(), buf.position(), buf.remaining())
                     }
@@ -104,8 +104,9 @@ class MainActivity : FragmentActivity() {
                         return@lambda
                     }
                     val url = tabHtmlFile(context).toURI().toString()
-                    webView!!.clearCache(true)
-                    webView!!.loadUrl(url)
+                    val webView = webView!!
+                    webView.clearCache(true)
+                    webView.loadUrl(url)
                 })
             }
         }
@@ -136,7 +137,7 @@ class MainActivity : FragmentActivity() {
             while (m.find()) {
                 val k = m.group(1)
                 if (k.matches("imageFilename(\\d+)".toRegex())) {
-                    m.appendReplacement(sb, images[Integer.parseInt(k.substring(13, k.length))].filename())
+                    m.appendReplacement(sb, images[Integer.parseInt(k.substring(13, k.length))].filename)
                 } else {
                     throw AssertionError("Invalid key in HTML template: " + k)
                 }
@@ -145,8 +146,6 @@ class MainActivity : FragmentActivity() {
             return sb.toString()
         }
 
-        private fun tabHtmlFile(context: Context): File {
-            return File(context.noBackupFilesDir, "tab0.html")
-        }
+        private fun tabHtmlFile(context: Context) = File(context.noBackupFilesDir, "tab0.html")
     }
 }
