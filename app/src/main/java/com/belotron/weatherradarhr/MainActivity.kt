@@ -24,6 +24,7 @@ const val LOADING_HTML = "loading.html"
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LRadarOCR.initDigitBitmaps(applicationContext)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         val viewPager = findViewById<ViewPager>(R.id.pager)

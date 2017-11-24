@@ -1,6 +1,8 @@
 package com.belotron.weatherradarhr
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import com.loopj.android.http.AsyncHttpResponseHandler
 import com.loopj.android.http.RequestParams
 import cz.msebera.android.httpclient.Header
@@ -10,6 +12,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
 val LAST_MODIFIED_REGEX = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
+
+fun ByteArray.toBitmap() : Bitmap =
+        BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 
 object ImageRequest {
     private val urlToLastModified = ConcurrentHashMap<String, String>()

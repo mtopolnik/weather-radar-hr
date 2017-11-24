@@ -10,10 +10,14 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.text.format.DateUtils.DAY_IN_MILLIS
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.formatElapsedTime
+import android.text.format.DateUtils.getRelativeDateTimeString
 import android.widget.RemoteViews
 import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
+import com.belotron.weatherradarhr.LRadarOCR.ocrLradarTimestamp
 import java.lang.System.currentTimeMillis
 import java.util.Calendar
 import java.util.TimeZone
@@ -24,24 +28,49 @@ const val SECS_IN_HOUR = 3600L
 const val SECS_IN_MINUTE = 60L
 const val IMAGE_UPDATE_PERIOD_MINUTES = 10L
 const val RETRY_PERIOD_MINUTES = 10L
-const val SCHEDULED_JOB_ID = 700713272
+const val REFRESH_IMAGE_JOB_ID = 700713272
+const val UPDATE_AGE_JOB_ID = 700713273
+
+private var lradarBitmap : BitmapWithTimestamp? = null
 
 class MyWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         MyLog.w("onUpdate")
+        LRadarOCR.initDigitBitmaps(context)
         updateWidgetAndScheduleNext(context.applicationContext, useIfModifiedSince = false)
+        val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        jobScheduler.cancel(UPDATE_AGE_JOB_ID)
+        jobScheduler.schedule(
+                JobInfo.Builder(UPDATE_AGE_JOB_ID, ComponentName(context, UpdateAgeService::class.java))
+                        .setPeriodic(MINUTE_IN_MILLIS)
+                        .build())
     }
 }
 
-class UpdateWidgetService : JobService() {
+class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
-        MyLog.i("UpdateWidgetService start job")
+        MyLog.i("RefreshImageService start job")
         updateWidgetAndScheduleNext(applicationContext, onCompletion = { jobFinished(params, false) })
         return true
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        MyLog.i("UpdateWidgetService stop job")
+        MyLog.i("RefreshImageService stop job")
+        return true
+    }
+}
+
+class UpdateAgeService : JobService() {
+    override fun onStartJob(params: JobParameters): Boolean {
+        MyLog.i("UpdateAgeService start job")
+        if (lradarBitmap != null) {
+            updateRemoteViews(applicationContext)
+        }
+        return false
+    }
+
+    override fun onStopJob(params: JobParameters): Boolean {
+        MyLog.i("UpdateAgeService stop job")
         return true
     }
 }
@@ -55,7 +84,8 @@ fun updateWidgetAndScheduleNext(context: Context,
             useIfModifiedSince = useIfModifiedSince,
             //                      seconds past full hour
             onSuccess = { imgBytes, lastModified ->
-                updateRemoteViews(context, imgBytes)
+                lradarBitmap = BitmapWithTimestamp(imgBytes.toBitmap())
+                updateRemoteViews(context)
                 scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, IMAGE_UPDATE_PERIOD_MINUTES))
             },
             onNotModified = {
@@ -68,14 +98,52 @@ fun updateWidgetAndScheduleNext(context: Context,
             onCompletion = onCompletion)
 }
 
-private fun hourRelativeCurrentTime() : Long {
-    val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-    cal.timeInMillis = currentTimeMillis()
-    return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
+private fun updateRemoteViews(context : Context) {
+    val lradarBitmap = lradarBitmap!!
+    val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
+    remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
+    val ageString = getRelativeDateTimeString(context, lradarBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
+    remoteViews.setImageViewBitmap(R.id.img_view_widget, lradarBitmap.bitmap)
+    remoteViews.setTextViewText(R.id.text_view_widget, ageString)
+    AppWidgetManager.getInstance(context)
+            .updateAppWidget(ComponentName(context, MyWidgetProvider::class.java), remoteViews)
+    MyLog.i("Updated App Widget")
+}
+
+private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, latencyMillis: Long) {
+    if (!reallyDoIt) {
+        return
+    }
+    val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+    jobScheduler.cancel(REFRESH_IMAGE_JOB_ID)
+    val resultCode = jobScheduler.schedule(
+            JobInfo.Builder(REFRESH_IMAGE_JOB_ID, ComponentName(context, RefreshImageService::class.java))
+                    .setMinimumLatency(latencyMillis)
+                    .build())
+    reportScheduleResult(latencyMillis, resultCode)
+}
+
+private fun reportScheduleResult(minLatency: Long, resultCode: Int) {
+    val minLatencyStr = formatElapsedTime(MILLISECONDS.toSeconds(minLatency))
+    when (resultCode) {
+        JobScheduler.RESULT_SUCCESS -> MyLog.i(
+                """Scheduled to update widget after $minLatencyStr minutes""")
+        JobScheduler.RESULT_FAILURE -> MyLog.e(
+                """Failed to schedule widget update after $minLatencyStr minutes""")
+        else -> throw AssertionError("""Unknown scheduler result code $resultCode""")
+    }
+}
+
+private fun onClickIntent(context: Context): PendingIntent {
+    val intent = Intent(context, MainActivity::class.java)
+    intent.addCategory("android.intent.category.LAUNCHER")
+    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+    intent.component = ComponentName(context.packageName, MainActivity::class.java.name)
+    return PendingIntent.getActivity(context, 0, intent, 0)
 }
 
 /**
- * @param lastModified last modified time, seconds past full hour
+ * @param lastModified last modified time in seconds past full hour
  */
 private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long) : Long {
     require(updateIntervalMinutes in 0 until 60, { """updateInterval out of range: $updateIntervalMinutes""" })
@@ -89,41 +157,16 @@ private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long)
                             else RETRY_PERIOD_MINUTES * SECS_IN_MINUTE)
 }
 
-private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, minLatency: Long) {
-    if (!reallyDoIt) {
-        return
-    }
-    val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-    jobScheduler.cancel(SCHEDULED_JOB_ID)
-    val resultCode = jobScheduler.schedule(
-            JobInfo.Builder(SCHEDULED_JOB_ID, ComponentName(context, UpdateWidgetService::class.java))
-                    .setMinimumLatency(minLatency)
-                    .build())
-    val minLatencyStr = formatElapsedTime(MILLISECONDS.toSeconds(minLatency))
-    when (resultCode) {
-        JobScheduler.RESULT_SUCCESS -> MyLog.i(
-                """Scheduled to update widget after $minLatencyStr minutes""")
-        JobScheduler.RESULT_FAILURE -> MyLog.e(
-                """Failed to schedule widget update after $minLatencyStr minutes""")
-        else -> throw AssertionError("""Unknown scheduler result code $resultCode""")
-    }
+private fun hourRelativeCurrentTime() : Long {
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+    cal.timeInMillis = currentTimeMillis()
+    return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
 }
 
-private fun updateRemoteViews(context : Context, bytes: ByteArray?) {
-    if (bytes == null) return
-    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options())
-    val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
-    remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
-    remoteViews.setImageViewBitmap(R.id.img_view_widget, bitmap)
-    AppWidgetManager.getInstance(context)
-            .updateAppWidget(ComponentName(context, MyWidgetProvider::class.java), remoteViews)
-    MyLog.i("Updated App Widget")
-}
+private const val CROP_Y_START = 40
 
-private fun onClickIntent(context: Context): PendingIntent {
-    val intent = Intent(context, MainActivity::class.java)
-    intent.addCategory("android.intent.category.LAUNCHER")
-    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-    intent.component = ComponentName(context.packageName, MainActivity::class.java.name)
-    return PendingIntent.getActivity(context, 0, intent, 0)
+private data class BitmapWithTimestamp(val bitmap : Bitmap, val timestamp : Long) {
+    constructor(bitmap : Bitmap) : this(
+            Bitmap.createBitmap(bitmap, 0, CROP_Y_START, bitmap.width, bitmap.height - CROP_Y_START),
+            ocrLradarTimestamp(bitmap))
 }

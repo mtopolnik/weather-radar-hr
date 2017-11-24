@@ -26,7 +26,11 @@
                 android:resource="@xml/app_widget_info"/>
         </receiver>
         <service
-            android:name=".UpdateWidgetService"
+            android:name=".RefreshImageService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+        />
+        <service
+            android:name=".UpdateAgeService"
             android:permission="android.permission.BIND_JOB_SERVICE"
         />
     </application>

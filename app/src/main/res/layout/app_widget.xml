@@ -1,12 +1,28 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:padding="@dimen/widget_margin"
->
+              android:orientation="vertical">
+    <TextView
+            android:id="@+id/text_view_widget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:minLines="1"
+            android:maxLines="1"
+            android:layout_gravity="bottom"
+            android:textColor="#ffeeeeee"
+            android:shadowColor="#ff000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="2"
+    />
     <ImageView
         android:id="@+id/img_view_widget"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_gravity="top"
+        android:scaleType="fitStart"
         android:contentDescription="@string/app_name"
     />
 </LinearLayout>
