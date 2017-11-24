@@ -1,12 +1,10 @@
-package com.belotron.weatherradarhr.editgif
+package com.belotron.weatherradarhr
 
-import com.belotron.weatherradarhr.ANIMATION_DURATION
-import com.belotron.weatherradarhr.LOOP_COUNT
-import com.belotron.weatherradarhr.MyLog
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
 import java.nio.charset.Charset
-import java.util.*
+import java.util.ArrayDeque
+import java.util.Deque
 
 fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
     GifEditor(buf, delayTime, framesToKeep).go()
@@ -256,13 +254,9 @@ constructor(
             currFrame = null
         }
 
-        fun popNextFrame(): FrameDescriptor? {
-            return framesToKeep.poll()
-        }
+        fun popNextFrame(): FrameDescriptor? = framesToKeep.poll()
 
-        fun peekLastFrame(): FrameDescriptor? {
-            return framesToKeep.peekLast()
-        }
+        fun peekLastFrame(): FrameDescriptor? = framesToKeep.peekLast()
 
         private fun addFrame() {
             if (framesToKeep.size == frameCountToKeep) {
@@ -291,21 +285,9 @@ constructor(
             return block1 == block2
         }
 
-        fun frameCount(): Int {
-            return distinctFrameCount
-        }
+        fun firstFrameOffset() = firstFrameOffset
 
-        fun keptFrameCount(): Int {
-            return framesToKeep.size
-        }
-
-        fun firstFrameOffset(): Int {
-            return firstFrameOffset
-        }
-
-        fun lastFrameDelay(): Int {
-            return delayTime + ANIMATION_DURATION - keptFrameCount * delayTime
-        }
+        fun lastFrameDelay() = delayTime + ANIMATION_DURATION - keptFrameCount * delayTime
     }
 
     private class FrameDescriptor constructor(internal val start: Int) {
@@ -315,9 +297,7 @@ constructor(
         var imageDataStart: Int = 0
         var end: Int = 0
 
-        fun imageDataLength(): Int {
-            return end - imageDataStart
-        }
+        fun imageDataLength() = end - imageDataStart
 
         fun writeGraphicControlExt(buf: ByteBuffer, delayTime: Int) {
             buf.put(BLOCK_TYPE_EXTENSION.toByte())

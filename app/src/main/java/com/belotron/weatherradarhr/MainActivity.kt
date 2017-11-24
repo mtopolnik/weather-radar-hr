@@ -1,9 +1,6 @@
 package com.belotron.weatherradarhr
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
@@ -17,7 +14,6 @@ import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
 import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
-import com.belotron.weatherradarhr.editgif.editGif
 import java.io.*
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
@@ -75,24 +71,15 @@ class MainActivity : FragmentActivity() {
         override fun onResume() {
             super.onResume()
             MyLog.w("onResume")
-            triggerWidgetUpdate()
+            updateWidgetAndScheduleNext(context.applicationContext, alwaysScheduleNext = false)
             reloadImages()
-        }
-
-        private fun triggerWidgetUpdate() {
-            val intent = Intent(context, MyWidgetProvider::class.java)
-            intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val widgetIDs = AppWidgetManager.getInstance(context)
-                    .getAppWidgetIds(ComponentName(context, MyWidgetProvider::class.java))
-            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIDs)
-            context.sendBroadcast(intent)
         }
 
         private fun reloadImages() {
             val countdown = AtomicInteger(images.size)
             for (desc in images) {
-                sendImageRequest(context, desc.url, onSuccess = {
-                    val buf = ByteBuffer.wrap(it)
+                sendImageRequest(context, desc.url, onSuccess = { imgBytes, _ ->
+                    val buf = ByteBuffer.wrap(imgBytes)
                     val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
                     editGif(buf, frameDelay, desc.framesToKeep)
                     val gifFile = File(context.noBackupFilesDir, desc.filename)

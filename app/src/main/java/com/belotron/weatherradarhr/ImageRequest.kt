@@ -5,9 +5,11 @@ import com.loopj.android.http.AsyncHttpResponseHandler
 import com.loopj.android.http.RequestParams
 import cz.msebera.android.httpclient.Header
 import cz.msebera.android.httpclient.message.BasicHeader
+import java.lang.Long.parseLong
 import java.util.concurrent.ConcurrentHashMap
 
-const val DEFAULT_LAST_MODIFIED = "Thu, 1 Jan 1970 00:00:00 GMT"
+const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
+val LAST_MODIFIED_REGEX = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 
 object ImageRequest {
     private val urlToLastModified = ConcurrentHashMap<String, String>()
@@ -17,33 +19,51 @@ object ImageRequest {
     fun sendImageRequest(context : Context,
                          url : String,
                          useIfModifiedSince : Boolean = true,
-                         onSuccess : (ByteArray) -> Unit = {},
+                         // last modified time, seconds past full hour
+                         onSuccess : (ByteArray, Long) -> Unit = {_, _ -> },
+                         onNotModified : (Long) -> Unit = {},
+                         onFailure : () -> Unit = {},
                          onCompletion : () -> Unit = {}
     ) {
         val headers =
                 if (useIfModifiedSince) arrayOf(BasicHeader("If-Modified-Since", findLastModified(url)))
                 else arrayOf()
-        client.get(context, url, headers, RequestParams(), ResponseHandler(url, onSuccess, onCompletion))
+        client.get(context, url, headers, RequestParams(), ResponseHandler(url, onSuccess, onFailure, onCompletion))
     }
 
-    class ResponseHandler(
-            private val url : String,
-            private val onSuccess: (ByteArray) -> Unit,
+    private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
+        val groups = LAST_MODIFIED_REGEX.matchEntire(lastModifiedStr)?.groupValues
+                ?: throw AssertionError("""Failed to parse Last-Modified header: "$lastModifiedStr"""")
+        return 60 * parseLong(groups[1]) + parseLong(groups[2])
+    }
+
+    private class ResponseHandler(
+            private val url: String,
+            // last modified time, seconds past full hour
+            private val onSuccess: (ByteArray, Long) -> Unit,
+            private val onFailure: () -> Unit,
             private val onCompletion: () -> Unit
     ) : AsyncHttpResponseHandler() {
         override fun onSuccess(statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?) {
-            headers.find { it.name == "Last-Modified" }?.apply {
-                urlToLastModified[url] = value
-            }
-            MyLog.i("""Last modified ${urlToLastModified[url]}""")
-            onSuccess(responseBody!!)
+            val lastModified = headers.find { it.name == "Last-Modified" }?.value ?: DEFAULT_LAST_MODIFIED
+            MyLog.i("""Last-Modified $lastModified: $url""")
+            urlToLastModified[url] = lastModified
+            val hourRelativeModTime = parseHourRelativeModTime(lastModified)
+            onSuccess(responseBody!!, hourRelativeModTime)
             onCompletion()
         }
 
-        override fun onFailure(statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?, error: Throwable) {
+        override fun onFailure(
+                statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?, error: Throwable
+        ) {
             when (statusCode) {
-                304 -> MyLog.i("""Not Modified since ${findLastModified(url)}""")
-                else -> MyLog.e("Failed receiving image", error)
+                304 -> {
+                    MyLog.i("""Not Modified since ${findLastModified(url)}: $url""")
+                }
+                else -> {
+                    MyLog.e("""Failed to retrieve $url""", error)
+                    onFailure()
+                }
             }
             onCompletion()
         }
