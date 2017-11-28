@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.loopj.android.http.AsyncHttpClient
 import com.loopj.android.http.AsyncHttpResponseHandler
 import com.loopj.android.http.RequestParams
 import cz.msebera.android.httpclient.Header
@@ -10,8 +11,9 @@ import cz.msebera.android.httpclient.message.BasicHeader
 import java.lang.Long.parseLong
 import java.util.concurrent.ConcurrentHashMap
 
-const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
-val LAST_MODIFIED_REGEX = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
+private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
+private val client : AsyncHttpClient = AsyncHttpClient()
+private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 
 fun ByteArray.toBitmap() : Bitmap =
         BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
@@ -26,18 +28,20 @@ object ImageRequest {
                          useIfModifiedSince : Boolean = true,
                          // last modified time, seconds past full hour
                          onSuccess : (ByteArray, Long) -> Unit = {_, _ -> },
-                         onNotModified : (Long) -> Unit = {},
+                         onNotModified : () -> Unit = {},
                          onFailure : () -> Unit = {},
                          onCompletion : () -> Unit = {}
     ) {
         val headers =
                 if (useIfModifiedSince) arrayOf(BasicHeader("If-Modified-Since", findLastModified(url)))
                 else arrayOf()
-        client.get(context, url, headers, RequestParams(), ResponseHandler(url, onSuccess, onFailure, onCompletion))
+        client.get(context, url, headers, RequestParams(), ResponseHandler(url,
+                onSuccess = onSuccess, onFailure = onFailure,
+                onNotModified = onNotModified, onCompletion = onCompletion))
     }
 
     private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
-        val groups = LAST_MODIFIED_REGEX.matchEntire(lastModifiedStr)?.groupValues
+        val groups = lastModifiedRegex.matchEntire(lastModifiedStr)?.groupValues
                 ?: throw AssertionError("""Failed to parse Last-Modified header: "$lastModifiedStr"""")
         return 60 * parseLong(groups[1]) + parseLong(groups[2])
     }
@@ -47,6 +51,7 @@ object ImageRequest {
             // last modified time, seconds past full hour
             private val onSuccess: (ByteArray, Long) -> Unit,
             private val onFailure: () -> Unit,
+            private val onNotModified: () -> Unit,
             private val onCompletion: () -> Unit
     ) : AsyncHttpResponseHandler() {
         override fun onSuccess(statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?) {
@@ -64,6 +69,7 @@ object ImageRequest {
             when (statusCode) {
                 304 -> {
                     MyLog.i("""Not Modified since ${findLastModified(url)}: $url""")
+                    onNotModified()
                 }
                 else -> {
                     MyLog.e("""Failed to retrieve $url""", error)

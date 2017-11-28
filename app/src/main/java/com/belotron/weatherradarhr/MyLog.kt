@@ -2,6 +2,8 @@ package com.belotron.weatherradarhr
 
 import android.util.Log
 
+const val LOGTAG = "WeatherRadar"
+
 object MyLog {
     fun d(arg : String) {
         if (Log.isLoggable(LOGTAG, Log.DEBUG)) {

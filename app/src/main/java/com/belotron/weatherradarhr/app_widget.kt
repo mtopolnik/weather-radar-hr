@@ -17,26 +17,50 @@ import android.text.format.DateUtils.formatElapsedTime
 import android.text.format.DateUtils.getRelativeDateTimeString
 import android.widget.RemoteViews
 import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
-import com.belotron.weatherradarhr.LRadarOCR.ocrLradarTimestamp
-import java.lang.System.currentTimeMillis
+import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
+import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 
-const val SECS_IN_HOUR = 3600L
-const val SECS_IN_MINUTE = 60L
-const val IMAGE_UPDATE_PERIOD_MINUTES = 10L
-const val RETRY_PERIOD_MINUTES = 10L
-const val REFRESH_IMAGE_JOB_ID = 700713272
-const val UPDATE_AGE_JOB_ID = 700713273
+private const val SECS_IN_HOUR = 3600L
+private const val SECS_IN_MINUTE = 60L
+private const val RETRY_PERIOD_MINUTES = 10L
+private const val REFRESH_IMAGE_JOB_ID = 700713272
+private const val UPDATE_AGE_JOB_ID = 700713273
+private const val LRADAR_CROP_Y_TOP = 40
+private const val KRADAR_CROP_X_RIGHT = 480
 
-private var lradarBitmap : BitmapWithTimestamp? = null
+private const val ACTIVE_RADAR_INDEX = 1
+
+private val radars = arrayOf(
+        Descriptor("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
+                { TimestampedBitmap(
+                        Bitmap.createBitmap(it, 0, LRADAR_CROP_Y_TOP, it.width, it.height - LRADAR_CROP_Y_TOP),
+                        ocrLradarTimestamp(it)
+                )}),
+        Descriptor("http://vrijeme.hr/kradar.gif", 15,
+                { TimestampedBitmap(
+                        Bitmap.createBitmap(it, 0, 0, KRADAR_CROP_X_RIGHT, it.height ),
+                        ocrKradarTimestamp(it))
+                })
+)
+
+private data class Descriptor(
+        val url : String,
+        val updatePeriodMinutes : Long,
+        val toTimestampedBitmap : (Bitmap) -> TimestampedBitmap
+)
+
+private data class TimestampedBitmap(val bitmap : Bitmap, val timestamp : Long)
+
+private var radarBitmap: TimestampedBitmap? = null
 
 class MyWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         MyLog.w("onUpdate")
-        LRadarOCR.initDigitBitmaps(context)
+        initOcr(context)
         updateWidgetAndScheduleNext(context.applicationContext, useIfModifiedSince = false)
         val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
         jobScheduler.cancel(UPDATE_AGE_JOB_ID)
@@ -50,7 +74,9 @@ class MyWidgetProvider : AppWidgetProvider() {
 class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         MyLog.i("RefreshImageService start job")
-        updateWidgetAndScheduleNext(applicationContext, onCompletion = { jobFinished(params, false) })
+        updateWidgetAndScheduleNext(applicationContext,
+                onImageUpdated = { jobFinished(params, false) },
+                onImageNotUpdated = { jobFinished(params, true) })
         return true
     }
 
@@ -63,7 +89,7 @@ class RefreshImageService : JobService() {
 class UpdateAgeService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         MyLog.i("UpdateAgeService start job")
-        if (lradarBitmap != null) {
+        if (radarBitmap != null) {
             updateRemoteViews(applicationContext)
         }
         return false
@@ -76,30 +102,26 @@ class UpdateAgeService : JobService() {
 }
 
 fun updateWidgetAndScheduleNext(context: Context,
-                                useIfModifiedSince : Boolean = true,
-                                alwaysScheduleNext: Boolean = true,
-                                onCompletion : () -> Unit = {}
+                                useIfModifiedSince: Boolean = true,
+                                onImageUpdated: () -> Unit = {},
+                                onImageNotUpdated: () -> Unit = {}
 ) {
-    sendImageRequest(context, APPWIDGET_IMG_URL,
+    val radarDesc = radars[ACTIVE_RADAR_INDEX]
+    sendImageRequest(context, radarDesc.url,
             useIfModifiedSince = useIfModifiedSince,
             //                      seconds past full hour
             onSuccess = { imgBytes, lastModified ->
-                lradarBitmap = BitmapWithTimestamp(imgBytes.toBitmap())
+                radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
                 updateRemoteViews(context)
-                scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, IMAGE_UPDATE_PERIOD_MINUTES))
+                scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, radarDesc.updatePeriodMinutes))
+                onImageUpdated()
             },
-            onNotModified = {
-                scheduleWidgetUpdate(alwaysScheduleNext, context, RETRY_PERIOD_MINUTES)
-            },
-            onFailure = {
-                MyLog.w("""Failed to update radar image. Will retry in $RETRY_PERIOD_MINUTES minutes.""")
-                scheduleWidgetUpdate(alwaysScheduleNext, context, RETRY_PERIOD_MINUTES)
-            },
-            onCompletion = onCompletion)
+            onNotModified = onImageNotUpdated,
+            onFailure = onImageNotUpdated)
 }
 
 private fun updateRemoteViews(context : Context) {
-    val lradarBitmap = lradarBitmap!!
+    val lradarBitmap = radarBitmap!!
     val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
     remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
     val ageString = getRelativeDateTimeString(context, lradarBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
@@ -115,7 +137,6 @@ private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, latencyM
         return
     }
     val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-    jobScheduler.cancel(REFRESH_IMAGE_JOB_ID)
     val resultCode = jobScheduler.schedule(
             JobInfo.Builder(REFRESH_IMAGE_JOB_ID, ComponentName(context, RefreshImageService::class.java))
                     .setMinimumLatency(latencyMillis)
@@ -143,6 +164,9 @@ private fun onClickIntent(context: Context): PendingIntent {
 }
 
 /**
+ * We use Last-Modified modulo one hour due to DHMZ's broken Last-Modified
+ * reporting (it's off by one hour)
+ *
  * @param lastModified last modified time in seconds past full hour
  */
 private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long) : Long {
@@ -152,21 +176,12 @@ private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long)
     val now = hourRelativeCurrentTime()
     val modifiedSecondsAgo = if (now >= lastModified) now - lastModified
                              else (now + SECS_IN_HOUR) - lastModified
-    val proposedDelay = (updateIntervalMinutes + 1) * SECS_IN_MINUTE - modifiedSecondsAgo
+    val proposedDelay = updateIntervalMinutes * SECS_IN_MINUTE - modifiedSecondsAgo
     return SECONDS.toMillis(if (proposedDelay > 0) proposedDelay
                             else RETRY_PERIOD_MINUTES * SECS_IN_MINUTE)
 }
 
 private fun hourRelativeCurrentTime() : Long {
     val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-    cal.timeInMillis = currentTimeMillis()
     return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
-}
-
-private const val CROP_Y_START = 40
-
-private data class BitmapWithTimestamp(val bitmap : Bitmap, val timestamp : Long) {
-    constructor(bitmap : Bitmap) : this(
-            Bitmap.createBitmap(bitmap, 0, CROP_Y_START, bitmap.width, bitmap.height - CROP_Y_START),
-            ocrLradarTimestamp(bitmap))
 }

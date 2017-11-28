@@ -14,17 +14,38 @@ import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
 import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
-import java.io.*
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileOutputStream
+import java.io.FileWriter
+import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
-const val LOADING_HTML = "loading.html"
+private const val LOADING_HTML = "loading.html"
+private const val MAIN_HTML = "radar_image.html"
+
+val images = arrayOf(
+        ImgDescriptor("Lisca",
+                "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
+                10),
+        ImgDescriptor("Puntijarka-Bilogora-Osijek",
+                "http://vrijeme.hr/kradar-anim.gif",
+                15)
+)
+
+class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int) {
+    val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
+    val filename = url.substring(url.lastIndexOf('/') + 1, url.length)
+}
+
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        LRadarOCR.initDigitBitmaps(applicationContext)
+        initOcr(applicationContext)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         val viewPager = findViewById<ViewPager>(R.id.pager)
@@ -72,7 +93,7 @@ class MainActivity : FragmentActivity() {
         override fun onResume() {
             super.onResume()
             MyLog.w("onResume")
-            updateWidgetAndScheduleNext(context.applicationContext, alwaysScheduleNext = false)
+            updateWidgetAndScheduleNext(context.applicationContext)
             reloadImages()
         }
 
@@ -100,23 +121,9 @@ class MainActivity : FragmentActivity() {
         }
 
         private fun writeTabHtml() {
-            val htmlTemplate = readTemplate()
-            val htmlFile = tabHtmlFile(context)
-            BufferedWriter(FileWriter(htmlFile)).use { w -> w.write(expandTemplate(htmlTemplate)) }
-        }
-
-        private fun readTemplate(): String {
-            context.assets.open("radar_image.html").use { input ->
-                val r = BufferedReader(InputStreamReader(input))
-                val buf = CharArray(BUFSIZ)
-                val b = StringBuilder(BUFSIZ)
-                while (true) {
-                    val count = r.read(buf)
-                    if (count == -1) break
-                    b.append(buf, 0, count)
-                }
-                return b.toString()
-            }
+            val htmlTemplate =
+                    BufferedReader(InputStreamReader(context.assets.open(MAIN_HTML))).use { it.readText() }
+            BufferedWriter(FileWriter(tabHtmlFile(context))).use { w -> w.write(expandTemplate(htmlTemplate)) }
         }
 
         private fun expandTemplate(htmlTemplate: String): String {

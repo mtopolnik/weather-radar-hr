@@ -6,6 +6,10 @@ import java.nio.charset.Charset
 import java.util.ArrayDeque
 import java.util.Deque
 
+const val ANIMATION_COVERS_MINUTES = 100
+private const val LOOP_COUNT = 50
+private const val ANIMATION_DURATION = 250
+
 fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
     GifEditor(buf, delayTime, framesToKeep).go()
 }
