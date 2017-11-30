@@ -11,7 +11,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Bitmap.createBitmap
 import android.text.format.DateUtils.DAY_IN_MILLIS
+import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.formatElapsedTime
 import android.text.format.DateUtils.getRelativeDateTimeString
@@ -19,6 +21,9 @@ import android.widget.RemoteViews
 import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -35,23 +40,24 @@ private const val KRADAR_CROP_X_RIGHT = 480
 private const val ACTIVE_RADAR_INDEX = 1
 
 private val radars = arrayOf(
-        Descriptor("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
-                { TimestampedBitmap(
-                        Bitmap.createBitmap(it, 0, LRADAR_CROP_Y_TOP, it.width, it.height - LRADAR_CROP_Y_TOP),
-                        ocrLradarTimestamp(it)
-                )}),
-        Descriptor("http://vrijeme.hr/kradar.gif", 15,
-                { TimestampedBitmap(
-                        Bitmap.createBitmap(it, 0, 0, KRADAR_CROP_X_RIGHT, it.height ),
-                        ocrKradarTimestamp(it))
-                })
+        Descriptor("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10, {
+            TimestampedBitmap(
+                createBitmap(it, 0, LRADAR_CROP_Y_TOP, it.width, it.height - LRADAR_CROP_Y_TOP),
+                ocrLradarTimestamp(it)
+        )}),
+        Descriptor("http://vrijeme.hr/kradar.gif", 15, {
+            TimestampedBitmap(
+                    createBitmap(it, 0, 0, KRADAR_CROP_X_RIGHT, it.height),
+                    ocrKradarTimestamp(it)) })
 )
 
 private data class Descriptor(
         val url : String,
         val updatePeriodMinutes : Long,
         val toTimestampedBitmap : (Bitmap) -> TimestampedBitmap
-)
+) {
+    fun filename() = url.substringAfterLast('/')
+}
 
 private data class TimestampedBitmap(val bitmap : Bitmap, val timestamp : Long)
 
@@ -60,14 +66,8 @@ private var radarBitmap: TimestampedBitmap? = null
 class MyWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         MyLog.w("onUpdate")
-        initOcr(context)
         updateWidgetAndScheduleNext(context.applicationContext, useIfModifiedSince = false)
-        val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        jobScheduler.cancel(UPDATE_AGE_JOB_ID)
-        jobScheduler.schedule(
-                JobInfo.Builder(UPDATE_AGE_JOB_ID, ComponentName(context, UpdateAgeService::class.java))
-                        .setPeriodic(MINUTE_IN_MILLIS)
-                        .build())
+        scheduleUpdateAge(context.applicationContext)
     }
 }
 
@@ -89,9 +89,9 @@ class RefreshImageService : JobService() {
 class UpdateAgeService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         MyLog.i("UpdateAgeService start job")
-        if (radarBitmap != null) {
-            updateRemoteViews(applicationContext)
-        }
+        updateRemoteViews(applicationContext)
+        jobFinished(params, false)
+        scheduleUpdateAge(applicationContext)
         return false
     }
 
@@ -111,25 +111,41 @@ fun updateWidgetAndScheduleNext(context: Context,
             useIfModifiedSince = useIfModifiedSince,
             //                      seconds past full hour
             onSuccess = { imgBytes, lastModified ->
-                radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
-                updateRemoteViews(context)
-                scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, radarDesc.updatePeriodMinutes))
-                onImageUpdated()
+                try {
+                    FileOutputStream(File(context.noBackupFilesDir, radarDesc.filename())).use { it.write(imgBytes) }
+                    radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
+                    updateRemoteViews(context)
+                    onImageUpdated()
+                    scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, radarDesc.updatePeriodMinutes))
+                } catch (e: Throwable) {
+                    onImageNotUpdated()
+                    throw e
+                }
             },
             onNotModified = onImageNotUpdated,
             onFailure = onImageNotUpdated)
 }
 
 private fun updateRemoteViews(context : Context) {
-    val lradarBitmap = radarBitmap!!
     val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
     remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
-    val ageString = getRelativeDateTimeString(context, lradarBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
-    remoteViews.setImageViewBitmap(R.id.img_view_widget, lradarBitmap.bitmap)
-    remoteViews.setTextViewText(R.id.text_view_widget, ageString)
+    if (radarBitmap == null) {
+        val radarDesc = radars[ACTIVE_RADAR_INDEX]
+        val imgBytes = FileInputStream(File(context.noBackupFilesDir, radarDesc.filename())).use { it.readBytes() }
+        radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
+    }
+    val radarBitmap = radarBitmap
+    if (radarBitmap != null) {
+        val ageString = getRelativeDateTimeString(context, radarBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
+        remoteViews.setImageViewBitmap(R.id.img_view_widget, radarBitmap.bitmap)
+        remoteViews.setTextViewText(R.id.text_view_widget, ageString)
+    } else {
+        MyLog.i("Radar image unavailable")
+        remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
+    }
     AppWidgetManager.getInstance(context)
             .updateAppWidget(ComponentName(context, MyWidgetProvider::class.java), remoteViews)
-    MyLog.i("Updated App Widget")
+    MyLog.i("Updated Remote Views")
 }
 
 private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, latencyMillis: Long) {
@@ -140,17 +156,28 @@ private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, latencyM
     val resultCode = jobScheduler.schedule(
             JobInfo.Builder(REFRESH_IMAGE_JOB_ID, ComponentName(context, RefreshImageService::class.java))
                     .setMinimumLatency(latencyMillis)
+                    .setOverrideDeadline(HOUR_IN_MILLIS)
                     .build())
-    reportScheduleResult(latencyMillis, resultCode)
+    reportScheduleResult("refresh radar image", latencyMillis, resultCode)
 }
 
-private fun reportScheduleResult(minLatency: Long, resultCode: Int) {
+private fun scheduleUpdateAge(context: Context) {
+    val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+    val resultCode = jobScheduler.schedule(
+            JobInfo.Builder(UPDATE_AGE_JOB_ID, ComponentName(context, UpdateAgeService::class.java))
+                    .setMinimumLatency(MINUTE_IN_MILLIS)
+                    .setOverrideDeadline(2 * MINUTE_IN_MILLIS)
+                    .build())
+    reportScheduleResult("update age", MINUTE_IN_MILLIS, resultCode)
+}
+
+private fun reportScheduleResult(task: String, minLatency: Long, resultCode: Int) {
     val minLatencyStr = formatElapsedTime(MILLISECONDS.toSeconds(minLatency))
     when (resultCode) {
         JobScheduler.RESULT_SUCCESS -> MyLog.i(
-                """Scheduled to update widget after $minLatencyStr minutes""")
+                """Scheduled to $task after $minLatencyStr minutes""")
         JobScheduler.RESULT_FAILURE -> MyLog.e(
-                """Failed to schedule widget update after $minLatencyStr minutes""")
+                """Failed to schedule to $task after $minLatencyStr minutes""")
         else -> throw AssertionError("""Unknown scheduler result code $resultCode""")
     }
 }

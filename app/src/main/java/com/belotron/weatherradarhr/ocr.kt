@@ -22,8 +22,8 @@ object LradarOcr {
         }
     }
 
-    fun ocrLradarTimestamp(lradar: Bitmap): Long {
-        val dt = ocrDateTime(lradar)
+    fun ocrLradarTimestamp(bitmap: Bitmap): Long {
+        val dt = ocrDateTime(bitmap)
         MyLog.i("""OCRed date/time: $dt""")
         return dt.toTimestamp()
     }
@@ -128,4 +128,6 @@ data class DateTime(
         cal.set(SECOND, second)
         return cal.timeInMillis
     }
+
+    override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d UTC".format(year, month, day, hour, minute, second)
 }

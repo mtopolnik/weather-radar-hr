@@ -38,14 +38,13 @@ val images = arrayOf(
 
 class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
-    val filename = url.substring(url.lastIndexOf('/') + 1, url.length)
+    val filename = url.substringAfterLast('/')
 }
 
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        initOcr(applicationContext)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         val viewPager = findViewById<ViewPager>(R.id.pager)

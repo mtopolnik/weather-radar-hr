@@ -42,7 +42,7 @@ object ImageRequest {
 
     private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
         val groups = lastModifiedRegex.matchEntire(lastModifiedStr)?.groupValues
-                ?: throw AssertionError("""Failed to parse Last-Modified header: "$lastModifiedStr"""")
+                ?: throw NumberFormatException("""Failed to parse Last-Modified header: "$lastModifiedStr"""")
         return 60 * parseLong(groups[1]) + parseLong(groups[2])
     }
 
@@ -58,9 +58,15 @@ object ImageRequest {
             val lastModified = headers.find { it.name == "Last-Modified" }?.value ?: DEFAULT_LAST_MODIFIED
             MyLog.i("""Last-Modified $lastModified: $url""")
             urlToLastModified[url] = lastModified
-            val hourRelativeModTime = parseHourRelativeModTime(lastModified)
-            onSuccess(responseBody!!, hourRelativeModTime)
-            onCompletion()
+            try {
+                val hourRelativeModTime = parseHourRelativeModTime(lastModified)
+                onSuccess(responseBody!!, hourRelativeModTime)
+            } catch (t : Throwable) {
+                MyLog.e("""Failed to handle a successful image response""", t)
+                onFailure()
+            } finally {
+                onCompletion()
+            }
         }
 
         override fun onFailure(
