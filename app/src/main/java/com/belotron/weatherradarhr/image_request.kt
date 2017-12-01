@@ -11,14 +11,13 @@ import cz.msebera.android.httpclient.message.BasicHeader
 import java.lang.Long.parseLong
 import java.util.concurrent.ConcurrentHashMap
 
-private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
-private val client : AsyncHttpClient = AsyncHttpClient()
-private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
-
 fun ByteArray.toBitmap() : Bitmap =
         BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 
 object ImageRequest {
+    private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
+    private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
+    private val client : AsyncHttpClient = AsyncHttpClient()
     private val urlToLastModified = ConcurrentHashMap<String, String>()
 
     private fun findLastModified(url: String) = urlToLastModified[url] ?: DEFAULT_LAST_MODIFIED
@@ -70,7 +69,7 @@ object ImageRequest {
         }
 
         override fun onFailure(
-                statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?, error: Throwable
+                statusCode: Int, headers: Array<out Header>?, responseBody: ByteArray?, error: Throwable
         ) {
             when (statusCode) {
                 304 -> {

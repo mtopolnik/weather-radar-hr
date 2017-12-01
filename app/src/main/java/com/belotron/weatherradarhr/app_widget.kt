@@ -36,37 +36,41 @@ private const val REFRESH_IMAGE_JOB_ID = 700713272
 private const val UPDATE_AGE_JOB_ID = 700713273
 private const val LRADAR_CROP_Y_TOP = 40
 private const val KRADAR_CROP_X_RIGHT = 480
-
 private const val ACTIVE_RADAR_INDEX = 1
 
-private val radars = arrayOf(
+private var imgTimestamp: Long? = null
+
+private val radarDescriptors = arrayOf(
         Descriptor("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10, {
+            val bitmap = it.toBitmap()
             TimestampedBitmap(
-                createBitmap(it, 0, LRADAR_CROP_Y_TOP, it.width, it.height - LRADAR_CROP_Y_TOP),
-                ocrLradarTimestamp(it)
-        )}),
+                    createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP),
+                    ocrLradarTimestamp(bitmap)
+            )}),
         Descriptor("http://vrijeme.hr/kradar.gif", 15, {
+            val bitmap = it.toBitmap()
             TimestampedBitmap(
-                    createBitmap(it, 0, 0, KRADAR_CROP_X_RIGHT, it.height),
-                    ocrKradarTimestamp(it)) })
+                    createBitmap(bitmap, 0, 0, KRADAR_CROP_X_RIGHT, bitmap.height),
+                    ocrKradarTimestamp(bitmap)) })
 )
 
 private data class Descriptor(
         val url : String,
         val updatePeriodMinutes : Long,
-        val toTimestampedBitmap : (Bitmap) -> TimestampedBitmap
+        val timestampedBitmapFrom: (ByteArray) -> TimestampedBitmap
 ) {
     fun filename() = url.substringAfterLast('/')
+
 }
 
-private data class TimestampedBitmap(val bitmap : Bitmap, val timestamp : Long)
-
-private var radarBitmap: TimestampedBitmap? = null
+private data class TimestampedBitmap(val bitmap : Bitmap?, val timestamp : Long?) {
+    fun isEmpty() = bitmap == null && timestamp == null
+}
 
 class MyWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         MyLog.w("onUpdate")
-        updateWidgetAndScheduleNext(context.applicationContext, useIfModifiedSince = false)
+        updateWidgetAndScheduleNext(context.applicationContext, forceLoadImage = true)
         scheduleUpdateAge(context.applicationContext)
     }
 }
@@ -89,9 +93,10 @@ class RefreshImageService : JobService() {
 class UpdateAgeService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         MyLog.i("UpdateAgeService start job")
-        updateRemoteViews(applicationContext)
-        jobFinished(params, false)
-        scheduleUpdateAge(applicationContext)
+        initOcr(applicationContext)
+        updateRemoteViews(applicationContext,
+                if (imgTimestamp != null) TimestampedBitmap(null, imgTimestamp)
+                else tryLoadImgFromFile(applicationContext))
         return false
     }
 
@@ -102,82 +107,95 @@ class UpdateAgeService : JobService() {
 }
 
 fun updateWidgetAndScheduleNext(context: Context,
-                                useIfModifiedSince: Boolean = true,
+                                forceLoadImage: Boolean = false,
                                 onImageUpdated: () -> Unit = {},
                                 onImageNotUpdated: () -> Unit = {}
 ) {
-    val radarDesc = radars[ACTIVE_RADAR_INDEX]
+    val radarDesc = radarDescriptors[ACTIVE_RADAR_INDEX]
     sendImageRequest(context, radarDesc.url,
-            useIfModifiedSince = useIfModifiedSince,
+            useIfModifiedSince = !forceLoadImage,
             //                      seconds past full hour
             onSuccess = { imgBytes, lastModified ->
                 try {
                     FileOutputStream(File(context.noBackupFilesDir, radarDesc.filename())).use { it.write(imgBytes) }
-                    radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
-                    updateRemoteViews(context)
+                    val tsBitmap = radarDesc.timestampedBitmapFrom(imgBytes)
+                    imgTimestamp = tsBitmap.timestamp
+                    updateRemoteViews(context, tsBitmap)
                     onImageUpdated()
-                    scheduleWidgetUpdate(true, context, millisToNextUpdate(lastModified, radarDesc.updatePeriodMinutes))
+                    scheduleWidgetUpdate(context, millisToNextUpdate(lastModified, radarDesc.updatePeriodMinutes))
                 } catch (e: Throwable) {
                     onImageNotUpdated()
                     throw e
                 }
             },
             onNotModified = onImageNotUpdated,
-            onFailure = onImageNotUpdated)
+            onFailure = {
+                if (forceLoadImage) {
+                    updateRemoteViews(context, tryLoadImgFromFile(context))
+                }
+                onImageNotUpdated()
+            })
 }
 
-private fun updateRemoteViews(context : Context) {
+private fun updateRemoteViews(context : Context, tsBitmap: TimestampedBitmap) {
     val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
     remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
-    if (radarBitmap == null) {
-        val radarDesc = radars[ACTIVE_RADAR_INDEX]
-        val imgBytes = FileInputStream(File(context.noBackupFilesDir, radarDesc.filename())).use { it.readBytes() }
-        radarBitmap = radarDesc.toTimestampedBitmap(imgBytes.toBitmap())
-    }
-    val radarBitmap = radarBitmap
-    if (radarBitmap != null) {
-        val ageString = getRelativeDateTimeString(context, radarBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
-        remoteViews.setImageViewBitmap(R.id.img_view_widget, radarBitmap.bitmap)
-        remoteViews.setTextViewText(R.id.text_view_widget, ageString)
-    } else {
-        MyLog.i("Radar image unavailable")
+    if (tsBitmap.isEmpty()) {
+        MyLog.w("Set text radar image unavailable")
         remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
+    } else {
+        tsBitmap.bitmap?.apply {
+            remoteViews.setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
+        }
+        tsBitmap.timestamp?.apply {
+            remoteViews.setTextViewText(R.id.text_view_widget,
+                    getRelativeDateTimeString(context, tsBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
+        }
     }
     AppWidgetManager.getInstance(context)
             .updateAppWidget(ComponentName(context, MyWidgetProvider::class.java), remoteViews)
     MyLog.i("Updated Remote Views")
 }
 
-private fun scheduleWidgetUpdate(reallyDoIt: Boolean, context: Context, latencyMillis: Long) {
-    if (!reallyDoIt) {
-        return
+private fun tryLoadImgFromFile(context: Context) : TimestampedBitmap {
+    val radarDesc = radarDescriptors[ACTIVE_RADAR_INDEX]
+    val gif = File(context.noBackupFilesDir, radarDesc.filename())
+    if (!gif.exists()) {
+        return TimestampedBitmap(null, null)
     }
+    val imgBytes = FileInputStream(gif).use { it.readBytes() }
+    val tsBitmap = radarDesc.timestampedBitmapFrom(imgBytes)
+    imgTimestamp = tsBitmap.timestamp
+    return tsBitmap
+}
+
+private fun scheduleWidgetUpdate(context: Context, latencyMillis: Long) {
     val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
     val resultCode = jobScheduler.schedule(
             JobInfo.Builder(REFRESH_IMAGE_JOB_ID, ComponentName(context, RefreshImageService::class.java))
+                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                     .setMinimumLatency(latencyMillis)
                     .setOverrideDeadline(HOUR_IN_MILLIS)
                     .build())
-    reportScheduleResult("refresh radar image", latencyMillis, resultCode)
+    val latencyStr = formatElapsedTime(MILLISECONDS.toSeconds(latencyMillis))
+    reportScheduleResult("""refresh radar image after $latencyStr""", resultCode)
 }
 
 private fun scheduleUpdateAge(context: Context) {
     val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
     val resultCode = jobScheduler.schedule(
             JobInfo.Builder(UPDATE_AGE_JOB_ID, ComponentName(context, UpdateAgeService::class.java))
-                    .setMinimumLatency(MINUTE_IN_MILLIS)
-                    .setOverrideDeadline(2 * MINUTE_IN_MILLIS)
+                    .setPeriodic(MINUTE_IN_MILLIS)
                     .build())
-    reportScheduleResult("update age", MINUTE_IN_MILLIS, resultCode)
+    reportScheduleResult("update age every minute", resultCode)
 }
 
-private fun reportScheduleResult(task: String, minLatency: Long, resultCode: Int) {
-    val minLatencyStr = formatElapsedTime(MILLISECONDS.toSeconds(minLatency))
+private fun reportScheduleResult(task: String, resultCode: Int) {
     when (resultCode) {
         JobScheduler.RESULT_SUCCESS -> MyLog.i(
-                """Scheduled to $task after $minLatencyStr minutes""")
+                """Scheduled to $task""")
         JobScheduler.RESULT_FAILURE -> MyLog.e(
-                """Failed to schedule to $task after $minLatencyStr minutes""")
+                """Failed to schedule to $task""")
         else -> throw AssertionError("""Unknown scheduler result code $resultCode""")
     }
 }
