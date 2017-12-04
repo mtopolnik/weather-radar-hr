@@ -27,13 +27,13 @@ import java.util.regex.Pattern
 private const val LOADING_HTML = "loading.html"
 private const val MAIN_HTML = "radar_image.html"
 
-val images = arrayOf(
-        ImgDescriptor("Lisca",
-                "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
-                10),
+private val images = arrayOf(
         ImgDescriptor("Puntijarka-Bilogora-Osijek",
                 "http://vrijeme.hr/kradar-anim.gif",
-                15)
+                15),
+        ImgDescriptor("Lisca",
+                "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
+                10)
 )
 
 class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int) {
@@ -41,8 +41,7 @@ class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int
     val filename = url.substringAfterLast('/')
 }
 
-
-class MainActivity : FragmentActivity() {
+class MainActivity : FragmentActivity()  {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
@@ -92,7 +91,7 @@ class MainActivity : FragmentActivity() {
         override fun onResume() {
             super.onResume()
             MyLog.w("onResume")
-            updateWidgetAndScheduleNext(context.applicationContext)
+            updateWidgets(context.applicationContext)
             reloadImages()
         }
 

@@ -56,18 +56,18 @@ object KradarOcr {
         }
     }
 
-    fun ocrKradarTimestamp(kradar: Bitmap): Long {
-        val dt = ocrDateTime(kradar)
+    fun ocrKradarTimestamp(bitmap: Bitmap): Long {
+        val dt = ocrDateTime(bitmap)
         MyLog.i("""OCRed date/time: $dt""")
         return dt.toTimestamp()
     }
 
-    private fun ocrDateTime(kradar: Bitmap): DateTime {
+    private fun ocrDateTime(bitmap: Bitmap): DateTime {
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         val dt = DateTime(
-                hour = readTimeNumber(kradar, 486, 504),
-                minute = readTimeNumber(kradar, 532, 550),
-                second = readTimeNumber(kradar, 578, 596),
+                hour = readTimeNumber(bitmap, 486, 504),
+                minute = readTimeNumber(bitmap, 532, 550),
+                second = readTimeNumber(bitmap, 578, 596),
                 day = cal.get(DAY_OF_MONTH), //readDateNumber(kradar, 0, 1),
                 month = cal.get(MONTH) + 1, //readDateString(kradar, 3, 4, 5),
                 year = cal.get(YEAR) //readDateNumber(kradar, 7, 8, 9, 10)
@@ -86,11 +86,11 @@ object KradarOcr {
         )
     }
 
-    private fun readTimeNumber(kradar: Bitmap, vararg xs : Int): Int =
-        xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(kradar, x) })
+    private fun readTimeNumber(bitmap: Bitmap, vararg xs : Int): Int =
+        xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(bitmap, x) })
 
-    private fun readTimeDigit(kradar: Bitmap, x : Int) =
-            (0..9).find { stripeEqual(kradar, x, 143, timeDigitBitmaps[it], 3) }
+    private fun readTimeDigit(bitmap: Bitmap, x : Int) =
+            (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
                     ?: throw AssertionError("""Couldn't read the digit at $x""")
 
     private fun readDateNumber(kradar: Bitmap, vararg indices : Int): Int = TODO()

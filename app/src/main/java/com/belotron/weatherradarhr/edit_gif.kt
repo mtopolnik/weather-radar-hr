@@ -9,6 +9,11 @@ import java.util.Deque
 const val ANIMATION_COVERS_MINUTES = 100
 private const val LOOP_COUNT = 50
 private const val ANIMATION_DURATION = 250
+private const val BLOCK_TYPE_EXTENSION = 0x21
+private const val BLOCK_TYPE_IMAGE = 0x2c
+private const val BLOCK_TYPE_TRAILER = 0x3b
+private const val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
+private const val EXT_TYPE_APPLICATION = 0xff
 
 fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
     GifEditor(buf, delayTime, framesToKeep).go()
@@ -17,12 +22,6 @@ fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
 fun checkGif(buf: ByteBuffer) {
     GifEditor(buf, 0, 1).checkGif()
 }
-
-private const val BLOCK_TYPE_EXTENSION = 0x21
-private const val BLOCK_TYPE_IMAGE = 0x2c
-private const val BLOCK_TYPE_TRAILER = 0x3b
-private const val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
-private const val EXT_TYPE_APPLICATION = 0xff
 
 private class GifEditor
 constructor(
