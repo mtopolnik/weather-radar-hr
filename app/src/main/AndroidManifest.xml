@@ -20,7 +20,7 @@
         </activity>
 
         <receiver android:name=".LradarWidgetProvider"
-                  android:label="aVrijeme na radaru SLO">
+                  android:label="Vrijeme na radaru SLO">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
@@ -29,7 +29,7 @@
                 android:resource="@xml/lradar_widget_info"/>
         </receiver>
         <receiver android:name=".KradarWidgetProvider"
-                  android:label="aVrijeme na radaru HR">
+                  android:label="Vrijeme na radaru HR">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
