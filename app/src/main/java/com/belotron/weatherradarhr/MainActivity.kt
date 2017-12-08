@@ -13,7 +13,8 @@ import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
-import com.belotron.weatherradarhr.ImageRequest.sendImageRequest
+import kotlinx.coroutines.experimental.Unconfined
+import kotlinx.coroutines.experimental.launch
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
@@ -95,26 +96,46 @@ class MainActivity : FragmentActivity()  {
             reloadImages()
         }
 
+        override fun onDestroyView() {
+            super.onDestroyView()
+            webView = null
+        }
+
         private fun reloadImages() {
             val countdown = AtomicInteger(images.size)
+            val androidCtx = context
             for (desc in images) {
-                sendImageRequest(context, desc.url, onSuccess = { imgBytes, _ ->
-                    val buf = ByteBuffer.wrap(imgBytes)
-                    val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
-                    editGif(buf, frameDelay, desc.framesToKeep)
-                    val gifFile = File(context.noBackupFilesDir, desc.filename)
-                    FileOutputStream(gifFile).use { out ->
-                        out.write(buf.array(), buf.position(), buf.remaining())
+                launch(Unconfined) coroutine@{
+                    try {
+                        val (_, imgBytes) = try {
+                            fetchImage(androidCtx, desc.url, onlyIfNew = false)
+                        } catch (e: ImageFetchException) {
+                            Pair(0L, e.cached)
+                        }
+                        if (imgBytes == null || webView == null) {
+                            return@coroutine
+                        }
+                        val buf = ByteBuffer.wrap(imgBytes)
+                        val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
+                        editGif(buf, frameDelay, desc.framesToKeep)
+                        val gifFile = File(androidCtx.noBackupFilesDir, desc.filename)
+                        FileOutputStream(gifFile).use { out ->
+                            out.write(buf.array(), buf.position(), buf.remaining())
+                        }
+                    } catch (t: Throwable) {
+                        MyLog.e("Failed to load animated GIF ${desc.filename}")
+                    } finally {
+                        if (countdown.addAndGet(-1) != 0) {
+                            return@coroutine
+                        }
+                        val url = tabHtmlFile(androidCtx).toURI().toString()
+                        val webView = webView
+                        if (webView != null) {
+                            webView.clearCache(true)
+                            webView.loadUrl(url)
+                        }
                     }
-                }, onCompletion = lambda@ {
-                    if (countdown.addAndGet(-1) != 0) {
-                        return@lambda
-                    }
-                    val url = tabHtmlFile(context).toURI().toString()
-                    val webView = webView!!
-                    webView.clearCache(true)
-                    webView.loadUrl(url)
-                })
+                }
             }
         }
 

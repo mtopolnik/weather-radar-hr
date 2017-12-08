@@ -8,80 +8,129 @@ import com.loopj.android.http.AsyncHttpResponseHandler
 import com.loopj.android.http.RequestParams
 import cz.msebera.android.httpclient.Header
 import cz.msebera.android.httpclient.message.BasicHeader
+import java.io.File
+import java.io.IOException
 import java.lang.Long.parseLong
-import java.util.concurrent.ConcurrentHashMap
+import java.text.SimpleDateFormat
+import java.util.Locale
+import kotlin.coroutines.experimental.Continuation
+import kotlin.coroutines.experimental.suspendCoroutine
 
 fun ByteArray.toBitmap() : Bitmap =
         BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 
-object ImageRequest {
-    private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
-    private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
-    private val client : AsyncHttpClient = AsyncHttpClient()
-    private val urlToLastModified = ConcurrentHashMap<String, String>()
+private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
+private const val FILENAME_SUBSTITUTE_CHAR = ":"
+private const val HTTP_CACHE_DIR = "httpcache"
+private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
+private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
+private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
+private val client : AsyncHttpClient = AsyncHttpClient()
 
-    private fun findLastModified(url: String) = urlToLastModified[url] ?: DEFAULT_LAST_MODIFIED
+suspend fun fetchImage(context: Context, url: String, onlyIfNew: Boolean
+): Pair<Long, ByteArray?> = suspendCoroutine { cont ->
+    val headers = loadLastModified(context, url)?.let { arrayOf(BasicHeader("If-Modified-Since", it)) }
+    client.get(context, url, headers, RequestParams(), ResponseHandler(context, cont, url, onlyIfNew))
+}
 
-    fun sendImageRequest(context : Context,
-                         url : String,
-                         useIfModifiedSince : Boolean = true,
-                         // last modified time, seconds past full hour
-                         onSuccess : (ByteArray, Long) -> Unit = {_, _ -> },
-                         onNotModified : () -> Unit = {},
-                         onFailure : () -> Unit = {},
-                         onCompletion : () -> Unit = {}
-    ) {
-        val headers =
-                if (useIfModifiedSince) arrayOf(BasicHeader("If-Modified-Since", findLastModified(url)))
-                else arrayOf()
-        client.get(context, url, headers, RequestParams(), ResponseHandler(url,
-                onSuccess = onSuccess, onFailure = onFailure,
-                onNotModified = onNotModified, onCompletion = onCompletion))
+private class ResponseHandler(
+        private val context: Context,
+        private val cont: Continuation<Pair<Long, ByteArray?>>,
+        private val url: String,
+        private val onlyIfNew: Boolean
+) : AsyncHttpResponseHandler() {
+    override fun onSuccess(
+            statusCode: Int,
+            headers: Array<out Header>,
+            responseBody: ByteArray
+    ) = synchronized(client) {
+        try {
+            val lastModifiedStr = headers.find { it.name == "Last-Modified" }?.value ?: DEFAULT_LAST_MODIFIED
+            val lastModified = lastModifiedStr.parseLastModified()
+            MyLog.i("Last-Modified $lastModifiedStr: $url")
+            val cachedIn = Try({ cachedDataIn(context, url) })
+            val imgBytes: ByteArray = if (cachedIn == null) responseBody
+            else {
+                val cachedLastModified = Try({ cachedIn.readUTF().parseLastModified() })
+                if (cachedLastModified == null || cachedLastModified < lastModified) {
+                    cachedIn.close()
+                    val cacheFile = cacheFile(context, url)
+                    try {
+                        dataOut(fileOut(cacheFile)).use { cachedOut ->
+                            cachedOut.writeUTF(lastModifiedStr)
+                            cachedOut.write(responseBody)
+                        }
+                    } catch (e: IOException) {
+                        MyLog.e("Failed to write cached image to $cacheFile", e)
+                    }
+                    responseBody
+                } else if (cachedLastModified == lastModified) {
+                    cachedIn.close()
+                    responseBody
+                } else { // cachedLastModified > lastModified
+                    cachedIn.use { it.readBytes() }
+                }
+            }
+            val hourRelativeModTime = parseHourRelativeModTime(lastModifiedStr)
+            try {
+                cont.resume(Pair(hourRelativeModTime, imgBytes))
+            } catch (t: Throwable) {
+                MyLog.e("Continuation failed", t)
+            }
+        } catch (t : Throwable) {
+            MyLog.e("Failed to handle a successful image response", t)
+            cont.resumeWithException(t)
+        }
     }
+
+    override fun onFailure(statusCode: Int, headers: Array<out Header>?, responseBody: ByteArray?, error: Throwable) {
+        when (statusCode) {
+            304 -> try {
+                if (onlyIfNew) {
+                    cont.resume(Pair(0L, null))
+                    return
+                }
+                val (lastModifiedStr, imgBytes) =
+                        cachedDataIn(context, url).use { Pair(it.readUTF(), it.readBytes()) }
+                MyLog.i("Not Modified since $lastModifiedStr: $url")
+                cont.resume(Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes))
+            } catch (t : Throwable) {
+                MyLog.e("Failed to handle 304 NOT MODIFIED", t)
+                cont.resumeWithException(t)
+            }
+            else -> {
+                MyLog.e("Failed to retrieve $url", error)
+                val cachedImg = if (onlyIfNew) null
+                else Try({ cachedDataIn(context, url).use { it.readUTF(); it.readBytes() } })
+                cont.resumeWithException(ImageFetchException(error, cachedImg))
+            }
+        }
+    }
+
+    private fun String.parseLastModified() = lastModifiedDateFormat.parse(this).time
 
     private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
         val groups = lastModifiedRegex.matchEntire(lastModifiedStr)?.groupValues
-                ?: throw NumberFormatException("""Failed to parse Last-Modified header: "$lastModifiedStr"""")
+                ?: throw NumberFormatException("Failed to parse Last-Modified header: '$lastModifiedStr'")
         return 60 * parseLong(groups[1]) + parseLong(groups[2])
     }
+}
 
-    private class ResponseHandler(
-            private val url: String,
-            // last modified time, seconds past full hour
-            private val onSuccess: (ByteArray, Long) -> Unit,
-            private val onFailure: () -> Unit,
-            private val onNotModified: () -> Unit,
-            private val onCompletion: () -> Unit
-    ) : AsyncHttpResponseHandler() {
-        override fun onSuccess(statusCode: Int, headers: Array<out Header>, responseBody: ByteArray?) {
-            val lastModified = headers.find { it.name == "Last-Modified" }?.value ?: DEFAULT_LAST_MODIFIED
-            MyLog.i("""Last-Modified $lastModified: $url""")
-            urlToLastModified[url] = lastModified
-            try {
-                val hourRelativeModTime = parseHourRelativeModTime(lastModified)
-                onSuccess(responseBody!!, hourRelativeModTime)
-            } catch (t : Throwable) {
-                MyLog.e("""Failed to handle a successful image response""", t)
-                onFailure()
-            } finally {
-                onCompletion()
-            }
-        }
+class ImageFetchException(cause : Throwable, val cached : ByteArray?) : RuntimeException(cause)
 
-        override fun onFailure(
-                statusCode: Int, headers: Array<out Header>?, responseBody: ByteArray?, error: Throwable
-        ) {
-            when (statusCode) {
-                304 -> {
-                    MyLog.i("""Not Modified since ${findLastModified(url)}: $url""")
-                    onNotModified()
-                }
-                else -> {
-                    MyLog.e("""Failed to retrieve $url""", error)
-                    onFailure()
-                }
-            }
-            onCompletion()
-        }
-    }
+private fun loadLastModified(context: Context, url: String) = Try({ cachedDataIn(context, url).use { it.readUTF() } })
+
+private fun cachedDataIn(context: Context, url: String) = dataIn(fileIn(cacheFile(context, url)))
+
+private fun cacheFile(context: Context, url: String): File {
+    val fname = filenameCharsToAvoidRegex.replace(url, FILENAME_SUBSTITUTE_CHAR)
+    val file = File(context.noBackupFilesDir, "$HTTP_CACHE_DIR/" + fname)
+    file.mkdirs()
+    return file
+}
+
+fun <T> Try(block: () -> T) = try {
+    block()
+} catch(t :Throwable) {
+    null
 }

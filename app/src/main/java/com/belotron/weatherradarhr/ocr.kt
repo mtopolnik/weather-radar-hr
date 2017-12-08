@@ -24,7 +24,7 @@ object LradarOcr {
 
     fun ocrLradarTimestamp(bitmap: Bitmap): Long {
         val dt = ocrDateTime(bitmap)
-        MyLog.i("""OCRed date/time: $dt""")
+        MyLog.i("OCRed date/time: $dt")
         return dt.toTimestamp()
     }
 
@@ -40,7 +40,7 @@ object LradarOcr {
 
     private fun readDigit(lradar: Bitmap, pos : Int) =
         (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) }
-                ?: throw AssertionError("""Couldn't read the digit at $pos""")
+                ?: throw AssertionError("Couldn't read the digit at $pos")
 }
 
 object KradarOcr {
@@ -58,7 +58,7 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(bitmap: Bitmap): Long {
         val dt = ocrDateTime(bitmap)
-        MyLog.i("""OCRed date/time: $dt""")
+        MyLog.i("OCRed date/time: $dt")
         return dt.toTimestamp()
     }
 
@@ -91,7 +91,7 @@ object KradarOcr {
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
             (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
-                    ?: throw AssertionError("""Couldn't read the digit at $x""")
+                    ?: throw AssertionError("Couldn't read the digit at $x")
 
     private fun readDateNumber(kradar: Bitmap, vararg indices : Int): Int = TODO()
 
@@ -107,7 +107,7 @@ private fun stripeEqual(img: Bitmap, imgX: Int, imgY: Int, rect: Bitmap, rectX: 
         (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY) }
 
 private fun loadDigits(context: Context, path : String) =
-        (0..9).map { context.assets.open("""$path/$it.gif""").use { it.readBytes() }.toBitmap() }
+        (0..9).map { context.assets.open("$path/$it.gif").use { it.readBytes() }.toBitmap() }
 
 data class DateTime(
         val year : Int,
