@@ -6,7 +6,6 @@ import java.util.Calendar
 import java.util.Calendar.*
 import java.util.TimeZone
 
-
 fun initOcr(context : Context) {
     LradarOcr.initDigitBitmaps(context)
     KradarOcr.initDigitBitmaps(context)
@@ -40,7 +39,7 @@ object LradarOcr {
 
     private fun readDigit(lradar: Bitmap, pos : Int) =
         (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) }
-                ?: throw AssertionError("Couldn't read the digit at $pos")
+                ?: throw AssertionError("Couldn't read lradar digit at $pos")
 }
 
 object KradarOcr {
@@ -48,9 +47,9 @@ object KradarOcr {
     private var timeDigitBitmaps: List<Bitmap> = emptyList()
 
     fun initDigitBitmaps(context: Context) {
-//        if (dateDigitBitmaps.isEmpty()) {
-//            dateDigitBitmaps = loadDigits(context, "kradar/date")
-//        }
+        if (dateDigitBitmaps.isEmpty()) {
+            dateDigitBitmaps = loadDigits(context, "kradar/date")
+        }
         if (timeDigitBitmaps.isEmpty()) {
             timeDigitBitmaps = loadDigits(context, "kradar/time")
         }
@@ -63,40 +62,44 @@ object KradarOcr {
     }
 
     private fun ocrDateTime(bitmap: Bitmap): DateTime {
-        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+
+        // Remember that dt.month is 1-based, but now.get(MONTH) is 0-based!
+
         val dt = DateTime(
+                year = readDateNumber(bitmap, 7, 8, 9, 10),
+                month = now.get(MONTH) + 1, //readDateString(bitmap, 3, 4, 5),
+                day = readDateNumber(bitmap, 0, 1),
                 hour = readTimeNumber(bitmap, 486, 504),
                 minute = readTimeNumber(bitmap, 532, 550),
-                second = readTimeNumber(bitmap, 578, 596),
-                day = cal.get(DAY_OF_MONTH), //readDateNumber(kradar, 0, 1),
-                month = cal.get(MONTH) + 1, //readDateString(kradar, 3, 4, 5),
-                year = cal.get(YEAR) //readDateNumber(kradar, 7, 8, 9, 10)
+                second = readTimeNumber(bitmap, 578, 596)
         )
-        if (dt.hour <= cal.get(HOUR_OF_DAY)) {
-            return dt
+        return when {
+            dt.year < now.get(YEAR) -> DateTime(dt, month = 12)
+            dt.day > now.get(DAY_OF_MONTH) -> DateTime(dt, month = dt.month - 1)
+            else -> dt
         }
-        cal.add(DAY_OF_MONTH, -1)
-        return DateTime(
-                hour = dt.hour,
-                minute = dt.minute,
-                second = dt.second,
-                day = cal.get(DAY_OF_MONTH),
-                month = cal.get(MONTH) + 1,
-                year = cal.get(YEAR)
-        )
     }
 
     private fun readTimeNumber(bitmap: Bitmap, vararg xs : Int): Int =
         xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(bitmap, x) })
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
-            (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
-                    ?: throw AssertionError("Couldn't read the digit at $x")
+            (0..13).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
+                    ?: throw AssertionError("Couldn't kradar time digit at $x")
 
-    private fun readDateNumber(kradar: Bitmap, vararg indices : Int): Int = TODO()
+    private fun readDateNumber(bitmap: Bitmap, vararg indices : Int): Int =
+            indices.fold(0, { acc, i -> 10 * acc + readDateDigit(bitmap, i) })
 
-    private fun readDateString(kradar: Bitmap, vararg indices : Int): Int = TODO()
-
+    private fun readDateDigit(bitmap: Bitmap, pos: Int): Int {
+        val imgX = 486 + 10 * pos
+        val imgY = 168
+        return when {
+            (0 until 13).all { rectY -> bitmap.getPixel(imgX + 3, imgY + rectY) != -1 } -> 0 // blank space
+            else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 3) }
+                    ?: throw AssertionError("Couldn't read kradar date digit at $pos")
+        }
+    }
 }
 
 /**
@@ -104,19 +107,28 @@ object KradarOcr {
  * the vertical stripe in `img` at `(imgX + rectX, imgY)`
  */
 private fun stripeEqual(img: Bitmap, imgX: Int, imgY: Int, rect: Bitmap, rectX: Int) =
-        (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY) }
+    (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY)
+}
 
 private fun loadDigits(context: Context, path : String) =
         (0..9).map { context.assets.open("$path/$it.gif").use { it.readBytes() }.toBitmap() }
 
-data class DateTime(
-        val year : Int,
-        val month : Int,
-        val day : Int,
-        val hour : Int,
-        val minute : Int,
-        val second : Int = 0
+class DateTime(
+        copyFrom: DateTime? = null,
+        year: Int? = null,
+        month: Int? = null,
+        day: Int? = null,
+        hour: Int? = null,
+        minute: Int? = null,
+        second: Int? = null
 ) {
+    val year: Int = year ?: copyFrom?.year ?: throw missingVal("year")
+    val month: Int = month ?: copyFrom?.month ?: throw missingVal("month")
+    val day: Int = day ?: copyFrom?.day ?: throw missingVal("day")
+    val hour: Int = hour ?: copyFrom?.hour ?: throw missingVal("hour")
+    val minute: Int = minute ?: copyFrom?.minute ?: throw missingVal("minute")
+    val second: Int = second ?: copyFrom?.second ?: 0
+
     fun toTimestamp() : Long {
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         cal.timeInMillis = 0
@@ -129,5 +141,8 @@ data class DateTime(
         return cal.timeInMillis
     }
 
-    override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d UTC".format(year, month, day, hour, minute, second)
+    private fun missingVal(field: String) = IllegalArgumentException("$field missing")
+
+    override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d UTC".format(
+            year, month, day, hour, minute, second)
 }
