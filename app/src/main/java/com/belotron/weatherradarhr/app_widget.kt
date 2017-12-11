@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Bitmap.createBitmap
+import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.os.PersistableBundle
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -29,6 +30,7 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.Calendar
@@ -51,27 +53,28 @@ private val widgetDescriptors = arrayOf(
                 R.drawable.lradar_widget_preview,
                 { val bitmap = it.toBitmap()
                     TimestampedBitmap(
-                            createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP),
-                            ocrLradarTimestamp(bitmap)
+                            ocrLradarTimestamp(bitmap),
+                            createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
         WidgetDescriptor("http://vrijeme.hr/kradar.gif", 15,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
                 { val bitmap = it.toBitmap()
                     TimestampedBitmap(
-                            createBitmap(bitmap, 0, 0, KRADAR_CROP_X_RIGHT, bitmap.height),
-                            ocrKradarTimestamp(bitmap)) })
+                            ocrKradarTimestamp(bitmap),
+                            createBitmap(bitmap, 0, 0, KRADAR_CROP_X_RIGHT, bitmap.height)) })
 )
 
 private data class WidgetDescriptor(
         val url: String,
         val updatePeriodMinutes: Long,
-        val providerClass: Class<out AppWidgetProvider>,
+        private val providerClass: Class<out AppWidgetProvider>,
         val previewResourceId: Int,
         val timestampedBitmapFrom: (ByteArray) -> TimestampedBitmap
 ) {
     fun imgFilename() = url.substringAfterLast('/')
     fun timestampFilename() = imgFilename() + ".timestamp"
+    fun providerName(context: Context) = ComponentName(context, providerClass)
     fun index() = widgetDescriptors.indexOf(this)
     fun toExtras() : PersistableBundle {
         val b = PersistableBundle()
@@ -80,13 +83,15 @@ private data class WidgetDescriptor(
     }
 }
 
-private data class TimestampedBitmap(val bitmap : Bitmap?, val timestamp : Long?)
+private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
 
 fun updateWidgets(context : Context) {
     val appContext = context.applicationContext
     widgetDescriptors.forEach { wDesc ->
-        launch(Unconfined) {
-            fetchImageAndUpdateWidget(appContext, wDesc, onlyIfNew = false)
+        if (!AppWidgetManager.getInstance(context).getAppWidgetIds(wDesc.providerName(context)).isEmpty()) {
+            launch(Unconfined) launch@ {
+                fetchImageAndUpdateWidget(appContext, wDesc, onlyIfNew = false)
+            }
         }
     }
 }
@@ -142,23 +147,15 @@ class UpdateAgeService : JobService() {
         MyLog.i("UpdateAgeService start job")
         val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
         val wDesc = widgetDescriptors[wDescIndex]
-        val imgTimestamp = readImgTimestamp(applicationContext, wDesc)
-        updateRemoteViews(applicationContext, wDesc, TimestampedBitmap(null, imgTimestamp))
+        readImgAndTimestamp(applicationContext, wDesc)?.apply {
+            updateRemoteViews(applicationContext, wDesc, this)
+        }
         return false
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
         MyLog.i("UpdateAgeService stop job")
         return true
-    }
-
-    private fun readImgTimestamp(context : Context, wDesc: WidgetDescriptor) : Long? {
-        val file = file(context, wDesc.timestampFilename())
-        return try {
-            DataInputStream(fileIn(file)).use { it.readLong() }
-        } catch (e : Exception) {
-            0L
-        }
     }
 }
 
@@ -168,10 +165,11 @@ private suspend fun fetchImageAndUpdateWidget(
     try {
         val (lastModified, imgBytes) = fetchImage(context, wDesc.url, onlyIfNew)
         if (imgBytes == null) {
+
             return null
         }
         val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes)
-        writeImgTimestamp(context, wDesc, tsBitmap)
+        writeImgAndTimestamp(context, wDesc, tsBitmap)
         updateRemoteViews(context, wDesc, tsBitmap)
         return lastModified
     } catch (e: ImageFetchException) {
@@ -180,29 +178,23 @@ private suspend fun fetchImageAndUpdateWidget(
         } else if (!onlyIfNew) {
             MyLog.w("Failed to fetch ${wDesc.imgFilename()}, using preview")
             updateRemoteViews(context, wDesc, TimestampedBitmap(
-                    (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap,
-                    0L))
+                    0L,
+                    (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap))
         }
         return null
     } catch (t: Throwable) {
+        MyLog.e("Widget refresh failure", t)
         return null
     }
 }
 
-private fun updateRemoteViews(
-        context: Context, wDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap
-) {
+private fun updateRemoteViews(context: Context, wDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap) {
     val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
     remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
-    tsBitmap.bitmap?.apply {
-        remoteViews.setImageViewBitmap(R.id.img_view_widget, this)
-    }
-    tsBitmap.timestamp?.apply {
-        remoteViews.setTextViewText(R.id.text_view_widget,
-                if (this == 0L) "Radar image unavailable. Tap to retry."
-                else getRelativeDateTimeString(context, this, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
-    }
-    AppWidgetManager.getInstance(context).updateAppWidget(ComponentName(context, wDesc.providerClass), remoteViews)
+    remoteViews.setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
+    remoteViews.setTextViewText(R.id.text_view_widget,
+            getRelativeDateTimeString(context, tsBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
+    AppWidgetManager.getInstance(context).updateAppWidget(wDesc.providerName(context), remoteViews)
     MyLog.i("Updated Remote Views")
 }
 
@@ -246,19 +238,24 @@ private fun onClickIntent(context: Context): PendingIntent {
     return PendingIntent.getActivity(context, 0, intent, 0)
 }
 
-
-private fun tryLoadImgFromFile(context: Context, wDesc: WidgetDescriptor) : TimestampedBitmap {
-    val gif = File(context.noBackupFilesDir, wDesc.imgFilename())
-    if (!gif.exists()) {
-        return TimestampedBitmap(null, null)
+private fun writeImgAndTimestamp(context: Context, wDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap) {
+    val fname = wDesc.timestampFilename()
+    val growingFile = file(context, fname + ".growing")
+    dataOut(fileOut(growingFile)).use {
+        it.writeLong(tsBitmap.timestamp)
+        tsBitmap.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
     }
-    val imgBytes = FileInputStream(gif).use { it.readBytes() }
-    return wDesc.timestampedBitmapFrom(imgBytes)
+    if (!growingFile.renameTo(file(context, fname))) {
+        throw IOException("Couldn't rename $growingFile")
+    }
 }
 
-private fun writeImgTimestamp(context: Context, radarDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap) {
-    dataOut(fileOut(file(context, radarDesc.timestampFilename()))).use {
-        it.writeLong(tsBitmap.timestamp!!)
+private fun readImgAndTimestamp(context : Context, wDesc: WidgetDescriptor) : TimestampedBitmap? {
+    val file = file(context, wDesc.timestampFilename())
+    return try {
+        DataInputStream(fileIn(file)).use { TimestampedBitmap(it.readLong(), BitmapFactory.decodeStream(it)) }
+    } catch (e : Exception) {
+        null
     }
 }
 
