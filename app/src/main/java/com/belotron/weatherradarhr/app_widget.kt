@@ -147,9 +147,7 @@ class UpdateAgeService : JobService() {
         MyLog.i("UpdateAgeService start job")
         val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
         val wDesc = widgetDescriptors[wDescIndex]
-        readImgAndTimestamp(applicationContext, wDesc)?.apply {
-            updateRemoteViews(applicationContext, wDesc, this)
-        }
+        updateRemoteViews(applicationContext, wDesc, readImgAndTimestamp(applicationContext, wDesc))
         return false
     }
 
@@ -188,12 +186,16 @@ private suspend fun fetchImageAndUpdateWidget(
     }
 }
 
-private fun updateRemoteViews(context: Context, wDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap) {
+private fun updateRemoteViews(context: Context, wDesc: WidgetDescriptor, tsBitmap: TimestampedBitmap?) {
     val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
     remoteViews.setOnClickPendingIntent(R.id.img_view_widget, onClickIntent(context))
-    remoteViews.setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
-    remoteViews.setTextViewText(R.id.text_view_widget,
-            getRelativeDateTimeString(context, tsBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
+    if (tsBitmap != null) {
+        remoteViews.setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
+        remoteViews.setTextViewText(R.id.text_view_widget,
+                getRelativeDateTimeString(context, tsBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
+    } else {
+        remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
+    }
     AppWidgetManager.getInstance(context).updateAppWidget(wDesc.providerName(context), remoteViews)
     MyLog.i("Updated Remote Views")
 }

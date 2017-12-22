@@ -27,11 +27,11 @@ private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
 private val client : AsyncHttpClient = AsyncHttpClient()
 
-suspend fun fetchImage(context: Context, url: String, onlyIfNew: Boolean
-): Pair<Long, ByteArray?> = suspendCoroutine { cont ->
-    val headers = loadLastModified(context, url)?.let { arrayOf(BasicHeader("If-Modified-Since", it)) }
-    client.get(context, url, headers, RequestParams(), ResponseHandler(context, cont, url, onlyIfNew))
-}
+suspend fun fetchImage(context: Context, url: String, onlyIfNew: Boolean): Pair<Long, ByteArray?> =
+    suspendCoroutine { cont ->
+        val headers = loadLastModified(context, url)?.let { arrayOf(BasicHeader("If-Modified-Since", it)) }
+        client.get(context, url, headers, RequestParams(), ResponseHandler(context, cont, url, onlyIfNew))
+    }
 
 private class ResponseHandler(
         private val context: Context,

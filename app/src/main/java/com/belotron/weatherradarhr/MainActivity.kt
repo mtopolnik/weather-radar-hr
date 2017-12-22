@@ -7,6 +7,7 @@ import android.support.v4.app.FragmentActivity
 import android.support.v4.app.FragmentManager
 import android.support.v4.app.FragmentPagerAdapter
 import android.support.v4.view.ViewPager
+import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,11 +23,11 @@ import java.io.FileOutputStream
 import java.io.FileWriter
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.regex.Pattern
 
 private const val LOADING_HTML = "loading.html"
 private const val MAIN_HTML = "radar_image.html"
+private const val KEY_SAVED_TIMESTAMP = "previous-orientation"
+private var didRotate = false
 
 private val images = arrayOf(
         ImgDescriptor("Puntijarka-Bilogora-Osijek",
@@ -43,12 +44,26 @@ class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int
 }
 
 class MainActivity : FragmentActivity()  {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         val viewPager = findViewById<ViewPager>(R.id.pager)
         viewPager.adapter = FlipThroughRadarImages(supportFragmentManager)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val timestamp = System.currentTimeMillis()
+        outState.putLong(KEY_SAVED_TIMESTAMP, timestamp)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        val restoredTimestamp = savedInstanceState.getLong(KEY_SAVED_TIMESTAMP)
+        didRotate = restoredTimestamp != 0L && System.currentTimeMillis() - restoredTimestamp < SECOND_IN_MILLIS
+        MyLog.i("Did rotate? $didRotate")
     }
 
     private class FlipThroughRadarImages internal constructor(fm: FragmentManager) : FragmentPagerAdapter(fm) {
@@ -92,8 +107,19 @@ class MainActivity : FragmentActivity()  {
         override fun onResume() {
             super.onResume()
             MyLog.w("onResume")
-            updateWidgets(context.applicationContext)
-            reloadImages()
+            if (!didRotate) {
+                updateWidgets(context.applicationContext)
+                fetchImages()
+            }
+            val url = tabHtmlFile(context).toURI().toString()
+            val webView = webView
+            if (webView != null) {
+                if (!didRotate) {
+                    webView.clearCache(true)
+                }
+                webView.loadUrl(url)
+            }
+            didRotate = false
         }
 
         override fun onDestroyView() {
@@ -101,11 +127,10 @@ class MainActivity : FragmentActivity()  {
             webView = null
         }
 
-        private fun reloadImages() {
-            val countdown = AtomicInteger(images.size)
+        private fun fetchImages() {
             val androidCtx = context
             for (desc in images) {
-                launch(Unconfined) coroutine@{
+                launch(Unconfined) coroutine@ {
                     try {
                         val (_, imgBytes) = try {
                             fetchImage(androidCtx, desc.url, onlyIfNew = false)
@@ -119,21 +144,11 @@ class MainActivity : FragmentActivity()  {
                         val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
                         editGif(buf, frameDelay, desc.framesToKeep)
                         val gifFile = File(androidCtx.noBackupFilesDir, desc.filename)
-                        FileOutputStream(gifFile).use { out ->
-                            out.write(buf.array(), buf.position(), buf.remaining())
+                        FileOutputStream(gifFile).use {
+                            it.write(buf.array(), buf.position(), buf.remaining())
                         }
                     } catch (t: Throwable) {
                         MyLog.e("Failed to load animated GIF ${desc.filename}")
-                    } finally {
-                        if (countdown.addAndGet(-1) != 0) {
-                            return@coroutine
-                        }
-                        val url = tabHtmlFile(androidCtx).toURI().toString()
-                        val webView = webView
-                        if (webView != null) {
-                            webView.clearCache(true)
-                            webView.loadUrl(url)
-                        }
                     }
                 }
             }
@@ -142,23 +157,19 @@ class MainActivity : FragmentActivity()  {
         private fun writeTabHtml() {
             val htmlTemplate =
                     BufferedReader(InputStreamReader(context.assets.open(MAIN_HTML))).use { it.readText() }
-            BufferedWriter(FileWriter(tabHtmlFile(context))).use { w -> w.write(expandTemplate(htmlTemplate)) }
+            BufferedWriter(FileWriter(tabHtmlFile(context))).use { it.write(expandTemplate(htmlTemplate)) }
         }
 
-        private fun expandTemplate(htmlTemplate: String): String {
-            val m = Pattern.compile("\\$\\{([^}]+)\\}").matcher(htmlTemplate)
-            val sb = StringBuffer()
-            while (m.find()) {
-                val k = m.group(1)
-                if (k.matches("imageFilename(\\d+)".toRegex())) {
-                    m.appendReplacement(sb, images[Integer.parseInt(k.substring(13, k.length))].filename)
-                } else {
-                    throw AssertionError("Invalid key in HTML template: " + k)
-                }
-            }
-            m.appendTail(sb)
-            return sb.toString()
-        }
+        private val placeholderRegex = Regex("""\$\{([^}]+)\}""")
+        private val imageFilenameRegex = Regex("""imageFilename(\d+)""")
+
+        private fun expandTemplate(htmlTemplate: String): String =
+                placeholderRegex.replace(htmlTemplate, { placeholderMatch ->
+                    val key = placeholderMatch.groupValues[1]
+                    val fnameMatch = imageFilenameRegex.matchEntire(key)
+                            ?: throw AssertionError("Invalid key in HTML template: " + key)
+                    images[fnameMatch.groupValues[1].toInt()].filename
+                })
 
         private fun tabHtmlFile(context: Context) = File(context.noBackupFilesDir, "tab0.html")
     }

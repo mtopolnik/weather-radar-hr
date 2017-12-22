@@ -8,8 +8,8 @@ android {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 22
         targetSdkVersion 26
-        versionCode 3
-        versionName "0.3"
+        versionCode 4
+        versionName "0.4"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -36,4 +36,9 @@ dependencies {
 }
 repositories {
     mavenCentral()
+}
+kotlin {
+    experimental {
+        coroutines "enable"
+    }
 }
