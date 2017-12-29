@@ -85,7 +85,7 @@ private data class WidgetDescriptor(
 
 private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
 
-fun updateWidgets(context : Context) {
+fun launchFetchWidgetImages(context : Context) {
     val appContext = context.applicationContext
     widgetDescriptors.forEach { wDesc ->
         if (!AppWidgetManager.getInstance(context).getAppWidgetIds(wDesc.providerName(context)).isEmpty()) {
