@@ -7,15 +7,9 @@ import android.support.v4.app.FragmentManager
 import android.support.v4.app.FragmentPagerAdapter
 import android.support.v4.view.ViewPager
 import android.support.v7.app.AppCompatActivity
-import android.support.v7.widget.Toolbar
 import android.text.format.DateUtils.SECOND_IN_MILLIS
-import android.view.GestureDetector
-import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
-import android.view.View.INVISIBLE
-import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
@@ -107,14 +101,14 @@ class RadarImageFragment : Fragment() {
     ): View {
         val rootView = inflater.inflate(R.layout.image_radar, container, false)
         val webView = rootView.findViewById<WebView>(R.id.web_view_radar)!!
-        val gestureDetector = GestureDetector(context, object : SimpleOnGestureListener() {
-            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-                val toolbar = mainActivity!!.findViewById<Toolbar>(R.id.my_toolbar)!!
-                toolbar.visibility = if (toolbar.visibility == VISIBLE) INVISIBLE else VISIBLE
-                return true
-            }
-        })
-        webView.setOnTouchListener({_, event -> gestureDetector.onTouchEvent(event) })
+//        val gestureDetector = GestureDetector(context, object : SimpleOnGestureListener() {
+//            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
+//                val toolbar = mainActivity!!.findViewById<Toolbar>(R.id.my_toolbar)!!
+//                toolbar.visibility = if (toolbar.visibility == VISIBLE) INVISIBLE else VISIBLE
+//                return true
+//            }
+//        })
+//        webView.setOnTouchListener({_, event -> gestureDetector.onTouchEvent(event) })
         this.webView = webView
         val s = webView.settings
         s.setSupportZoom(true)
