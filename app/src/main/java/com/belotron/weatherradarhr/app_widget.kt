@@ -80,12 +80,12 @@ private data class WidgetDescriptor(
 
 private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
 
-fun launchFetchWidgetImages(context : Context) {
+fun startFetchWidgetImages(context : Context) {
     val appContext = context.applicationContext
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
         if (wCtx.isWidgetInUse()) {
-            launch(Unconfined) launch@ {
+            start start@ {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
         }
@@ -112,7 +112,7 @@ class RefreshImageService : JobService() {
             MyLog.i("RefreshImageService: ${wDesc.name}")
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse()) {
-                launch(Unconfined) {
+                start {
                     val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                     jobFinished(params, lastModified == null)
                     if (lastModified != null) {
@@ -173,7 +173,7 @@ private class WidgetContext (
 
     fun onUpdateWidget() {
         MyLog.w("onUpdate ${wDesc.name}")
-        launch(Unconfined) {
+        start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
                     if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)

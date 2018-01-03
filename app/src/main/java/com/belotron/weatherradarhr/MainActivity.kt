@@ -14,8 +14,6 @@ import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.webkit.WebSettings.LOAD_NO_CACHE
 import android.webkit.WebView
-import kotlinx.coroutines.experimental.Unconfined
-import kotlinx.coroutines.experimental.launch
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
@@ -131,8 +129,8 @@ class RadarImageFragment : Fragment() {
             didRotate = false
             loadImagesInWebView(false)
         } else {
-            launchFetchWidgetImages(context.applicationContext)
-            launchFetchAnimations()
+            startFetchWidgetImages(context.applicationContext)
+            startFetchAnimations()
         }
     }
 
@@ -141,11 +139,11 @@ class RadarImageFragment : Fragment() {
         webView = null
     }
 
-    private fun launchFetchAnimations() {
+    private fun startFetchAnimations() {
         val androidCtx = context
         val countDown = AtomicInteger(images.size)
         for (desc in images) {
-            launch(Unconfined) thread@ {
+            start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
                         fetchImage(androidCtx, desc.url, onlyIfNew = false)
@@ -153,7 +151,7 @@ class RadarImageFragment : Fragment() {
                         Pair(0L, e.cached)
                     }
                     if (imgBytes == null || webView == null) {
-                        return@thread
+                        return@coroutine
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
                     val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
