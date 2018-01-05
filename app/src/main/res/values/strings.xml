@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">Weather Radar HR and SLO</string>
+    <string name="title">Weather Radar</string>
     <string name="img_unavailable">Radar image unavailable. Tap to retry.</string>
     <string name="widget_slo">Weather Radar SLO</string>
     <string name="widget_hr">Weather Radar HR=</string>
+    <string name="settings">Settings</string>
+    <string name="about">About</string>
+    <string name="refresh">Refresh</string>
 </resources>

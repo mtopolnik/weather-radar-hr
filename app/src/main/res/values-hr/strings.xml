@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vrijeme na radaru</string>
+    <string name="title">Vrijeme na radaru</string>
     <string name="img_unavailable">Slika nedostupna. Dotakni da probam ponovo.</string>
     <string name="widget_slo">Vrijeme na SLO radaru</string>
     <string name="widget_hr">Vrijeme na HR radaru</string>
+    <string name="about">O aplikaciji</string>
+    <string name="settings">Postavke</string>
+    <string name="refresh">Osvježi</string>
 </resources>

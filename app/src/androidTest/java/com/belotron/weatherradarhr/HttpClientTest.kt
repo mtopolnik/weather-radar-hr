@@ -43,7 +43,7 @@ class HttpClientTest {
         counter.incrementAndGet()
         launch(Unconfined) {
             try {
-                fetchImage(appContext, url, onlyIfNew = false)
+                fetchUrl(appContext, url, onlyIfNew = false)
             } catch (e: Exception) {
                 fail(e.message)
             } finally {

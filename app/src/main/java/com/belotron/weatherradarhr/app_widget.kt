@@ -23,8 +23,6 @@ import android.text.format.DateUtils.getRelativeDateTimeString
 import android.widget.RemoteViews
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
-import kotlinx.coroutines.experimental.Unconfined
-import kotlinx.coroutines.experimental.launch
 import java.io.IOException
 import java.util.Calendar
 import java.util.TimeZone
@@ -85,7 +83,7 @@ fun startFetchWidgetImages(context : Context) {
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
         if (wCtx.isWidgetInUse()) {
-            start start@ {
+            start {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
         }
@@ -185,7 +183,7 @@ private class WidgetContext (
 
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
-            val (lastModified, imgBytes) = fetchImage(context, wDesc.url, onlyIfNew)
+            val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, onlyIfNew)
             if (imgBytes == null) {
 
                 return null

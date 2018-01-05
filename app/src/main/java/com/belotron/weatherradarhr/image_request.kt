@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper.myLooper
 import kotlinx.coroutines.experimental.CoroutineScope
-import kotlinx.coroutines.experimental.CoroutineStart
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Unconfined
 import kotlinx.coroutines.experimental.android.asCoroutineDispatcher
@@ -25,8 +24,6 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executors
-import kotlin.coroutines.experimental.Continuation
-import kotlin.coroutines.experimental.suspendCoroutine
 import java.util.logging.Logger as JulLogger
 
 fun ByteArray.toBitmap() : Bitmap =
@@ -51,7 +48,7 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-suspend fun fetchImage(
+suspend fun fetchUrl(
         context: Context, url: String, onlyIfNew: Boolean
 ): Pair<Long, ByteArray?> = withContext(threadPool) {
     val conn = URL(url).openConnection() as HttpURLConnection
@@ -81,30 +78,28 @@ suspend fun fetchImage(
 }
 
 private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context): Pair<Long, ByteArray> {
-    val url = conn.url.toExternalForm()
-    val responseBody = conn.inputStream.use { it.readBytes() }
+    val responseBody = lazy { conn.inputStream.use { it.readBytes() } }
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
     val lastModified = lastModifiedStr.parseLastModified()
+    val url = conn.url.toExternalForm()
     MyLog.i("Last-Modified $lastModifiedStr: $url")
     return synchronized(threadPool) {
         try {
             val cachedIn = runOrNull({ cachedDataIn(context, url) })
             val imgBytes = if (cachedIn == null)
-                responseBody
+                responseBody.value
             else {
                 val cachedLastModified = runOrNull({ cachedIn.readUTF().parseLastModified() })
                 when {
                     cachedLastModified == null || cachedLastModified < lastModified -> {
                         cachedIn.close()
-                        updateCache(cacheFile(context, url), lastModifiedStr, responseBody)
-                        responseBody
+                        updateCache(cacheFile(context, url), lastModifiedStr, responseBody.value)
+                        responseBody.value
                     }
-                    cachedLastModified == lastModified -> {
-                        cachedIn.close()
-                        responseBody
-                    }
-                    else -> // cachedLastModified > lastModified
+                    else -> { // cachedLastModified >= lastModified, can happen with concurrent requests
+                        conn.inputStream.close()
                         cachedIn.use { it.readBytes() }
+                    }
                 }
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)

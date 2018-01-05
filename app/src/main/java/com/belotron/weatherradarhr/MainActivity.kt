@@ -1,14 +1,20 @@
 package com.belotron.weatherradarhr
 
+import android.app.Activity
+import android.app.Fragment
+import android.app.FragmentManager
 import android.content.Context
 import android.os.Bundle
-import android.support.v4.app.Fragment
-import android.support.v4.app.FragmentManager
-import android.support.v4.app.FragmentPagerAdapter
+import android.support.v13.app.FragmentPagerAdapter
 import android.support.v4.view.ViewPager
-import android.support.v7.app.AppCompatActivity
 import android.text.format.DateUtils.SECOND_IN_MILLIS
+import android.view.GestureDetector
+import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -43,16 +49,17 @@ class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int
     val filename = url.substringAfterLast('/')
 }
 
-class MainActivity : AppCompatActivity()  {
+class MainActivity : Activity()  {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MyLog.i("onCreate")
         mainActivity = this
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
+        actionBar.hide()
         setContentView(R.layout.activity_main)
         val viewPager = findViewById<ViewPager>(R.id.my_pager)
-        viewPager.adapter = FlipThroughRadarImages(supportFragmentManager)
+        viewPager.adapter = FlipThroughRadarImages(fragmentManager)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -94,19 +101,47 @@ class RadarImageFragment : Fragment() {
 
     private var webView: WebView? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setHasOptionsMenu(true)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        inflater.inflate(R.menu.main_menu, menu)
+        super.onCreateOptionsMenu(menu, inflater)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.refresh -> {
+                webView?.apply {
+                    showSpinner()
+                    startFetchAnimations()
+                }
+            }
+            R.id.settings -> Unit
+            R.id.about -> Unit
+        }
+        return true
+    }
+
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         val rootView = inflater.inflate(R.layout.image_radar, container, false)
         val webView = rootView.findViewById<WebView>(R.id.web_view_radar)!!
-//        val gestureDetector = GestureDetector(context, object : SimpleOnGestureListener() {
-//            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-//                val toolbar = mainActivity!!.findViewById<Toolbar>(R.id.my_toolbar)!!
-//                toolbar.visibility = if (toolbar.visibility == VISIBLE) INVISIBLE else VISIBLE
-//                return true
-//            }
-//        })
-//        webView.setOnTouchListener({_, event -> gestureDetector.onTouchEvent(event) })
+        val gestureDetector = GestureDetector(activity, object : SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
+                val toolbar = mainActivity!!.actionBar
+                if (toolbar.isShowing) {
+                    toolbar.hide()
+                } else {
+                    toolbar.show()
+                }
+                return true
+            }
+        })
+        webView.setOnTouchListener({_, event -> gestureDetector.onTouchEvent(event) })
         this.webView = webView
         val s = webView.settings
         s.setSupportZoom(true)
@@ -115,9 +150,7 @@ class RadarImageFragment : Fragment() {
         s.useWideViewPort = true
         s.loadWithOverviewMode = true
         s.cacheMode = LOAD_NO_CACHE
-        val loadingHtml = File(context.noBackupFilesDir, LOADING_HTML)
-        context.assets.open(LOADING_HTML).use { it.copyTo(FileOutputStream(loadingHtml)) }
-        webView.loadUrl(loadingHtml.toURI().toString())
+        webView.showSpinner()
         return rootView
     }
 
@@ -129,7 +162,7 @@ class RadarImageFragment : Fragment() {
             didRotate = false
             loadImagesInWebView(false)
         } else {
-            startFetchWidgetImages(context.applicationContext)
+            startFetchWidgetImages(activity.applicationContext)
             startFetchAnimations()
         }
     }
@@ -139,14 +172,20 @@ class RadarImageFragment : Fragment() {
         webView = null
     }
 
+    private fun WebView.showSpinner() {
+        val loadingHtml = File(activity.noBackupFilesDir, LOADING_HTML)
+        activity.assets.open(LOADING_HTML).use { it.copyTo(FileOutputStream(loadingHtml)) }
+        loadUrl(loadingHtml.toURI().toString())
+    }
+
     private fun startFetchAnimations() {
-        val androidCtx = context
+        val androidCtx = activity
         val countDown = AtomicInteger(images.size)
         for (desc in images) {
             start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
-                        fetchImage(androidCtx, desc.url, onlyIfNew = false)
+                        fetchUrl(androidCtx, desc.url, onlyIfNew = false)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
@@ -173,7 +212,7 @@ class RadarImageFragment : Fragment() {
 
     private fun loadImagesInWebView(clearCache: Boolean) {
         val webView = webView ?: return
-        val url = tabHtmlFile(context).toURI().toString()
+        val url = tabHtmlFile(activity).toURI().toString()
         if (clearCache) {
             webView.clearCache(true)
         }
@@ -181,8 +220,8 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun writeTabHtml() {
-        val htmlTemplate = BufferedReader(InputStreamReader(context.assets.open(MAIN_HTML))).use { it.readText() }
-        BufferedWriter(FileWriter(tabHtmlFile(context))).use { it.write(expandTemplate(htmlTemplate)) }
+        val htmlTemplate = BufferedReader(InputStreamReader(activity.assets.open(MAIN_HTML))).use { it.readText() }
+        BufferedWriter(FileWriter(tabHtmlFile(activity))).use { it.write(expandTemplate(htmlTemplate)) }
     }
 
     private val placeholderRegex = Regex("""\$\{([^}]+)\}""")
