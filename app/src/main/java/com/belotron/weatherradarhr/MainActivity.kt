@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Fragment
 import android.app.FragmentManager
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.support.v13.app.FragmentPagerAdapter
 import android.support.v4.view.ViewPager
@@ -53,7 +54,7 @@ class MainActivity : Activity()  {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        MyLog.i("onCreate")
+        MyLog.i("onCreate MainActivity")
         mainActivity = this
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         actionBar.hide()
@@ -119,7 +120,9 @@ class RadarImageFragment : Fragment() {
                     startFetchAnimations()
                 }
             }
-            R.id.settings -> Unit
+            R.id.settings -> {
+                startActivity(Intent(activity, SettingsActivity::class.java))
+            }
             R.id.about -> Unit
         }
         return true

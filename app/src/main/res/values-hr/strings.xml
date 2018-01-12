@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vrijeme na radaru</string>
-    <string name="title">Vrijeme na radaru</string>
+    <string name="main_activity_title">Vrijeme na radaru</string>
     <string name="img_unavailable">Slika nedostupna. Dotakni da probam ponovo.</string>
     <string name="widget_slo">Vrijeme na SLO radaru</string>
     <string name="widget_hr">Vrijeme na HR radaru</string>
     <string name="about">O aplikaciji</string>
     <string name="settings">Postavke</string>
     <string name="refresh">Osvježi</string>
+    <string name="animation_rate">Brzina animacije</string>
+    <string-array name="animation_rates">
+        <item>vrlo sporo</item>
+        <item>sporo</item>
+        <item>normalno</item>
+    </string-array>
+    <string name="freeze_time">Pauza na kraju</string>
+    <string-array name="freeze_times">
+        <item>vrlo duga</item>
+        <item>duga</item>
+        <item>normalna</item>
+    </string-array>
 </resources>

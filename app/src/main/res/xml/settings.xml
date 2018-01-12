@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <ListPreference
+            android:key="animation_rate"
+            android:title="@string/animation_rate"
+            android:entries="@array/animation_rates"
+            android:entryValues="@array/animation_rate_values"
+    />
+    <ListPreference
+            android:key="freeze_time"
+            android:title="@string/freeze_time"
+            android:entries="@array/freeze_times"
+            android:entryValues="@array/freeze_time_values"
+    />
+</PreferenceScreen>

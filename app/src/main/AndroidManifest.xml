@@ -12,12 +12,15 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity"
-                  android:label="@string/title"
+                  android:label="@string/main_activity_title"
                   android:noHistory="true">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <action android:name="android.intent.action.MAIN"/>
             </intent-filter>
+        </activity>
+        <activity android:name=".SettingsActivity"
+                  android:label="@string/settings">
         </activity>
 
         <receiver android:name=".LradarWidgetProvider"

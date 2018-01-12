@@ -1,10 +1,32 @@
 <resources>
     <string name="app_name">Weather Radar HR and SLO</string>
-    <string name="title">Weather Radar</string>
+    <string name="main_activity_title">Weather Radar</string>
     <string name="img_unavailable">Radar image unavailable. Tap to retry.</string>
     <string name="widget_slo">Weather Radar SLO</string>
     <string name="widget_hr">Weather Radar HR=</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>
     <string name="refresh">Refresh</string>
+    <string name="animation_rate">Animation Rate</string>
+    <string-array name="animation_rates">
+        <item>Glacial</item>
+        <item>Slow</item>
+        <item>Normal</item>
+    </string-array>
+    <string-array name="animation_rate_values">
+        <item>rate0</item>
+        <item>rate1</item>
+        <item>rate2</item>
+    </string-array>
+    <string name="freeze_time">Pause at End</string>
+    <string-array name="freeze_times">
+        <item>Very Long</item>
+        <item>Long</item>
+        <item>Normal</item>
+    </string-array>
+    <string-array name="freeze_time_values">
+        <item>delay0</item>
+        <item>delay1</item>
+        <item>delay2</item>
+    </string-array>
 </resources>
