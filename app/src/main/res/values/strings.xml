@@ -9,9 +9,9 @@
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
     <string-array name="animation_rates">
-        <item>Glacial</item>
-        <item>Slow</item>
         <item>Normal</item>
+        <item>Slow</item>
+        <item>Glacial</item>
     </string-array>
     <string-array name="animation_rate_values">
         <item>rate0</item>
@@ -20,9 +20,9 @@
     </string-array>
     <string name="freeze_time">Pause at End</string>
     <string-array name="freeze_times">
-        <item>Very Long</item>
-        <item>Long</item>
         <item>Normal</item>
+        <item>Long</item>
+        <item>Very Long</item>
     </string-array>
     <string-array name="freeze_time_values">
         <item>delay0</item>
