@@ -8,25 +8,25 @@ import java.util.Deque
 
 const val ANIMATION_COVERS_MINUTES = 100
 private const val LOOP_COUNT = 50
-private const val ANIMATION_DURATION = 250
 private const val BLOCK_TYPE_EXTENSION = 0x21
 private const val BLOCK_TYPE_IMAGE = 0x2c
 private const val BLOCK_TYPE_TRAILER = 0x3b
 private const val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
 private const val EXT_TYPE_APPLICATION = 0xff
 
-fun editGif(buf: ByteBuffer, delayTime: Int, framesToKeep: Int) {
-    GifEditor(buf, delayTime, framesToKeep).go()
+fun editGif(buf: ByteBuffer, delayTime: Int, animationDuration: Int, framesToKeep: Int) {
+    GifEditor(buf, delayTime, animationDuration, framesToKeep).go()
 }
 
 fun checkGif(buf: ByteBuffer) {
-    GifEditor(buf, 0, 1).checkGif()
+    GifEditor(buf, 0, 0, 1).checkGif()
 }
 
 private class GifEditor
 constructor(
         private val buf: ByteBuffer,
         private val delayTime: Int,
+        private val animationDuration: Int,
         private val framesToKeep: Int
 ) {
 
@@ -290,7 +290,7 @@ constructor(
 
         fun firstFrameOffset() = firstFrameOffset
 
-        fun lastFrameDelay() = delayTime + ANIMATION_DURATION - keptFrameCount * delayTime
+        fun lastFrameDelay() = delayTime + animationDuration - keptFrameCount * delayTime
     }
 
     private class FrameDescriptor constructor(internal val start: Int) {

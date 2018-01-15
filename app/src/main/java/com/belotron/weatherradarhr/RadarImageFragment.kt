@@ -4,6 +4,7 @@ import android.app.Fragment
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.preference.PreferenceManager.getDefaultSharedPreferences
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.Menu
@@ -35,9 +36,42 @@ private val images = arrayOf(
                 10)
 )
 
-private class ImgDescriptor(val title: String, val url: String, val minutesPerFrame: Int) {
+private class ImgDescriptor(
+        val title: String,
+        val url: String,
+        val minutesPerFrame: Int
+) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
     val filename = url.substringAfterLast('/')
+}
+
+private class ImgContext(
+        private val imgDesc: ImgDescriptor,
+        context: Context
+) {
+    private val prefs = getDefaultSharedPreferences(context)
+
+    val frameDelay = (frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
+
+    val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + freezeTime()
+
+    private fun freezeTime() = prefs.getString("freeze_time", "freeze0").let { freezeStr ->
+        when (freezeStr) {
+            "freeze0" -> 250
+            "freeze1" -> 400
+            "freeze2" -> 800
+            else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
+        }
+    }
+
+    private fun frameDelayFactor(): Float = prefs.getString("animation_rate", "rate0").let { rateStr ->
+        when (rateStr) {
+            "rate0" -> 1.2f
+            "rate1" -> 2.0f
+            "rate2" -> 4.0f
+            else -> throw RuntimeException("Invalid animation rate value: $rateStr")
+        }
+    }
 }
 
 class RadarImageFragment : Fragment() {
@@ -45,16 +79,19 @@ class RadarImageFragment : Fragment() {
     private var webView: WebView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        MyLog.i("RadarImageFragment.onCreate")
         super.onCreate(savedInstanceState)
         setHasOptionsMenu(true)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        MyLog.i("RadarImageFragment.onCreateOptionsMenu")
         inflater.inflate(R.menu.main_menu, menu)
         super.onCreateOptionsMenu(menu, inflater)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        MyLog.i("RadarImageFragment.onOptionsItemSelected")
         activity.actionBar.hide()
         when (item.itemId) {
             R.id.refresh -> {
@@ -74,6 +111,7 @@ class RadarImageFragment : Fragment() {
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
+        MyLog.i("RadarImageFragment.onCreateView")
         val rootView = inflater.inflate(R.layout.image_radar, container, false)
         val webView = rootView.findViewById<WebView>(R.id.web_view_radar)!!
         val gestureDetector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
@@ -102,7 +140,7 @@ class RadarImageFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        MyLog.w("onResume")
+        MyLog.w("RadarImageFragment.onResume")
         writeTabHtml()
         val mainActivity = activity as MainActivity
         if (mainActivity.didRotate) {
@@ -126,13 +164,13 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun startFetchAnimations() {
-        val androidCtx = activity
+        val context = activity
         val countDown = AtomicInteger(images.size)
         for (desc in images) {
             start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
-                        fetchUrl(androidCtx, desc.url, onlyIfNew = false)
+                        fetchUrl(context, desc.url, onlyIfNew = false)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
@@ -140,16 +178,16 @@ class RadarImageFragment : Fragment() {
                         return@coroutine
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
-                    val frameDelay = (1.2 * desc.minutesPerFrame).toInt()
-                    editGif(buf, frameDelay, desc.framesToKeep)
-                    val gifFile = File(androidCtx.noBackupFilesDir, desc.filename)
+                    val imgContext = ImgContext(desc, activity)
+                    editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
+                    val gifFile = File(context.noBackupFilesDir, desc.filename)
                     FileOutputStream(gifFile).use {
                         it.write(buf.array(), buf.position(), buf.remaining())
                     }
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}")
                 } finally {
-                    if (countDown.addAndGet(-1) == 0) {
+                    if (countDown.decrementAndGet() == 0) {
                         loadImagesInWebView(true)
                     }
                 }

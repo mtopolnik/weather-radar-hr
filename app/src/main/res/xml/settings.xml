@@ -5,7 +5,7 @@
             android:title="@string/animation_rate"
             android:entries="@array/animation_rates"
             android:entryValues="@array/animation_rate_values"
-            android:defaultValue="rate0"
+            android:defaultValue="@string/animation_rate_default"
             android:summary="%s"
     />
     <ListPreference
@@ -13,7 +13,7 @@
             android:title="@string/freeze_time"
             android:entries="@array/freeze_times"
             android:entryValues="@array/freeze_time_values"
-            android:defaultValue="delay0"
+            android:defaultValue="@string/freeze_time_default"
             android:summary="%s"
     />
 </PreferenceScreen>

@@ -13,6 +13,7 @@
         <item>Slow</item>
         <item>Glacial</item>
     </string-array>
+    <string name="animation_rate_default">rate0</string>
     <string-array name="animation_rate_values">
         <item>rate0</item>
         <item>rate1</item>
@@ -24,9 +25,10 @@
         <item>Long</item>
         <item>Very Long</item>
     </string-array>
+    <string name="freeze_time_default">freeze0</string>
     <string-array name="freeze_time_values">
-        <item>delay0</item>
-        <item>delay1</item>
-        <item>delay2</item>
+        <item>freeze0</item>
+        <item>freeze1</item>
+        <item>freeze2</item>
     </string-array>
 </resources>
