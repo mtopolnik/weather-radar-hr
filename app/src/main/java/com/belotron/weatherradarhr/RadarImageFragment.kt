@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.app.Fragment
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.preference.PreferenceManager.getDefaultSharedPreferences
 import android.view.GestureDetector
@@ -27,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
 private const val LOADING_HTML = "loading.html"
 private const val MAIN_HTML = "radar_image.html"
 
-private val images = arrayOf(
+val images = arrayOf(
         ImgDescriptor("Puntijarka-Bilogora-Osijek",
                 "http://vrijeme.hr/kradar-anim.gif",
                 15),
@@ -36,7 +37,7 @@ private val images = arrayOf(
                 10)
 )
 
-private class ImgDescriptor(
+class ImgDescriptor(
         val title: String,
         val url: String,
         val minutesPerFrame: Int
@@ -45,21 +46,18 @@ private class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-private class ImgContext(
-        private val imgDesc: ImgDescriptor,
-        context: Context
+class ImgContext(
+        imgDesc: ImgDescriptor,
+        private val prefs: SharedPreferences
 ) {
-    private val prefs = getDefaultSharedPreferences(context)
-
     val frameDelay = (frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
-
     val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + freezeTime()
 
     private fun freezeTime() = prefs.getString("freeze_time", "freeze0").let { freezeStr ->
         when (freezeStr) {
-            "freeze0" -> 250
-            "freeze1" -> 400
-            "freeze2" -> 800
+            "freeze0" -> 150
+            "freeze1" -> 300
+            "freeze2" -> 600
             else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
         }
     }
@@ -67,11 +65,16 @@ private class ImgContext(
     private fun frameDelayFactor(): Float = prefs.getString("animation_rate", "rate0").let { rateStr ->
         when (rateStr) {
             "rate0" -> 1.2f
-            "rate1" -> 2.0f
-            "rate2" -> 4.0f
+            "rate1" -> 3.4f
+            "rate2" -> 4.8f
             else -> throw RuntimeException("Invalid animation rate value: $rateStr")
         }
     }
+}
+
+fun main(args: Array<String>) {
+    println(1.2f * 10)
+    println(1.2f * 15)
 }
 
 class RadarImageFragment : Fragment() {
@@ -178,14 +181,14 @@ class RadarImageFragment : Fragment() {
                         return@coroutine
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
-                    val imgContext = ImgContext(desc, activity)
+                    val imgContext = ImgContext(desc, getDefaultSharedPreferences(activity))
                     editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
                     val gifFile = File(context.noBackupFilesDir, desc.filename)
                     FileOutputStream(gifFile).use {
                         it.write(buf.array(), buf.position(), buf.remaining())
                     }
                 } catch (t: Throwable) {
-                    MyLog.e("Failed to load animated GIF ${desc.filename}")
+                    MyLog.e("Failed to load animated GIF ${desc.filename}", t)
                 } finally {
                     if (countDown.decrementAndGet() == 0) {
                         loadImagesInWebView(true)

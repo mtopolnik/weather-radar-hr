@@ -164,7 +164,7 @@ constructor(
     }
 
     private fun nextByte(): Int {
-        return toUnsignedInt(buf.get().toInt())
+        return buf.get().toUnsignedInt()
     }
 
     private fun getString(len: Int): String {
@@ -184,10 +184,6 @@ constructor(
         val len = srcLimit - srcPos
         System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
         dest.position(dest.position() + len)
-    }
-
-    private fun toUnsignedInt(b: Int): Int {
-        return b and 0xff
     }
 
     private fun writeLoopingExtension(buf: ByteBuffer) {
@@ -221,7 +217,7 @@ constructor(
             if (!frameInProgress) {
                 currFrame = FrameDescriptor(offset)
             }
-            val blockType = toUnsignedInt(buf.get(offset).toInt())
+            val blockType = buf.get(offset).toUnsignedInt()
             frameInProgress = blockType != BLOCK_TYPE_IMAGE
         }
 
@@ -231,7 +227,8 @@ constructor(
                 throw AssertionError("Invalid Graphic Control Extension block size: " + blockSize)
             }
             currFrame!!.gcExtPackedFields = buf.get()
-            skip(2) // delayTime
+            MyLog.i("Frame delay ${buf.getChar().toInt()}")
+//            skip(2) // delayTime
             currFrame!!.gcExtTransparentColorIndex = buf.get()
             val blockTerminator = nextByte()
             if (blockTerminator != 0) {
@@ -314,6 +311,9 @@ constructor(
     }
 }
 
+private fun Byte.toUnsignedInt(): Int {
+    return this.toInt() and 0xff
+}
 
 private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
     if (srcPos == dest.position()) {
@@ -322,10 +322,6 @@ private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) 
     val len = srcLimit - srcPos
     System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
     dest.position(dest.position() + len)
-}
-
-private fun toUnsignedInt(b: Int): Int {
-    return b and 0xff
 }
 
 private fun writeLoopingExtension(buf: ByteBuffer) {
