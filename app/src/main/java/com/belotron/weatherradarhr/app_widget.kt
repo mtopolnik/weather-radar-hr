@@ -185,7 +185,6 @@ private class WidgetContext (
         try {
             val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, onlyIfNew)
             if (imgBytes == null) {
-
                 return null
             }
             val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes)

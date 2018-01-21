@@ -4,20 +4,13 @@ import android.os.Handler
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.Log
-import kotlinx.coroutines.experimental.Unconfined
-import kotlinx.coroutines.experimental.launch
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * Instrumentation test, which will execute on an Android device.
- *
- * @see [Testing documentation](http://d.android.com/tools/testing)
- */
 @RunWith(AndroidJUnit4::class)
-class HttpClientTest {
+class ConcurrentHttpFetchTest {
 
     private val logTag = "wrInstrumentedTest"
     private val appContext = InstrumentationRegistry.getTargetContext()
@@ -28,8 +21,8 @@ class HttpClientTest {
         counter.incrementAndGet()
         Handler(appContext.mainLooper).post( {
             (1..5).forEach {
-                fetch("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif")
-                fetch("http://vrijeme.hr/kradar.gif")
+                startFetch("http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif")
+                startFetch("http://vrijeme.hr/kradar.gif")
             }
             counter.decrementAndGet()
         })
@@ -39,9 +32,9 @@ class HttpClientTest {
         }
     }
 
-    private fun fetch(url: String) {
+    private fun startFetch(url: String) {
         counter.incrementAndGet()
-        launch(Unconfined) {
+        start {
             try {
                 fetchUrl(appContext, url, onlyIfNew = false)
             } catch (e: Exception) {

@@ -53,21 +53,21 @@ class ImgContext(
     val frameDelay = (frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
     val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + freezeTime()
 
-    private fun freezeTime() = prefs.getString("freeze_time", "freeze0").let { freezeStr ->
-        when (freezeStr) {
-            "freeze0" -> 150
-            "freeze1" -> 300
-            "freeze2" -> 600
-            else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
+    private fun frameDelayFactor(): Float = prefs.getString("frame_delay", "frameDelay0").let { delayStr ->
+        when (delayStr) {
+            "frameDelay0" -> 1.2f
+            "frameDelay1" -> 2.6f
+            "frameDelay2" -> 4.8f
+            else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
         }
     }
 
-    private fun frameDelayFactor(): Float = prefs.getString("animation_rate", "rate0").let { rateStr ->
-        when (rateStr) {
-            "rate0" -> 1.2f
-            "rate1" -> 3.4f
-            "rate2" -> 4.8f
-            else -> throw RuntimeException("Invalid animation rate value: $rateStr")
+    private fun freezeTime() = prefs.getString("freeze_time", "freeze0").let { freezeStr ->
+        when (freezeStr) {
+            "freeze0" -> 150
+            "freeze1" -> 250
+            "freeze2" -> 350
+            else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
         }
     }
 }
@@ -183,7 +183,7 @@ class RadarImageFragment : Fragment() {
                     val buf = ByteBuffer.wrap(imgBytes)
                     val imgContext = ImgContext(desc, getDefaultSharedPreferences(activity))
                     editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
-                    val gifFile = File(context.noBackupFilesDir, desc.filename)
+                    val gifFile = context.file(desc.filename)
                     FileOutputStream(gifFile).use {
                         it.write(buf.array(), buf.position(), buf.remaining())
                     }
@@ -223,5 +223,5 @@ class RadarImageFragment : Fragment() {
                 images[fnameMatch.groupValues[1].toInt()].filename
             })
 
-    private fun tabHtmlFile(context: Context) = File(context.noBackupFilesDir, "tab0.html")
+    private fun tabHtmlFile(context: Context) = context.file("tab0.html")
 }
