@@ -1,32 +1,18 @@
 package com.belotron.weatherradarhr
 
 import android.app.Fragment
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.preference.PreferenceManager.getDefaultSharedPreferences
-import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.WebSettings
-import android.webkit.WebView
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.File
-import java.io.FileOutputStream
-import java.io.FileWriter
-import java.io.InputStreamReader
+import android.widget.ImageView
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicInteger
-
-private const val LOADING_HTML = "loading.html"
-private const val MAIN_HTML = "radar_image.html"
 
 val images = arrayOf(
         ImgDescriptor("Puntijarka-Bilogora-Osijek",
@@ -78,8 +64,7 @@ fun main(args: Array<String>) {
 }
 
 class RadarImageFragment : Fragment() {
-
-    private var webView: WebView? = null
+    private val imgViews: Array<ImageView?> = arrayOf(null, null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i("RadarImageFragment.onCreate")
@@ -98,8 +83,7 @@ class RadarImageFragment : Fragment() {
         activity.actionBar.hide()
         when (item.itemId) {
             R.id.refresh -> {
-                webView?.apply {
-                    showSpinner()
+                if (imgViews[0] != null) {
                     startFetchAnimations()
                 }
             }
@@ -116,39 +100,17 @@ class RadarImageFragment : Fragment() {
     ): View {
         MyLog.i("RadarImageFragment.onCreateView")
         val rootView = inflater.inflate(R.layout.image_radar, container, false)
-        val webView = rootView.findViewById<WebView>(R.id.web_view_radar)!!
-        val gestureDetector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-                val toolbar = activity.actionBar
-                if (toolbar.isShowing) {
-                    toolbar.hide()
-                } else {
-                    toolbar.show()
-                }
-                return true
-            }
-        })
-        webView.setOnTouchListener({_, event -> gestureDetector.onTouchEvent(event) })
-        this.webView = webView
-        val s = webView.settings
-        s.setSupportZoom(true)
-        s.builtInZoomControls = true
-        s.displayZoomControls = false
-        s.useWideViewPort = true
-        s.loadWithOverviewMode = true
-        s.cacheMode = WebSettings.LOAD_NO_CACHE
-        webView.showSpinner()
+        imgViews[0] = rootView.findViewById(R.id.img_view_kradar)
+        imgViews[1] = rootView.findViewById(R.id.img_view_lradar)
         return rootView
     }
 
     override fun onResume() {
         super.onResume()
         MyLog.w("RadarImageFragment.onResume")
-        writeTabHtml()
         val mainActivity = activity as MainActivity
         if (mainActivity.didRotate) {
             mainActivity.didRotate = false
-            loadImagesInWebView(false)
         } else {
             startFetchWidgetImages(activity.applicationContext)
             startFetchAnimations()
@@ -157,19 +119,12 @@ class RadarImageFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        webView = null
-    }
-
-    private fun WebView.showSpinner() {
-        val loadingHtml = File(activity.noBackupFilesDir, LOADING_HTML)
-        activity.assets.open(LOADING_HTML).use { it.copyTo(FileOutputStream(loadingHtml)) }
-        loadUrl(loadingHtml.toURI().toString())
+        imgViews.fill(null)
     }
 
     private fun startFetchAnimations() {
         val context = activity
-        val countDown = AtomicInteger(images.size)
-        for (desc in images) {
+        for ((i, desc) in images.withIndex()) {
             start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
@@ -177,51 +132,19 @@ class RadarImageFragment : Fragment() {
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
-                    if (imgBytes == null || webView == null) {
+                    if (imgBytes == null || imgViews[i] == null) {
                         return@coroutine
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
                     val imgContext = ImgContext(desc, getDefaultSharedPreferences(activity))
                     editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
-                    val gifFile = context.file(desc.filename)
-                    FileOutputStream(gifFile).use {
-                        it.write(buf.array(), buf.position(), buf.remaining())
-                    }
+                    Animator(buf.toArray(), imgViews, i).animate()
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
-                } finally {
-                    if (countDown.decrementAndGet() == 0) {
-                        loadImagesInWebView(true)
-                    }
                 }
             }
         }
     }
-
-    private fun loadImagesInWebView(clearCache: Boolean) {
-        val webView = webView ?: return
-        val url = tabHtmlFile(activity).toURI().toString()
-        if (clearCache) {
-            webView.clearCache(true)
-        }
-        webView.loadUrl(url)
-    }
-
-    private fun writeTabHtml() {
-        val htmlTemplate = BufferedReader(InputStreamReader(activity.assets.open(MAIN_HTML))).use { it.readText() }
-        BufferedWriter(FileWriter(tabHtmlFile(activity))).use { it.write(expandTemplate(htmlTemplate)) }
-    }
-
-    private val placeholderRegex = Regex("""\$\{([^}]+)\}""")
-    private val imageFilenameRegex = Regex("""imageFilename(\d+)""")
-
-    private fun expandTemplate(htmlTemplate: String): String =
-            placeholderRegex.replace(htmlTemplate, { placeholderMatch ->
-                val key = placeholderMatch.groupValues[1]
-                val fnameMatch = imageFilenameRegex.matchEntire(key)
-                        ?: throw AssertionError("Invalid key in HTML template: " + key)
-                images[fnameMatch.groupValues[1].toInt()].filename
-            })
-
-    private fun tabHtmlFile(context: Context) = context.file("tab0.html")
 }
+
+private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }
