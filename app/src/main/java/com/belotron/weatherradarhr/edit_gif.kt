@@ -7,7 +7,7 @@ import java.util.ArrayDeque
 import java.util.Deque
 
 const val ANIMATION_COVERS_MINUTES = 100
-private const val LOOP_COUNT = 50
+private const val LOOP_COUNT = 1
 private const val BLOCK_TYPE_EXTENSION = 0x21
 private const val BLOCK_TYPE_IMAGE = 0x2c
 private const val BLOCK_TYPE_TRAILER = 0x3b
@@ -92,7 +92,7 @@ constructor(
         val destBuf = buf.duplicate()
         destBuf.order(LITTLE_ENDIAN)
         destBuf.position(frameList.firstFrameOffset())
-        writeLoopingExtension(destBuf)
+//        writeLoopingExtension(destBuf)
         while (true) {
             val frame = frameList.popNextFrame() ?: break
             val onLastFrame = frameList.peekLastFrame() == null
@@ -175,26 +175,6 @@ constructor(
         } finally {
             skip(len)
         }
-    }
-
-    private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
-        if (srcPos == dest.position()) {
-            return
-        }
-        val len = srcLimit - srcPos
-        System.arraycopy(src.array(), srcPos, dest.array(), dest.position(), len)
-        dest.position(dest.position() + len)
-    }
-
-    private fun writeLoopingExtension(buf: ByteBuffer) {
-        buf.put(BLOCK_TYPE_EXTENSION.toByte())
-        buf.put(EXT_TYPE_APPLICATION.toByte())
-        buf.put(11.toByte()) // Application Extension block size
-        buf.put("NETSCAPE2.0".toByteArray(Charset.forName("US-ASCII")))
-        buf.put(3.toByte()) // Netscape Looping Extension block size
-        buf.put(1.toByte()) // Looping Sub-Block ID
-        buf.putChar(LOOP_COUNT.toChar())
-        buf.put(0.toByte()) // Terminator byte
     }
 
     private inner class FrameList constructor(private val frameCountToKeep: Int) {
@@ -311,10 +291,6 @@ constructor(
     }
 }
 
-private fun Byte.toUnsignedInt(): Int {
-    return this.toInt() and 0xff
-}
-
 private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
     if (srcPos == dest.position()) {
         return
@@ -333,4 +309,8 @@ private fun writeLoopingExtension(buf: ByteBuffer) {
     buf.put(1.toByte()) // Looping Sub-Block ID
     buf.putChar(LOOP_COUNT.toChar())
     buf.put(0.toByte()) // Terminator byte
+}
+
+private fun Byte.toUnsignedInt(): Int {
+    return this.toInt() and 0xff
 }

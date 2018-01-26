@@ -3,8 +3,8 @@ package com.belotron.weatherradarhr
 import android.graphics.Bitmap
 import android.widget.ImageView
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
-import com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_OK
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
+import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
@@ -18,82 +18,104 @@ class Animator(
         private val viewIndex: Int
 ) {
     private val bitmapProvider = FreeLists()
-    private val gifDecoder = StandardGifDecoder(bitmapProvider)
-            .apply { read(gifData) }
+    private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
+    private var currFrame: Bitmap? = null
+    private var currFrameShownAt = 0L
 
-    fun animate() {
-        var currFrameShownAt = 0L
-        (imgViews[viewIndex] ?: return).apply {
-            gifDecoder.advance()
-            setImageBitmap(gifDecoder.nextFrame)
-            currFrameShownAt = System.nanoTime()
-            parent.requestLayout()
+    fun animate(): Job {
+        gifDecoder.apply {
+            rewind()
+            advance()
         }
-        var currFrame: Bitmap? = null
-        launch(UI) {
+        return launch(UI) coroutine@ {
+            if (!replaceCurrentFrame(gifDecoder.nextFrame)) {
+                MyLog.i("Animator stop: replaceCurrentFrame() returned false")
+                return@coroutine
+            }
+            imgViews[viewIndex]!!.parent.requestLayout()
             while (true) {
                 val currDelay = gifDecoder.nextDelay
-                gifDecoder.advance()
+                if (!gifDecoder.advance()) {
+                    MyLog.i("Animator stop: gifDecoder.advance() returned false")
+                    break
+                }
                 val nextFrame = gifDecoder.nextFrame
-                if (gifDecoder.status != STATUS_OK) {
-                    MyLog.e("GIF decoder failed with status ${gifDecoder.status}")
-                    break;
+                val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
+                val remainingTillNextFrame = currDelay - elapsedSinceFrameShown
+                MyLog.i("$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame")
+                remainingTillNextFrame.takeIf({ it > 0 })?.also {
+                    delay(it)
                 }
-                val elapsedSinceLastFrame = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
-                val timeTillNextFrame = currDelay - elapsedSinceLastFrame
-                MyLog.i("$elapsedSinceLastFrame ms since last frame, $timeTillNextFrame ms till next frame")
-                if (timeTillNextFrame > 0) {
-                    delay(timeTillNextFrame)
+                if (!replaceCurrentFrame(nextFrame)) {
+                    break
                 }
-                val view = imgViews[viewIndex] ?: break
-                view.setImageBitmap(nextFrame)
-                currFrameShownAt = System.nanoTime()
-                currFrame?.also { bitmapProvider.release(it) }
-                currFrame = nextFrame
             }
         }
+    }
+
+    private fun replaceCurrentFrame(nextFrame: Bitmap): Boolean {
+        val view = imgViews[viewIndex] ?: return false
+        view.setImageBitmap(nextFrame)
+        currFrameShownAt = System.nanoTime()
+        currFrame?.also { bitmapProvider.release(it) }
+        currFrame = nextFrame
+        return true
     }
 }
 
 private val emptyByteArray = ByteArray(0)
 private val emptyIntArray = IntArray(0)
 
-class FreeLists() : GifDecoder.BitmapProvider {
+class FreeLists : GifDecoder.BitmapProvider {
 
     private val bitmapQueues = HashMap<Pair<Int, Int>, ArrayDeque<Bitmap>>()
     private val byteArrayQueues = HashMap<Int, Queue<ByteArray>>()
     private val intArrayQueues = HashMap<Int, Queue<IntArray>>()
 
     override fun obtain(width: Int, height: Int, config: Bitmap.Config): Bitmap {
-        MyLog.i("Obtain bitmap ${width}x$height")
-        return bitmapQueues[Pair(width, height)]?.poll()?.apply { this.config = config }
+        MyLog.i("Obtain $width x $height bitmap")
+        val bitmap = bitmapQueues[Pair(width, height)]?.poll()
+        return bitmap?.apply { this.config = config }
                 ?: Bitmap.createBitmap(width, height, config)
     }
 
     override fun release(bitmap: Bitmap) {
-        MyLog.i("Release bitmap ${bitmap.width}x${bitmap.height}")
+        MyLog.i("Release ${bitmap.width} x ${bitmap.height} bitmap")
         val key = Pair(bitmap.width, bitmap.height)
-        bitmapQueues[key] ?: ArrayDeque<Bitmap>().also { bitmapQueues[key] = it }
-                .add(bitmap)
+        val freelist = bitmapQueues[key] ?: ArrayDeque<Bitmap>().also { bitmapQueues[key] = it }
+        if (freelist.any { bitmap === it }) {
+            throw IllegalStateException("Double release of bitmap")
+        }
+        freelist.add(bitmap)
     }
 
     override fun obtainByteArray(size: Int): ByteArray {
+        MyLog.i("Obtain $size bytes")
         return if (size == 0) emptyByteArray
         else byteArrayQueues[size]?.poll() ?: ByteArray(size)
     }
 
     override fun release(bytes: ByteArray) {
-        byteArrayQueues[bytes.size] ?: ArrayDeque<ByteArray>().also { byteArrayQueues[bytes.size] = it }
-                .add(bytes)
+        MyLog.i("Release ${bytes.size} bytes")
+        val freelist = byteArrayQueues[bytes.size] ?: ArrayDeque<ByteArray>().also { byteArrayQueues[bytes.size] = it }
+        if (freelist.any { bytes === it }) {
+            throw IllegalStateException("Double release of ByteArray")
+        }
+        freelist.add(bytes)
     }
 
     override fun obtainIntArray(size: Int): IntArray {
+        MyLog.i("Obtain $size ints")
         return if (size == 0) emptyIntArray
         else intArrayQueues[size]?.poll() ?: IntArray(size)
     }
 
     override fun release(array: IntArray) {
-        intArrayQueues[array.size] ?: ArrayDeque<IntArray>().also { intArrayQueues[array.size] = it }
-                .add(array)
+        MyLog.i("Release ${array.size} ints")
+        val freelist = intArrayQueues[array.size] ?: ArrayDeque<IntArray>().also { intArrayQueues[array.size] = it }
+        if (freelist.any { array === it }) {
+            throw IllegalStateException("Double release of IntArray")
+        }
+        freelist.add(array)
     }
 }

@@ -24,8 +24,6 @@ package com.belotron.weatherradarhr.gifdecode;
  */
 
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_PREVIOUS;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 import android.graphics.Bitmap;
@@ -70,8 +68,6 @@ public class StandardGifDecoder implements GifDecoder {
 
     private static final int NULL_CODE = -1;
 
-    private static final int INITIAL_FRAME_POINTER = -1;
-
     private static final int BYTES_PER_INTEGER = Integer.SIZE / 8;
 
     private static final int MASK_INT_LOWEST_BYTE = 0x000000FF;
@@ -115,8 +111,8 @@ public class StandardGifDecoder implements GifDecoder {
     private int[] mainScratch;
 
     private int framePointer;
+    private int iterationsCompleted;
     private GifHeader header;
-    private boolean savePrevious;
     @GifDecodeStatus
     private int status;
     private int sampleSize;
@@ -170,26 +166,40 @@ public class StandardGifDecoder implements GifDecoder {
     }
 
     @Override
-    public void advance() {
-        framePointer = (framePointer + 1) % header.frameCount;
+    public boolean advance() {
+        if (framePointer == header.frameCount) {
+            return false;
+        }
+        framePointer++;
+        if (framePointer == header.frameCount) {
+            int totalIterCount = getTotalIterationCount();
+            if (totalIterCount != TOTAL_ITERATION_COUNT_FOREVER) {
+                iterationsCompleted++;
+                if (iterationsCompleted == totalIterCount) {
+                    return false;
+                }
+            }
+            framePointer = 0;
+        }
+        return true;
+    }
+
+    @Override
+    public void rewind() {
+        iterationsCompleted = 0;
+        framePointer = -1;
     }
 
     @Override
     public int getDelay(int n) {
-        int delay = -1;
-        if ((n >= 0) && (n < header.frameCount)) {
-            delay = header.frames.get(n).delay;
-        }
-        return delay;
+        return n >= 0 && n < header.frameCount
+                ? header.frames.get(n).delay : -1;
     }
 
     @Override
     public int getNextDelay() {
-        if (header.frameCount <= 0 || framePointer < 0) {
-            return 0;
-        }
-
-        return getDelay(framePointer);
+        return header.frameCount > 0 && framePointer >= 0
+                ? getDelay(framePointer) : 0;
     }
 
     @Override
@@ -204,16 +214,7 @@ public class StandardGifDecoder implements GifDecoder {
 
     @Override
     public void resetFrameIndex() {
-        framePointer = INITIAL_FRAME_POINTER;
-    }
-
-    @Deprecated
-    @Override
-    public int getLoopCount() {
-        if (header.loopCount == GifHeader.NETSCAPE_LOOP_COUNT_DOES_NOT_EXIST) {
-            return 1;
-        }
-        return header.loopCount;
+        framePointer = -1;
     }
 
     @Override
@@ -223,13 +224,10 @@ public class StandardGifDecoder implements GifDecoder {
 
     @Override
     public int getTotalIterationCount() {
-        if (header.loopCount == GifHeader.NETSCAPE_LOOP_COUNT_DOES_NOT_EXIST) {
-            return 1;
-        }
-        if (header.loopCount == GifHeader.NETSCAPE_LOOP_COUNT_FOREVER) {
-            return TOTAL_ITERATION_COUNT_FOREVER;
-        }
-        return header.loopCount + 1;
+        int loopCount = header.loopCount;
+        return loopCount == GifHeader.NETSCAPE_LOOP_COUNT_DOES_NOT_EXIST ? 1
+                : loopCount == 0 ? 0
+                : loopCount + 1;
     }
 
     @Override
@@ -237,7 +235,7 @@ public class StandardGifDecoder implements GifDecoder {
         return rawData.limit() + mainPixels.length + (mainScratch.length * BYTES_PER_INTEGER);
     }
 
-    @Nullable
+    @NonNull
     @Override
     public synchronized Bitmap getNextFrame() {
         if (header.frameCount <= 0 || framePointer < 0) {
@@ -250,10 +248,7 @@ public class StandardGifDecoder implements GifDecoder {
             status = STATUS_FORMAT_ERROR;
         }
         if (status == STATUS_FORMAT_ERROR || status == STATUS_OPEN_ERROR) {
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "Unable to decode frame, status=" + status);
-            }
-            return null;
+            throw new RuntimeException("Unable to decode frame, status=" + status);
         }
         status = STATUS_OK;
 
@@ -268,12 +263,9 @@ public class StandardGifDecoder implements GifDecoder {
         // Set the appropriate color table.
         act = currentFrame.lct != null ? currentFrame.lct : header.gct;
         if (act == null) {
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "No valid color table found for frame #" + framePointer);
-            }
             // No color table defined.
             status = STATUS_FORMAT_ERROR;
-            return null;
+            throw new RuntimeException("No valid color table found for frame #" + framePointer);
         }
 
         // Reset the transparent pixel in the color table
@@ -357,14 +349,11 @@ public class StandardGifDecoder implements GifDecoder {
         sampleSize = Integer.highestOneBit(sampleSize);
         this.status = STATUS_OK;
         this.header = header;
-        framePointer = INITIAL_FRAME_POINTER;
+        framePointer = -1;
         // Initialize the raw data buffer.
         rawData = buffer.asReadOnlyBuffer();
         rawData.position(0);
         rawData.order(ByteOrder.LITTLE_ENDIAN);
-
-        // No point in specially saving an old frame if we're never going to use it.
-        savePrevious = needToSavePrevious();
 
         this.sampleSize = sampleSize;
         downsampledWidth = header.width / sampleSize;
@@ -373,15 +362,6 @@ public class StandardGifDecoder implements GifDecoder {
         // TODO Find a way to avoid this entirely or at least downsample it (either should be possible).
         mainPixels = bitmapProvider.obtainByteArray(header.width * header.height);
         mainScratch = bitmapProvider.obtainIntArray(downsampledWidth * downsampledHeight);
-    }
-
-    private boolean needToSavePrevious() {
-        for (GifFrame frame : header.frames) {
-            if (frame.dispose == DISPOSAL_PREVIOUS) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @NonNull

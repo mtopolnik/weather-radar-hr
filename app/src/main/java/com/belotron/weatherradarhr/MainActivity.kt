@@ -6,9 +6,9 @@ import android.app.FragmentManager
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.support.v13.app.FragmentPagerAdapter
-import android.support.v4.view.ViewPager
 import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+import kotlinx.android.synthetic.main.activity_main.*
 
 private const val KEY_SAVED_TIMESTAMP = "previous-orientation"
 
@@ -22,8 +22,7 @@ class MainActivity : Activity()  {
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         actionBar.hide()
         setContentView(R.layout.activity_main)
-        val viewPager = findViewById<ViewPager>(R.id.my_pager)
-        viewPager.adapter = FlipThroughRadarImages(fragmentManager)
+        my_pager.adapter = FlipThroughRadarImages(fragmentManager)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

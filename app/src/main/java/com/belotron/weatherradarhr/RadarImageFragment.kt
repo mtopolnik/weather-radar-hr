@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.app.Fragment
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -12,7 +13,12 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import kotlinx.android.synthetic.main.image_radar.*
+import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.delay
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit.*
 
 val images = arrayOf(
         ImgDescriptor("Puntijarka-Bilogora-Osijek",
@@ -34,28 +40,10 @@ class ImgDescriptor(
 
 class ImgContext(
         imgDesc: ImgDescriptor,
-        private val prefs: SharedPreferences
+        prefs: SharedPreferences
 ) {
-    val frameDelay = (frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
-    val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + freezeTime()
-
-    private fun frameDelayFactor(): Float = prefs.getString("frame_delay", "frameDelay0").let { delayStr ->
-        when (delayStr) {
-            "frameDelay0" -> 1.2f
-            "frameDelay1" -> 2.6f
-            "frameDelay2" -> 4.8f
-            else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
-        }
-    }
-
-    private fun freezeTime() = prefs.getString("freeze_time", "freeze0").let { freezeStr ->
-        when (freezeStr) {
-            "freeze0" -> 150
-            "freeze1" -> 250
-            "freeze2" -> 350
-            else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
-        }
-    }
+    val frameDelay = (prefs.frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
+    val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + prefs.freezeTime()
 }
 
 fun main(args: Array<String>) {
@@ -65,11 +53,13 @@ fun main(args: Array<String>) {
 
 class RadarImageFragment : Fragment() {
     private val imgViews: Array<ImageView?> = arrayOf(null, null)
+    private lateinit var animationLooper: AnimationLooper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i("RadarImageFragment.onCreate")
         super.onCreate(savedInstanceState)
         setHasOptionsMenu(true)
+        animationLooper = AnimationLooper(activity)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -138,7 +128,9 @@ class RadarImageFragment : Fragment() {
                     val buf = ByteBuffer.wrap(imgBytes)
                     val imgContext = ImgContext(desc, getDefaultSharedPreferences(activity))
                     editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
-                    Animator(buf.toArray(), imgViews, i).animate()
+                    MyLog.i("Set animators[$i]")
+                    animationLooper.animators[i] = Animator(buf.toArray(), imgViews, i)
+                    animationLooper.restart()
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
                 }
@@ -146,5 +138,52 @@ class RadarImageFragment : Fragment() {
         }
     }
 }
+
+class AnimationLooper(
+        private val androidCtx: Context
+) {
+    val animators = arrayOfNulls<Animator>(2)
+    private val animatorJobs = arrayOfNulls<Job>(2)
+    private var loopingJob: Job? = null
+
+    fun restart() {
+        MyLog.i("AnimationLooper.restart")
+        loopingJob?.cancel()
+        loopingJob = start {
+            while (true) {
+                val startedAt = System.nanoTime()
+                MyLog.i("startedAt $startedAt")
+                animatorJobs.forEach { it?.cancel() }
+                animators.withIndex().forEach { (i, it) -> animatorJobs[i] = it?.animate() }
+                val prefs = getDefaultSharedPreferences(androidCtx)
+                val animationDuration = 10 * (ANIMATION_COVERS_MINUTES * prefs.frameDelayFactor() + prefs.freezeTime())
+                val elapsedSinceStart = NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+                val remainsTillNextStart = animationDuration - elapsedSinceStart
+                if (remainsTillNextStart > 0) {
+                    delay(remainsTillNextStart.toLong())
+                }
+            }
+        }
+    }
+}
+
+private fun SharedPreferences.frameDelayFactor(): Float = getString("frame_delay", "frameDelay0").let { delayStr ->
+    when (delayStr) {
+        "frameDelay0" -> 1.2f
+        "frameDelay1" -> 2.6f
+        "frameDelay2" -> 4.8f
+        else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
+    }
+}
+
+private fun SharedPreferences.freezeTime() = getString("freeze_time", "freeze0").let { freezeStr ->
+    when (freezeStr) {
+        "freeze0" -> 150
+        "freeze1" -> 250
+        "freeze2" -> 350
+        else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
+    }
+}
+
 
 private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }

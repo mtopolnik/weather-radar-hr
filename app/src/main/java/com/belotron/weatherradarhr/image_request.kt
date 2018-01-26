@@ -67,8 +67,7 @@ suspend fun fetchUrl(
                 Pair(0L, null)
             else -> { // responseCode == 304, fetch from cache
                 MyLog.i("Not Modified since $ifModifiedSince: $url")
-                val (lastModifiedStr, imgBytes) =
-                        cachedDataIn(context, url).use { Pair(it.readUTF(), it.readBytes()) }
+                val (lastModifiedStr, imgBytes) = cachedDataIn(context, url).use { Pair(it.readUTF(), it.readBytes()) }
                 Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
             }
         }
@@ -85,21 +84,19 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
     MyLog.i("Last-Modified $lastModifiedStr: $url")
     return synchronized(threadPool) {
         try {
-            val cachedIn = runOrNull({ cachedDataIn(context, url) })
+            val cachedIn = runOrNull { cachedDataIn(context, url) }
             val imgBytes = if (cachedIn == null)
                 responseBody.value
             else {
-                val cachedLastModified = runOrNull({ cachedIn.readUTF().parseLastModified() })
-                when {
-                    cachedLastModified == null || cachedLastModified < lastModified -> {
-                        cachedIn.close()
-                        updateCache(cacheFile(context, url), lastModifiedStr, responseBody.value)
-                        responseBody.value
-                    }
-                    else -> { // cachedLastModified >= lastModified, can happen with concurrent requests
-                        conn.inputStream.close()
-                        cachedIn.use { it.readBytes() }
-                    }
+                val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
+                if (cachedLastModified == null || cachedLastModified < lastModified) {
+                    cachedIn.close()
+                    updateCache(cacheFile(context, url), lastModifiedStr, responseBody.value)
+                    responseBody.value
+                }
+                else { // cachedLastModified >= lastModified, can happen with concurrent requests
+                    conn.inputStream.close()
+                    cachedIn.use { it.readBytes() }
                 }
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
