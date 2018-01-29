@@ -107,7 +107,7 @@ class RefreshImageService : JobService() {
         try {
             val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
             val wDesc = widgetDescriptors[wDescIndex]
-            MyLog.i("RefreshImageService: ${wDesc.name}")
+            MyLog.i { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse()) {
                 start {
@@ -129,7 +129,7 @@ class RefreshImageService : JobService() {
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        MyLog.i("RefreshImageService stop job")
+        MyLog.i { "RefreshImageService stop job" }
         return true
     }
 
@@ -140,7 +140,7 @@ class UpdateAgeService : JobService() {
         try {
             val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
             val wDesc = widgetDescriptors[wDescIndex]
-            MyLog.i("UpdateAgeService: ${wDesc.name}")
+            MyLog.i { "UpdateAgeService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             if (wCtx.isWidgetInUse()) {
                 wCtx.updateRemoteViews(wCtx.readImgAndTimestamp())
@@ -155,7 +155,7 @@ class UpdateAgeService : JobService() {
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        MyLog.i("UpdateAgeService stop job")
+        MyLog.i { "UpdateAgeService stop job" }
         return true
     }
 }
@@ -218,7 +218,7 @@ private class WidgetContext (
             remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
         }
         AppWidgetManager.getInstance(context).updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
-        MyLog.i("Updated Remote Views")
+        MyLog.i { "Updated Remote Views" }
     }
 
     fun scheduleWidgetUpdate(latencyMillis: Long) {
@@ -235,7 +235,7 @@ private class WidgetContext (
     }
 
     fun cancelUpdateAge() {
-        MyLog.i("No ${wDesc.name} widget in use, cancelling scheduled jobs")
+        MyLog.i { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
         context.jobScheduler().cancel(wDesc.updateAgeJobId())
     }
 
@@ -283,7 +283,7 @@ private fun intentLaunchMainActivity(context: Context): PendingIntent {
 
 private fun reportScheduleResult(task: String, resultCode: Int) {
     when (resultCode) {
-        JobScheduler.RESULT_SUCCESS -> MyLog.i("Scheduled to $task")
+        JobScheduler.RESULT_SUCCESS -> MyLog.i { "Scheduled to $task" }
         JobScheduler.RESULT_FAILURE -> MyLog.e("Failed to schedule to $task")
         else -> throw AssertionError("Unknown scheduler result code $resultCode")
     }

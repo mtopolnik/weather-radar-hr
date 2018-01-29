@@ -66,7 +66,7 @@ suspend fun fetchUrl(
             onlyIfNew -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                 Pair(0L, null)
             else -> { // responseCode == 304, fetch from cache
-                MyLog.i("Not Modified since $ifModifiedSince: $url")
+                MyLog.i { "Not Modified since $ifModifiedSince: $url" }
                 val (lastModifiedStr, imgBytes) = cachedDataIn(context, url).use { Pair(it.readUTF(), it.readBytes()) }
                 Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
             }
@@ -81,7 +81,7 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
     val lastModified = lastModifiedStr.parseLastModified()
     val url = conn.url.toExternalForm()
-    MyLog.i("Last-Modified $lastModifiedStr: $url")
+    MyLog.i { "Last-Modified $lastModifiedStr: $url" }
     return synchronized(threadPool) {
         try {
             val cachedIn = runOrNull { cachedDataIn(context, url) }

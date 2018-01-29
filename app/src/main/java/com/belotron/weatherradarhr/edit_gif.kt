@@ -54,25 +54,25 @@ constructor(
                     val extensionLabel = nextByte()
                     when (extensionLabel) {
                         EXT_TYPE_APPLICATION -> {
-                            MyLog.d("Application extension at %d", blockPos)
+                            MyLog.d { "Application extension at $blockPos" }
                             parseApplicationExtension()
                         }
                         EXT_TYPE_GRAPHIC_CONTROL -> {
-                            MyLog.d("Graphic control ext at %d", blockPos)
+                            MyLog.d { "Graphic control ext at $blockPos" }
                             frameList.acceptGraphicControlExt()
                         }
                         else -> {
-                            MyLog.d("Ext 0x%02x at %d", extensionLabel, blockPos)
+                            MyLog.d { "Ext $extensionLabel at $blockPos" }
                             logSubBlocks()
                         }
                     }
                 }
                 BLOCK_TYPE_IMAGE -> {
-                    MyLog.d("Image desc at %d", blockPos)
+                    MyLog.d { "Image desc at $blockPos" }
                     frameList.acceptImageDescriptor()
                 }
                 BLOCK_TYPE_TRAILER -> {
-                    MyLog.d("Trailer at %d", blockPos)
+                    MyLog.d { "Trailer at $blockPos" }
                     buf.limit(buf.position())
                     break@readingLoop
                 }
@@ -109,14 +109,14 @@ constructor(
                 if (subBlockId == 1) {
                     if (len != 3) throw AssertionError("Invalid Netscape Looping Extension block size: " + len)
                     val loopCount = buf.char.toInt()
-                    MyLog.d("Netscape Extension Loop Count %d", loopCount)
+                    MyLog.d { "Netscape Extension Loop Count $loopCount" }
                     val terminatorByte = nextByte()
                     if (terminatorByte != 0) throw AssertionError("Invalid terminator byte " + terminatorByte)
                 }
                 return
             }
             else -> {
-                MyLog.d("Application Identifier %d", appId)
+                MyLog.d { "Application Identifier $appId" }
                 skipSubBlocks()
             }
         }
@@ -140,7 +140,7 @@ constructor(
 
     private fun skipSubBlocks() {
         while (true) {
-            val len = nextByte();
+            val len = nextByte()
             if (len == 0) break
             skip(len)
         }
@@ -148,9 +148,10 @@ constructor(
 
     private fun logSubBlocks() {
         while (true) {
-            val len = nextByte();
+            val len = nextByte()
             if (len == 0) break
-            MyLog.d("sub-block ", getString(len))
+            val block = getString(len)
+            MyLog.d { "sub-block $block" }
         }
     }
 
@@ -202,7 +203,7 @@ constructor(
                 throw AssertionError("Invalid Graphic Control Extension block size: " + blockSize)
             }
             currFrame!!.gcExtPackedFields = buf.get()
-            MyLog.i("Frame delay ${buf.getChar().toInt()}")
+            MyLog.i { "Frame delay ${buf.getChar().toInt()}" }
 //            skip(2) // delayTime
             currFrame!!.gcExtTransparentColorIndex = buf.get()
             val blockTerminator = nextByte()
@@ -224,7 +225,7 @@ constructor(
                 addFrame()
                 distinctFrameCount++
             } else {
-                MyLog.d("Dropping identical frame")
+                MyLog.d { "Dropping identical frame" }
             }
             currFrame = null
         }

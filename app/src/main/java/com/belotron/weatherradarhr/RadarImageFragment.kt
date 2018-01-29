@@ -59,7 +59,7 @@ class RadarImageFragment : Fragment() {
     private lateinit var animationLooper: AnimationLooper
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        MyLog.i("RadarImageFragment.onCreate")
+        MyLog.i { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
@@ -70,7 +70,7 @@ class RadarImageFragment : Fragment() {
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        MyLog.i("RadarImageFragment.onCreateView")
+        MyLog.i { "RadarImageFragment.onCreateView" }
         val rootView = inflater.inflate(R.layout.image_radar, container, false)
         images.forEach {
             val imgView = rootView.findViewById<ImageView>(it.imgViewId)
@@ -95,19 +95,19 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        MyLog.i("RadarImageFragment.onDestroyView")
+        MyLog.i { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
         imgViews.fill(null)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        MyLog.i("RadarImageFragment.onCreateOptionsMenu")
+        MyLog.i { "RadarImageFragment.onCreateOptionsMenu" }
         inflater.inflate(R.menu.main_menu, menu)
         super.onCreateOptionsMenu(menu, inflater)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        MyLog.i("RadarImageFragment.onOptionsItemSelected")
+        MyLog.i { "RadarImageFragment.onOptionsItemSelected" }
         activity.actionBar.hide()
         when (item.itemId) {
             R.id.refresh -> {
@@ -124,13 +124,13 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onPause() {
-        MyLog.i("RadarImageFragment.onPause")
+        MyLog.i { "RadarImageFragment.onPause" }
         super.onPause()
         animationLooper.cancel()
     }
 
     override fun onResume() {
-        MyLog.i("RadarImageFragment.onResume")
+        MyLog.i { "RadarImageFragment.onResume" }
         super.onResume()
         animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
     }

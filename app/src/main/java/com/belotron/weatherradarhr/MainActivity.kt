@@ -14,7 +14,7 @@ class MainActivity : Activity()  {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        MyLog.i("onCreate MainActivity")
+        MyLog.i { "onCreate MainActivity" }
         PreferenceManager.setDefaultValues(this, R.xml.settings, false)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
@@ -28,14 +28,14 @@ class MainActivity : Activity()  {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        MyLog.i("onSaveInstanceState")
+        MyLog.i { "onSaveInstanceState" }
         super.onSaveInstanceState(outState)
         outState.putLong(KEY_SAVED_TIMESTAMP, System.currentTimeMillis())
         outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar.isShowing)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        MyLog.i("onRestoreInstanceState")
+        MyLog.i { "onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
         val restoredTimestamp = savedInstanceState.getLong(KEY_SAVED_TIMESTAMP)
         if (restoredTimestamp == 0L) {
@@ -43,7 +43,7 @@ class MainActivity : Activity()  {
         }
         val timeDiff = System.currentTimeMillis() - restoredTimestamp
         didRotate = timeDiff < SECOND_IN_MILLIS
-        MyLog.i("Time diff $timeDiff, did rotate? $didRotate")
+        MyLog.i { "Time diff $timeDiff, did rotate? $didRotate" }
         if (didRotate && savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
             actionBar.show()
         }
