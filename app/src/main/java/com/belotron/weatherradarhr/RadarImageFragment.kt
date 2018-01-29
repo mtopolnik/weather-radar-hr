@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.preference.PreferenceManager
 import android.preference.PreferenceManager.getDefaultSharedPreferences
 import android.view.LayoutInflater
 import android.view.Menu
@@ -13,24 +14,23 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import kotlinx.android.synthetic.main.image_radar.*
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.delay
 import java.nio.ByteBuffer
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeUnit.*
+
+const val TAG_RADAR_IMAGE_FRAGMENT = "RadarImageFragment"
 
 val images = arrayOf(
-        ImgDescriptor("Puntijarka-Bilogora-Osijek",
+        ImgDescriptor(0, "HR", R.id.img_view_kradar,
                 "http://vrijeme.hr/kradar-anim.gif",
                 15),
-        ImgDescriptor("Lisca",
+        ImgDescriptor(1, "SLO", R.id.img_view_lradar,
                 "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
                 10)
 )
 
 class ImgDescriptor(
+        val index: Int,
         val title: String,
+        val imgViewId: Int,
         val url: String,
         val minutesPerFrame: Int
 ) {
@@ -38,17 +38,22 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-class ImgContext(
-        imgDesc: ImgDescriptor,
-        prefs: SharedPreferences
-) {
-    val frameDelay = (prefs.frameDelayFactor() * imgDesc.minutesPerFrame).toInt()
-    val animationDuration = (imgDesc.framesToKeep - 1) * frameDelay + prefs.freezeTime()
+fun SharedPreferences.frameDelayFactor(): Int = getString("frame_delay", "frameDelay0").let { delayStr ->
+    when (delayStr) {
+        "frameDelay0" -> 12
+        "frameDelay1" -> 26
+        "frameDelay2" -> 47
+        else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
+    }
 }
 
-fun main(args: Array<String>) {
-    println(1.2f * 10)
-    println(1.2f * 15)
+fun SharedPreferences.freezeTime() = getString("freeze_time", "freeze0").let { freezeStr ->
+    when (freezeStr) {
+        "freeze0" -> 1500
+        "freeze1" -> 2500
+        "freeze2" -> 3500
+        else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
+    }
 }
 
 class RadarImageFragment : Fragment() {
@@ -58,8 +63,37 @@ class RadarImageFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i("RadarImageFragment.onCreate")
         super.onCreate(savedInstanceState)
+        retainInstance = true
         setHasOptionsMenu(true)
-        animationLooper = AnimationLooper(activity)
+        animationLooper = AnimationLooper()
+
+    }
+
+    override fun onCreateView(
+            inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View {
+        MyLog.i("RadarImageFragment.onCreateView")
+        val rootView = inflater.inflate(R.layout.image_radar, container, false)
+        images.forEach {
+            val imgView = rootView.findViewById<ImageView>(it.imgViewId)
+            imgViews[it.index] = imgView
+            imgView.setOnClickListener {
+                val toolbar = activity.actionBar
+                if (toolbar.isShowing) {
+                    toolbar.hide()
+                } else {
+                    toolbar.show()
+                }
+            }
+        }
+        animationLooper.restart(activity.animationDuration())
+        return rootView
+    }
+
+    override fun onDestroyView() {
+        MyLog.i("RadarImageFragment.onDestroyView")
+        super.onDestroyView()
+        imgViews.fill(null)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -85,19 +119,9 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    override fun onCreateView(
-            inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
-        MyLog.i("RadarImageFragment.onCreateView")
-        val rootView = inflater.inflate(R.layout.image_radar, container, false)
-        imgViews[0] = rootView.findViewById(R.id.img_view_kradar)
-        imgViews[1] = rootView.findViewById(R.id.img_view_lradar)
-        return rootView
-    }
-
     override fun onResume() {
         super.onResume()
-        MyLog.w("RadarImageFragment.onResume")
+        MyLog.i("RadarImageFragment.onResume")
         val mainActivity = activity as MainActivity
         if (mainActivity.didRotate) {
             mainActivity.didRotate = false
@@ -107,14 +131,11 @@ class RadarImageFragment : Fragment() {
         }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        imgViews.fill(null)
-    }
-
     private fun startFetchAnimations() {
         val context = activity
-        for ((i, desc) in images.withIndex()) {
+        val frameDelayFactor = getDefaultSharedPreferences(context).frameDelayFactor()
+        val animationDuration = context.animationDuration()
+        for (desc in images) {
             start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
@@ -122,15 +143,14 @@ class RadarImageFragment : Fragment() {
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
-                    if (imgBytes == null || imgViews[i] == null) {
+                    if (imgBytes == null || imgViews[desc.index] == null) {
                         return@coroutine
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
-                    val imgContext = ImgContext(desc, getDefaultSharedPreferences(activity))
-                    editGif(buf, imgContext.frameDelay, imgContext.animationDuration, desc.framesToKeep)
-                    MyLog.i("Set animators[$i]")
-                    animationLooper.animators[i] = Animator(buf.toArray(), imgViews, i)
-                    animationLooper.restart()
+                    editGif(buf, desc.framesToKeep)
+                    animationLooper.animators[desc.index] = GifAnimator(
+                            buf.toArray(), imgViews, desc, frameDelayFactor)
+                    animationLooper.restart(animationDuration)
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
                 }
@@ -139,51 +159,10 @@ class RadarImageFragment : Fragment() {
     }
 }
 
-class AnimationLooper(
-        private val androidCtx: Context
-) {
-    val animators = arrayOfNulls<Animator>(2)
-    private val animatorJobs = arrayOfNulls<Job>(2)
-    private var loopingJob: Job? = null
-
-    fun restart() {
-        MyLog.i("AnimationLooper.restart")
-        loopingJob?.cancel()
-        loopingJob = start {
-            while (true) {
-                val startedAt = System.nanoTime()
-                MyLog.i("startedAt $startedAt")
-                animatorJobs.forEach { it?.cancel() }
-                animators.withIndex().forEach { (i, it) -> animatorJobs[i] = it?.animate() }
-                val prefs = getDefaultSharedPreferences(androidCtx)
-                val animationDuration = 10 * (ANIMATION_COVERS_MINUTES * prefs.frameDelayFactor() + prefs.freezeTime())
-                val elapsedSinceStart = NANOSECONDS.toMillis(System.nanoTime() - startedAt)
-                val remainsTillNextStart = animationDuration - elapsedSinceStart
-                if (remainsTillNextStart > 0) {
-                    delay(remainsTillNextStart.toLong())
-                }
-            }
-        }
-    }
-}
-
-private fun SharedPreferences.frameDelayFactor(): Float = getString("frame_delay", "frameDelay0").let { delayStr ->
-    when (delayStr) {
-        "frameDelay0" -> 1.2f
-        "frameDelay1" -> 2.6f
-        "frameDelay2" -> 4.8f
-        else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
-    }
-}
-
-private fun SharedPreferences.freezeTime() = getString("freeze_time", "freeze0").let { freezeStr ->
-    when (freezeStr) {
-        "freeze0" -> 150
-        "freeze1" -> 250
-        "freeze2" -> 350
-        else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
-    }
-}
-
-
 private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }
+
+private fun Context.animationDuration(): Int {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+    return ANIMATION_COVERS_MINUTES * prefs.frameDelayFactor() + prefs.freezeTime()
+
+}

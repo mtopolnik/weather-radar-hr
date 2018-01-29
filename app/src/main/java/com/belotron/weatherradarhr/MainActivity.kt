@@ -1,35 +1,37 @@
 package com.belotron.weatherradarhr
 
 import android.app.Activity
-import android.app.Fragment
-import android.app.FragmentManager
 import android.os.Bundle
 import android.preference.PreferenceManager
-import android.support.v13.app.FragmentPagerAdapter
 import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
-import kotlinx.android.synthetic.main.activity_main.*
 
-private const val KEY_SAVED_TIMESTAMP = "previous-orientation"
+private const val KEY_SAVED_TIMESTAMP = "saved-timestamp"
+private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
 
 class MainActivity : Activity()  {
-    internal var didRotate = false
+    var didRotate = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MyLog.i("onCreate MainActivity")
         PreferenceManager.setDefaultValues(this, R.xml.settings, false)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
-        actionBar.hide()
         setContentView(R.layout.activity_main)
-        my_pager.adapter = FlipThroughRadarImages(fragmentManager)
+        actionBar.hide()
+        if (fragmentManager.findFragmentByTag(TAG_RADAR_IMAGE_FRAGMENT) == null) {
+            val newFragment = RadarImageFragment()
+            fragmentManager.beginTransaction()
+                    .add(newFragment, TAG_RADAR_IMAGE_FRAGMENT)
+                    .commit()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         MyLog.i("onSaveInstanceState")
         super.onSaveInstanceState(outState)
-        val timestamp = System.currentTimeMillis()
-        outState.putLong(KEY_SAVED_TIMESTAMP, timestamp)
+        outState.putLong(KEY_SAVED_TIMESTAMP, System.currentTimeMillis())
+        outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar.isShowing)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -42,20 +44,8 @@ class MainActivity : Activity()  {
         val timeDiff = System.currentTimeMillis() - restoredTimestamp
         didRotate = timeDiff < SECOND_IN_MILLIS
         MyLog.i("Time diff $timeDiff, did rotate? $didRotate")
-    }
-
-}
-
-private class FlipThroughRadarImages internal constructor(fm: FragmentManager) : FragmentPagerAdapter(fm) {
-
-    override fun getCount() = 1
-
-    override fun getPageTitle(position: Int) = "Radar"
-
-    override fun getItem(i: Int): Fragment {
-        when (i) {
-            0 -> return RadarImageFragment()
-            else -> throw AssertionError("Invalid tab index: " + i)
+        if (didRotate && savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
+            actionBar.show()
         }
     }
 }

@@ -41,10 +41,7 @@ class AnimationDurationTest {
 
     @Test
     fun test() {
-        assertEquals(prefs.animationDuration(0), prefs.animationDuration(1))
     }
-
-    private fun SharedPreferences.animationDuration(i: Int) = ImgContext(images[i], this).animationDuration
 
     private fun setupPrefs(frameDelay: String, freezeTime: String): SharedPreferences {
         val prefs: SharedPreferences = mock(SharedPreferences::class.java)
