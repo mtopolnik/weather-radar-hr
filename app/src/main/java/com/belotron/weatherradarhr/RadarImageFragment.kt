@@ -16,8 +16,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import java.nio.ByteBuffer
 
-const val TAG_RADAR_IMAGE_FRAGMENT = "RadarImageFragment"
-
 val images = arrayOf(
         ImgDescriptor(0, "HR", R.id.img_view_kradar,
                 "http://vrijeme.hr/kradar-anim.gif",
@@ -86,7 +84,13 @@ class RadarImageFragment : Fragment() {
                 }
             }
         }
-        animationLooper.restart(activity.animationDuration())
+        val mainActivity = activity as MainActivity
+        if (mainActivity.didRotate) {
+            mainActivity.didRotate = false
+        } else {
+            startFetchWidgetImages(activity.applicationContext)
+            startFetchAnimations()
+        }
         return rootView
     }
 
@@ -119,21 +123,21 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
+    override fun onPause() {
+        MyLog.i("RadarImageFragment.onPause")
+        super.onPause()
+        animationLooper.cancel()
+    }
+
     override fun onResume() {
-        super.onResume()
         MyLog.i("RadarImageFragment.onResume")
-        val mainActivity = activity as MainActivity
-        if (mainActivity.didRotate) {
-            mainActivity.didRotate = false
-        } else {
-            startFetchWidgetImages(activity.applicationContext)
-            startFetchAnimations()
-        }
+        super.onResume()
+        animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
     }
 
     private fun startFetchAnimations() {
         val context = activity
-        val frameDelayFactor = getDefaultSharedPreferences(context).frameDelayFactor()
+        val frameDelayFactor = context.frameDelayFactor()
         val animationDuration = context.animationDuration()
         for (desc in images) {
             start coroutine@ {
@@ -148,9 +152,8 @@ class RadarImageFragment : Fragment() {
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
                     editGif(buf, desc.framesToKeep)
-                    animationLooper.animators[desc.index] = GifAnimator(
-                            buf.toArray(), imgViews, desc, frameDelayFactor)
-                    animationLooper.restart(animationDuration)
+                    animationLooper.animators[desc.index] = GifAnimator(buf.toArray(), imgViews, desc)
+                    animationLooper.restart(animationDuration, frameDelayFactor)
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
                 }
@@ -164,5 +167,10 @@ private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(i
 private fun Context.animationDuration(): Int {
     val prefs = PreferenceManager.getDefaultSharedPreferences(this)
     return ANIMATION_COVERS_MINUTES * prefs.frameDelayFactor() + prefs.freezeTime()
-
 }
+
+private fun Context.frameDelayFactor(): Int {
+    return getDefaultSharedPreferences(this).frameDelayFactor()
+}
+
+

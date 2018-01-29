@@ -12,19 +12,22 @@ import java.util.ArrayDeque
 import java.util.Queue
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
-class AnimationLooper(
-) {
+class AnimationLooper {
     val animators = arrayOfNulls<GifAnimator>(2)
     private val animatorJobs = arrayOfNulls<Job>(2)
     private var loopingJob: Job? = null
 
-    fun restart(animationDuration: Int) {
+    fun restart(animationDuration: Int, frameDelayFactor: Int) {
         MyLog.i("AnimationLooper.restart. Animation duration $animationDuration")
+        if (animators.none()) {
+            return
+        }
         cancel()
         loopingJob = start {
             while (true) {
                 animatorJobs.forEach { it?.join() }
-                animators.withIndex().forEach { (i, it) ->
+                animators.forEachIndexed { i, it ->
+                    it?.frameDelayFactor = frameDelayFactor
                     animatorJobs[i] = it?.animate()
                 }
                 delay(animationDuration)
@@ -32,7 +35,7 @@ class AnimationLooper(
         }
     }
 
-    private fun cancel() {
+    fun cancel() {
         animatorJobs.forEach { it?.cancel() }
         loopingJob?.cancel()
     }
@@ -41,10 +44,11 @@ class AnimationLooper(
 class GifAnimator(
         gifData: ByteArray,
         private val imgViews: Array<ImageView?>,
-        private val imgDesc: ImgDescriptor,
-        frameDelayFactor: Int
+        private val imgDesc: ImgDescriptor
 ) {
-    private val frameDelay: Int = frameDelayFactor * imgDesc.minutesPerFrame
+    var frameDelayFactor: Int = 100
+    private val frameDelay: Int
+        get() = frameDelayFactor * imgDesc.minutesPerFrame
     private val bitmapProvider = FreeLists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
     private var currFrame: Bitmap? = null

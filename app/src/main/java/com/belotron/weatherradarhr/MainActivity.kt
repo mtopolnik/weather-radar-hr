@@ -19,10 +19,10 @@ class MainActivity : Activity()  {
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         actionBar.hide()
-        if (fragmentManager.findFragmentByTag(TAG_RADAR_IMAGE_FRAGMENT) == null) {
+        if (fragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {
             val newFragment = RadarImageFragment()
             fragmentManager.beginTransaction()
-                    .add(newFragment, TAG_RADAR_IMAGE_FRAGMENT)
+                    .add(R.id.radar_img_fragment, newFragment)
                     .commit()
         }
     }
