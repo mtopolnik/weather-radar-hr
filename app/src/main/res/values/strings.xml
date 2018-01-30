@@ -13,8 +13,8 @@
         <item>40 minutes/second</item>
         <item>20 minutes/second</item>
     </string-array>
-    <string name="frame_delay_default">frameDelay0</string>
-    <string-array name="frame_delay_values">
+    <string name="frame_delay_default" translatable="false">frameDelay0</string>
+    <string-array name="frame_delay_values" translatable="false">
         <item>frameDelay0</item>
         <item>frameDelay1</item>
         <item>frameDelay2</item>
@@ -25,8 +25,8 @@
         <item>2.5 seconds</item>
         <item>3.5 seconds</item>
     </string-array>
-    <string name="freeze_time_default">freeze0</string>
-    <string-array name="freeze_time_values">
+    <string name="freeze_time_default" translatable="false">freeze0</string>
+    <string-array name="freeze_time_values" translatable="false">
         <item>freeze0</item>
         <item>freeze1</item>
         <item>freeze2</item>
