@@ -16,6 +16,14 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import java.nio.ByteBuffer
 
+const val KEY_FRAME_DELAY = "frame_delay"
+const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
+const val DEFAULT_VALUE_FRAME_DELAY = 12
+
+const val KEY_FREEZE_TIME = "freeze_time"
+const val DEFAULT_STR_FREEZE_TIME = "freeze0"
+const val DEFAULT_VALUE_FREEZE_TIME = 1500
+
 val images = arrayOf(
         ImgDescriptor(0, "HR", R.id.img_view_kradar,
                 "http://vrijeme.hr/kradar-anim.gif",
@@ -36,22 +44,29 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-fun SharedPreferences.frameDelayFactor(): Int = getString("frame_delay", "frameDelay0").let { delayStr ->
+fun SharedPreferences.frameDelayFactor() = getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
     when (delayStr) {
-        "frameDelay0" -> 12
-        "frameDelay1" -> 26
-        "frameDelay2" -> 47
-        else -> throw RuntimeException("Invalid animation frameDelay value: $delayStr")
+        DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY
+        "frameDelay1" -> return 26
+        "frameDelay2" -> return 47
+        else -> replaceSetting(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY, DEFAULT_VALUE_FRAME_DELAY)
     }
 }
 
-fun SharedPreferences.freezeTime() = getString("freeze_time", "freeze0").let { freezeStr ->
+fun SharedPreferences.freezeTime() = getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
     when (freezeStr) {
-        "freeze0" -> 1500
-        "freeze1" -> 2500
-        "freeze2" -> 3500
-        else -> throw RuntimeException("Invalid animation duration value: $freezeStr")
+        DEFAULT_STR_FREEZE_TIME -> return DEFAULT_VALUE_FREEZE_TIME
+        "freeze1" -> return 2500
+        "freeze2" -> return 3500
+        else -> replaceSetting(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME, DEFAULT_VALUE_FREEZE_TIME)
     }
+}
+
+private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
+    val e = edit()
+    e.putString(keyStr, valStr)
+    e.apply()
+    return value
 }
 
 class RadarImageFragment : Fragment() {
@@ -64,7 +79,6 @@ class RadarImageFragment : Fragment() {
         retainInstance = true
         setHasOptionsMenu(true)
         animationLooper = AnimationLooper()
-
     }
 
     override fun onCreateView(

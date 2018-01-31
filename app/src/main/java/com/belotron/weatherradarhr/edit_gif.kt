@@ -203,8 +203,9 @@ constructor(
                 throw AssertionError("Invalid Graphic Control Extension block size: " + blockSize)
             }
             currFrame!!.gcExtPackedFields = buf.get()
-            MyLog.i { "Frame delay ${buf.getChar().toInt()}" }
-//            skip(2) // delayTime
+//            val frameDelay = buf.getChar().toInt()
+//            MyLog.i { "Frame delay $frameDelay" }
+            skip(2) // delayTime
             currFrame!!.gcExtTransparentColorIndex = buf.get()
             val blockTerminator = nextByte()
             if (blockTerminator != 0) {

@@ -20,7 +20,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".SettingsActivity"
-                  android:label="@string/settings">
+                  android:label="@string/settings"
+                  android:parentActivityName=".MainActivity">
         </activity>
 
         <receiver android:name=".LradarWidgetProvider"

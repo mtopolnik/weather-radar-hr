@@ -276,7 +276,9 @@ private fun Context.jobScheduler() =
 private fun intentLaunchMainActivity(context: Context): PendingIntent {
     val intent = Intent(context, MainActivity::class.java)
     intent.addCategory("android.intent.category.LAUNCHER")
-    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION
+            or Intent.FLAG_ACTIVITY_NEW_TASK
+            or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     intent.component = ComponentName(context.packageName, MainActivity::class.java.name)
     return PendingIntent.getActivity(context, 0, intent, 0)
 }
