@@ -12,8 +12,11 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import java.nio.ByteBuffer
 
 const val KEY_FRAME_DELAY = "frame_delay"
@@ -24,11 +27,11 @@ const val KEY_FREEZE_TIME = "freeze_time"
 const val DEFAULT_STR_FREEZE_TIME = "freeze0"
 const val DEFAULT_VALUE_FREEZE_TIME = 1500
 
-val images = arrayOf(
-        ImgDescriptor(0, "HR", R.id.img_view_kradar,
+val imgDescs = arrayOf(
+        ImgDescriptor(0, "HR", R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
                 "http://vrijeme.hr/kradar-anim.gif",
                 15),
-        ImgDescriptor(1, "SLO", R.id.img_view_lradar,
+        ImgDescriptor(1, "SLO", R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
                 "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
                 10)
 )
@@ -37,6 +40,8 @@ class ImgDescriptor(
         val index: Int,
         val title: String,
         val imgViewId: Int,
+        val progressBarId: Int,
+        val brokenImgViewId: Int,
         val url: String,
         val minutesPerFrame: Int
 ) {
@@ -71,6 +76,8 @@ private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, val
 
 class RadarImageFragment : Fragment() {
     private val imgViews: Array<ImageView?> = arrayOf(null, null)
+    private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
+    private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
     private lateinit var animationLooper: AnimationLooper
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,25 +92,18 @@ class RadarImageFragment : Fragment() {
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         MyLog.i { "RadarImageFragment.onCreateView" }
-        val rootView = inflater.inflate(R.layout.image_radar, container, false)
-        images.forEach {
-            val imgView = rootView.findViewById<ImageView>(it.imgViewId)
-            imgViews[it.index] = imgView
-            imgView.setOnClickListener {
-                val toolbar = activity.actionBar
-                if (toolbar.isShowing) {
-                    toolbar.hide()
-                } else {
-                    toolbar.show()
-                }
+        val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        imgDescs.forEach {
+            brokenImgViews[it.index] = rootView.findViewById<ImageView>(it.brokenImgViewId).also {
+                it.setSwitchActionBarListener()
+                it.visibility = GONE
             }
-        }
-        val mainActivity = activity as MainActivity
-        if (mainActivity.didRotate) {
-            mainActivity.didRotate = false
-        } else {
-            startFetchWidgetImages(activity.applicationContext)
-            startFetchAnimations()
+            progressBars[it.index] = rootView.findViewById<ProgressBar>(it.progressBarId).also {
+                it.setSwitchActionBarListener()
+            }
+            imgViews[it.index] = rootView.findViewById<ImageView>(it.imgViewId).also {
+                it.setSwitchActionBarListener()
+            }
         }
         return rootView
     }
@@ -112,6 +112,8 @@ class RadarImageFragment : Fragment() {
         MyLog.i { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
         imgViews.fill(null)
+        brokenImgViews.fill(null)
+        progressBars.fill(null)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -122,11 +124,10 @@ class RadarImageFragment : Fragment() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         MyLog.i { "RadarImageFragment.onOptionsItemSelected" }
-        activity.actionBar.hide()
         when (item.itemId) {
             R.id.refresh -> {
                 if (imgViews[0] != null) {
-                    startFetchAnimations()
+                    startReloadAnimations()
                 }
             }
             R.id.settings -> {
@@ -146,14 +147,39 @@ class RadarImageFragment : Fragment() {
     override fun onResume() {
         MyLog.i { "RadarImageFragment.onResume" }
         super.onResume()
-        animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
+        if (animationLooper.animators.any { it != null }) {
+            imgDescs.forEach {
+                progressBars[it.index]?.visibility = GONE
+                val hasImage = animationLooper.animators[it.index] != null
+                imgViews[it.index]?.visibility = if (hasImage) VISIBLE else GONE
+                brokenImgViews[it.index]?.visibility = if (hasImage) GONE else VISIBLE
+            }
+            animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
+        } else {
+            startReloadAnimations()
+            startFetchWidgetImages(activity.applicationContext)
+        }
     }
 
-    private fun startFetchAnimations() {
+    private fun View.setSwitchActionBarListener() = setOnClickListener {
+        val toolbar = activity.actionBar
+        if (toolbar.isShowing) {
+            toolbar.hide()
+        } else {
+            toolbar.show()
+        }
+    }
+
+    private fun startReloadAnimations() {
+        imgDescs.forEach {
+            progressBars[it.index]?.visibility = VISIBLE
+            brokenImgViews[it.index]?.visibility = GONE
+            imgViews[it.index]?.visibility = GONE
+        }
         val context = activity
         val frameDelayFactor = context.frameDelayFactor()
         val animationDuration = context.animationDuration()
-        for (desc in images) {
+        for (desc in imgDescs) {
             start coroutine@ {
                 try {
                     val (_, imgBytes) = try {
@@ -168,8 +194,13 @@ class RadarImageFragment : Fragment() {
                     editGif(buf, desc.framesToKeep)
                     animationLooper.animators[desc.index] = GifAnimator(buf.toArray(), imgViews, desc)
                     animationLooper.restart(animationDuration, frameDelayFactor)
+                    progressBars[desc.index]?.visibility = GONE
+                    imgViews[desc.index]?.visibility = VISIBLE
+                    activity.actionBar.hide()
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
+                    progressBars[desc.index]?.visibility = GONE
+                    brokenImgViews[desc.index]?.visibility = VISIBLE
                 }
             }
         }

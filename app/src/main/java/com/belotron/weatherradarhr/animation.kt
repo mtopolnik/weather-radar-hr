@@ -64,7 +64,6 @@ class GifAnimator(
                 MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
                 return@coroutine
             }
-            imgViews[imgDesc.index]!!.parent.requestLayout()
             while (true) {
                 if (!gifDecoder.advance()) {
                     MyLog.i { "Animator stop: gifDecoder.advance() returned false" }
