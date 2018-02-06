@@ -197,7 +197,7 @@ public class StandardGifDecoder implements GifDecoder {
     }
 
     @Override
-    public int getNextDelay() {
+    public int getCurrentDelay() {
         return header.frameCount > 0 && framePointer >= 0
                 ? getDelay(framePointer) : 0;
     }
@@ -210,6 +210,11 @@ public class StandardGifDecoder implements GifDecoder {
     @Override
     public int getCurrentFrameIndex() {
         return framePointer;
+    }
+
+    @Override
+    public void gotoLastFrame() {
+        framePointer = header.frameCount - 1;
     }
 
     @Override
@@ -237,7 +242,7 @@ public class StandardGifDecoder implements GifDecoder {
 
     @NonNull
     @Override
-    public synchronized Bitmap getNextFrame() {
+    public synchronized Bitmap getCurrentFrame() {
         if (header.frameCount <= 0 || framePointer < 0) {
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(TAG, "Unable to decode frame"

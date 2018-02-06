@@ -133,7 +133,7 @@ public interface GifDecoder {
     /**
      * Gets display duration for the upcoming frame in ms.
      */
-    int getNextDelay();
+    int getCurrentDelay();
 
     /**
      * Gets the number of frames read from file.
@@ -148,6 +148,8 @@ public interface GifDecoder {
      * @return frame index.
      */
     int getCurrentFrameIndex();
+
+    void gotoLastFrame();
 
     /**
      * Resets the frame pointer to before the 0th frame, as if we'd never used this decoder to
@@ -206,7 +208,7 @@ public interface GifDecoder {
      * @return Bitmap representation of frame.
      */
     @NonNull
-    Bitmap getNextFrame();
+    Bitmap getCurrentFrame();
 
     /**
      * Reads GIF image from stream.

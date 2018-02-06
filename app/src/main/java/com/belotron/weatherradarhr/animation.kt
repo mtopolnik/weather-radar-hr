@@ -2,6 +2,7 @@ package com.belotron.weatherradarhr
 
 import android.graphics.Bitmap
 import android.widget.ImageView
+import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import kotlinx.coroutines.experimental.Job
@@ -47,20 +48,36 @@ class GifAnimator(
         private val imgViews: Array<ImageView?>,
         private val imgDesc: ImgDescriptor
 ) {
+    private val bitmapProvider = FreeLists()
+    private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
+    private val timestamp: Long = run {
+        with(gifDecoder) {
+            gotoLastFrame()
+            currentFrame.let {
+                val result = imgDesc.ocrTimestamp(it)
+                bitmapProvider.release(it)
+                resetFrameIndex()
+                result
+            }
+        }
+    }
     var frameDelayFactor: Int = 100
     private val frameDelay: Int
         get() = frameDelayFactor * imgDesc.minutesPerFrame
-    private val bitmapProvider = FreeLists()
-    private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
     private var currFrame: Bitmap? = null
+
     private var currFrameShownAt = 0L
+
+    fun setAgeText(textView: TextView) {
+        textView.text = textView.context.ageText(timestamp)
+    }
 
     fun animate(): Job? {
         with(gifDecoder) {
             rewind()
             advance()
         }
-        if (!replaceCurrentFrame(gifDecoder.nextFrame)) {
+        if (!replaceCurrentFrame(gifDecoder.currentFrame)) {
             MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
             return null
         }
@@ -70,11 +87,11 @@ class GifAnimator(
                     MyLog.d { "Animator stop: gifDecoder.advance() returned false" }
                     break
                 }
-                val nextFrame = withContext(threadPool) { gifDecoder.nextFrame }
+                val nextFrame = withContext(threadPool) { gifDecoder.currentFrame }
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
                 val remainingTillNextFrame = frameDelay - elapsedSinceFrameShown
                 MyLog.d { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
-                remainingTillNextFrame.takeIf({ it > 0 })?.also {
+                remainingTillNextFrame.takeIf { it > 0 } ?.also {
                     delay(it)
                 }
                 if (!replaceCurrentFrame(nextFrame)) {

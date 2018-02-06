@@ -78,6 +78,10 @@ private data class WidgetDescriptor(
 
 private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
 
+fun Context.ageText(timestamp: Long) =
+    getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
+
+
 fun startFetchWidgetImages(context : Context) {
     val appContext = context.applicationContext
     widgetDescriptors.forEach { wDesc ->
@@ -211,9 +215,10 @@ private class WidgetContext (
         val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
         remoteViews.setOnClickPendingIntent(R.id.img_view_widget, intentLaunchMainActivity(context))
         if (tsBitmap != null) {
-            remoteViews.setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
-            remoteViews.setTextViewText(R.id.text_view_widget,
-                    getRelativeDateTimeString(context, tsBitmap.timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0))
+            with(remoteViews) {
+                setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
+                setTextViewText(R.id.text_view_widget, context.ageText(tsBitmap.timestamp))
+            }
         } else {
             remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
         }

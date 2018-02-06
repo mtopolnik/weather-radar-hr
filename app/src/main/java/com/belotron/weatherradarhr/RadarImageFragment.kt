@@ -1,10 +1,11 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.app.Fragment
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Matrix
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.preference.PreferenceManager.getDefaultSharedPreferences
@@ -20,6 +21,10 @@ import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.TextView
+import com.belotron.weatherradarhr.ImgStatus.BROKEN
+import com.belotron.weatherradarhr.ImgStatus.LOADING
+import com.belotron.weatherradarhr.ImgStatus.SHOWING
 import java.nio.ByteBuffer
 
 const val KEY_FRAME_DELAY = "frame_delay"
@@ -31,22 +36,24 @@ const val DEFAULT_STR_FREEZE_TIME = "freeze0"
 const val DEFAULT_VALUE_FREEZE_TIME = 1500
 
 val imgDescs = arrayOf(
-        ImgDescriptor(0, "HR", R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
-                "http://vrijeme.hr/kradar-anim.gif",
-                15),
-        ImgDescriptor(1, "SLO", R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
-                "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif",
-                10)
+        ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
+                R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
+                R.id.text_kradar, KradarOcr::ocrKradarTimestamp),
+        ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 10,
+                R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
+                R.id.text_lradar, LradarOcr::ocrLradarTimestamp)
 )
 
 class ImgDescriptor(
         val index: Int,
         val title: String,
+        val url: String,
+        val minutesPerFrame: Int,
         val imgViewId: Int,
         val progressBarId: Int,
         val brokenImgViewId: Int,
-        val url: String,
-        val minutesPerFrame: Int
+        val textViewId: Int,
+        val ocrTimestamp: (Bitmap) -> Long
 ) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
     val filename = url.substringAfterLast('/')
@@ -70,20 +77,21 @@ fun SharedPreferences.freezeTime() = getString(KEY_FREEZE_TIME, DEFAULT_STR_FREE
     }
 }
 
+@SuppressLint("CommitPrefEdits")
 private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
-    val e = edit()
-    e.putString(keyStr, valStr)
-    e.apply()
+    with(edit()) {
+        putString(keyStr, valStr)
+        apply()
+    }
     return value
 }
 
 class RadarImageFragment : Fragment() {
+    private val textViews: Array<TextView?> = arrayOf(null, null)
     private val imgViews: Array<ImageView?> = arrayOf(null, null)
     private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
     private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
     private lateinit var animationLooper: AnimationLooper
-    val matrices = arrayOf(Matrix(), Matrix())
-    val imgScaleFactors = floatArrayOf(1.0f, 1.0f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i { "RadarImageFragment.onCreate" }
@@ -99,6 +107,7 @@ class RadarImageFragment : Fragment() {
         MyLog.i { "RadarImageFragment.onCreateView" }
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         imgDescs.forEach {
+            textViews[it.index] = rootView.findViewById(it.textViewId)
             brokenImgViews[it.index] = rootView.findViewById<ImageView>(it.brokenImgViewId).also {
                 it.setOnClickListener { switchActionBarVisible() }
                 it.visibility = GONE
@@ -122,16 +131,17 @@ class RadarImageFragment : Fragment() {
         val noAnimationsLoaded = animationLooper.animators.all { it == null }
         if (noAnimationsLoaded || isTimeToReload) {
             MyLog.i {
-                "Reloading animations. Was it time to reload? $isTimeToReload. No animations loaded? $noAnimationsLoaded"
+                "Reloading animations. Was it time to reload? $isTimeToReload." +
+                        " No animations loaded? $noAnimationsLoaded"
             }
             startReloadAnimations()
             startFetchWidgetImages(activity.applicationContext)
         } else {
             imgDescs.forEach {
-                progressBars[it.index]?.visibility = GONE
-                val hasImage = animationLooper.animators[it.index] != null
-                imgViews[it.index]?.visibility = if (hasImage) VISIBLE else GONE
-                brokenImgViews[it.index]?.visibility = if (hasImage) GONE else VISIBLE
+                val animator = animationLooper.animators[it.index]?.apply {
+                    setAgeText(textViews[it.index]!!)
+                }
+                setImageStatus(it.index, if (animator != null) SHOWING else BROKEN)
             }
             animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
         }
@@ -140,6 +150,7 @@ class RadarImageFragment : Fragment() {
     override fun onDestroyView() {
         MyLog.i { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
+        textViews.fill(null)
         imgViews.fill(null)
         brokenImgViews.fill(null)
         progressBars.fill(null)
@@ -160,14 +171,11 @@ class RadarImageFragment : Fragment() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         MyLog.i { "RadarImageFragment.onOptionsItemSelected" }
         when (item.itemId) {
-            R.id.refresh -> {
+            R.id.refresh ->
                 if (imgViews[0] != null) {
                     startReloadAnimations()
                 }
-            }
-            R.id.settings -> {
-                startActivity(Intent(activity, SettingsActivity::class.java))
-            }
+            R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
             R.id.about -> Unit
         }
         return true
@@ -183,18 +191,15 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-
     private fun startReloadAnimations() {
         imgDescs.forEach {
-            progressBars[it.index]?.visibility = VISIBLE
-            brokenImgViews[it.index]?.visibility = GONE
-            imgViews[it.index]?.visibility = GONE
+            setImageStatus(it.index, LOADING)
         }
         val context = activity
         val frameDelayFactor = context.frameDelayFactor()
         val animationDuration = context.animationDuration()
         for (desc in imgDescs) {
-            start coroutine@ {
+            start {
                 try {
                     val (_, imgBytes) = try {
                         fetchUrl(context, desc.url, onlyIfNew = false)
@@ -202,35 +207,48 @@ class RadarImageFragment : Fragment() {
                         Pair(0L, e.cached)
                     }
                     if (imgBytes == null || imgViews[desc.index] == null) {
-                        return@coroutine
+                        return@start
                     }
                     val buf = ByteBuffer.wrap(imgBytes)
                     editGif(buf, desc.framesToKeep)
-                    animationLooper.animators[desc.index] = GifAnimator(buf.toArray(), imgViews, desc)
+                    animationLooper.animators[desc.index] = GifAnimator(buf.toArray(), imgViews, desc).apply {
+                        setAgeText(textViews[desc.index]!!)
+                    }
                     animationLooper.restart(animationDuration, frameDelayFactor)
-                    progressBars[desc.index]?.visibility = GONE
-                    imgViews[desc.index]?.visibility = VISIBLE
+                    setImageStatus(desc.index, SHOWING)
                     activity.actionBar.hide()
                 } catch (t: Throwable) {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
-                    progressBars[desc.index]?.visibility = GONE
-                    brokenImgViews[desc.index]?.visibility = VISIBLE
+                    setImageStatus(desc.index, BROKEN)
                 }
                 lastReloadedTimestamp = System.currentTimeMillis()
             }
         }
     }
+
+    private fun setImageStatus(i: Int, status: ImgStatus) {
+        progressBars[i]?.setVisible(status == LOADING)
+        imgViews[i]?.setVisible(status == SHOWING)
+        brokenImgViews[i]?.setVisible(status == BROKEN)
+    }
+}
+
+private fun View.setVisible(state: Boolean) {
+    visibility = if (state) VISIBLE else GONE
+}
+
+private enum class ImgStatus {
+    LOADING, SHOWING, BROKEN
 }
 
 private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }
 
 private fun Context.animationDuration(): Int {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-    return ANIMATION_COVERS_MINUTES * prefs.frameDelayFactor() + prefs.freezeTime()
+    with(PreferenceManager.getDefaultSharedPreferences(this)) {
+        return ANIMATION_COVERS_MINUTES * frameDelayFactor() + freezeTime()
+    }
 }
 
 private fun Context.frameDelayFactor(): Int {
     return getDefaultSharedPreferences(this).frameDelayFactor()
 }
-
-

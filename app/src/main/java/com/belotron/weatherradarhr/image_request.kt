@@ -154,4 +154,3 @@ private inline fun <T> runOrNull(block: () -> T) = try {
 }
 
 class ImageFetchException(val cached : ByteArray?) : Exception()
-
