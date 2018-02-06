@@ -8,6 +8,7 @@ import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.withContext
 import java.util.ArrayDeque
 import java.util.Queue
 import java.util.concurrent.TimeUnit.NANOSECONDS
@@ -54,22 +55,22 @@ class GifAnimator(
     private var currFrame: Bitmap? = null
     private var currFrameShownAt = 0L
 
-    fun animate(): Job {
-        gifDecoder.apply {
+    fun animate(): Job? {
+        with(gifDecoder) {
             rewind()
             advance()
         }
-        return launch(UI) coroutine@ {
-            if (!replaceCurrentFrame(gifDecoder.nextFrame)) {
-                MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
-                return@coroutine
-            }
+        if (!replaceCurrentFrame(gifDecoder.nextFrame)) {
+            MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
+            return null
+        }
+        return launch(UI) {
             while (true) {
                 if (!gifDecoder.advance()) {
-                    MyLog.i { "Animator stop: gifDecoder.advance() returned false" }
+                    MyLog.d { "Animator stop: gifDecoder.advance() returned false" }
                     break
                 }
-                val nextFrame = gifDecoder.nextFrame
+                val nextFrame = withContext(threadPool) { gifDecoder.nextFrame }
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
                 val remainingTillNextFrame = frameDelay - elapsedSinceFrameShown
                 MyLog.d { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }

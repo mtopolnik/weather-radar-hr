@@ -4,13 +4,16 @@ import android.app.Fragment
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Matrix
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.preference.PreferenceManager.getDefaultSharedPreferences
+import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -79,6 +82,8 @@ class RadarImageFragment : Fragment() {
     private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
     private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
     private lateinit var animationLooper: AnimationLooper
+    val matrices = arrayOf(Matrix(), Matrix())
+    val imgScaleFactors = floatArrayOf(1.0f, 1.0f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i { "RadarImageFragment.onCreate" }
@@ -95,17 +100,41 @@ class RadarImageFragment : Fragment() {
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         imgDescs.forEach {
             brokenImgViews[it.index] = rootView.findViewById<ImageView>(it.brokenImgViewId).also {
-                it.setSwitchActionBarListener()
+                it.setOnClickListener { switchActionBarVisible() }
                 it.visibility = GONE
             }
             progressBars[it.index] = rootView.findViewById<ProgressBar>(it.progressBarId).also {
-                it.setSwitchActionBarListener()
+                it.setOnClickListener { switchActionBarVisible() }
             }
-            imgViews[it.index] = rootView.findViewById<ImageView>(it.imgViewId).also {
-                it.setSwitchActionBarListener()
+            imgViews[it.index] = rootView.findViewById<TouchImageView>(it.imgViewId).also {
+                it.setOnDoubleTapListener(object: GestureDetector.SimpleOnGestureListener() {
+                    override fun onSingleTapConfirmed(e: MotionEvent?): Boolean = switchActionBarVisible()
+                })
             }
         }
         return rootView
+    }
+
+    override fun onResume() {
+        MyLog.i { "RadarImageFragment.onResume" }
+        super.onResume()
+        val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
+        val noAnimationsLoaded = animationLooper.animators.all { it == null }
+        if (noAnimationsLoaded || isTimeToReload) {
+            MyLog.i {
+                "Reloading animations. Was it time to reload? $isTimeToReload. No animations loaded? $noAnimationsLoaded"
+            }
+            startReloadAnimations()
+            startFetchWidgetImages(activity.applicationContext)
+        } else {
+            imgDescs.forEach {
+                progressBars[it.index]?.visibility = GONE
+                val hasImage = animationLooper.animators[it.index] != null
+                imgViews[it.index]?.visibility = if (hasImage) VISIBLE else GONE
+                brokenImgViews[it.index]?.visibility = if (hasImage) GONE else VISIBLE
+            }
+            animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
+        }
     }
 
     override fun onDestroyView() {
@@ -114,6 +143,12 @@ class RadarImageFragment : Fragment() {
         imgViews.fill(null)
         brokenImgViews.fill(null)
         progressBars.fill(null)
+    }
+
+    override fun onPause() {
+        MyLog.i { "RadarImageFragment.onPause" }
+        super.onPause()
+        animationLooper.cancel()
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -138,37 +173,16 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    override fun onPause() {
-        MyLog.i { "RadarImageFragment.onPause" }
-        super.onPause()
-        animationLooper.cancel()
-    }
-
-    override fun onResume() {
-        MyLog.i { "RadarImageFragment.onResume" }
-        super.onResume()
-        if (animationLooper.animators.any { it != null }) {
-            imgDescs.forEach {
-                progressBars[it.index]?.visibility = GONE
-                val hasImage = animationLooper.animators[it.index] != null
-                imgViews[it.index]?.visibility = if (hasImage) VISIBLE else GONE
-                brokenImgViews[it.index]?.visibility = if (hasImage) GONE else VISIBLE
-            }
-            animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
-        } else {
-            startReloadAnimations()
-            startFetchWidgetImages(activity.applicationContext)
-        }
-    }
-
-    private fun View.setSwitchActionBarListener() = setOnClickListener {
+    private fun switchActionBarVisible():Boolean {
         val toolbar = activity.actionBar
         if (toolbar.isShowing) {
             toolbar.hide()
         } else {
             toolbar.show()
         }
+        return true
     }
+
 
     private fun startReloadAnimations() {
         imgDescs.forEach {
@@ -202,6 +216,7 @@ class RadarImageFragment : Fragment() {
                     progressBars[desc.index]?.visibility = GONE
                     brokenImgViews[desc.index]?.visibility = VISIBLE
                 }
+                lastReloadedTimestamp = System.currentTimeMillis()
             }
         }
     }
