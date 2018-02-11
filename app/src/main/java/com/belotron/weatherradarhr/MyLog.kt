@@ -11,6 +11,13 @@ object MyLog {
         }
     }
 
+    @JvmStatic
+    fun ii(arg: String) {
+        if (logLevelEnabled(Log.INFO)) {
+            Log.i(LOGTAG, arg)
+        }
+    }
+
     inline fun i(arg: () -> String) {
         if (logLevelEnabled(Log.INFO)) {
             Log.i(LOGTAG, arg())

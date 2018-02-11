@@ -50,15 +50,13 @@ class GifAnimator(
 ) {
     private val bitmapProvider = FreeLists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
-    private val timestamp: Long = run {
-        with(gifDecoder) {
-            gotoLastFrame()
-            currentFrame.let {
-                val result = imgDesc.ocrTimestamp(it)
-                bitmapProvider.release(it)
-                resetFrameIndex()
-                result
-            }
+    private val timestamp: Long = with(gifDecoder) {
+        gotoLastFrame()
+        currentFrame.let {
+            val result = imgDesc.ocrTimestamp(it)
+            bitmapProvider.release(it)
+            resetFrameIndex()
+            result
         }
     }
     var frameDelayFactor: Int = 100

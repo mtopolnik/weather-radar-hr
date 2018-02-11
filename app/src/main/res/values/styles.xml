@@ -2,10 +2,13 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary</item>
         <item name="android:actionBarStyle">@style/MyActionBar</item>
     </style>
 
     <style name="MyActionBar" parent="@android:style/Widget.DeviceDefault.ActionBar">
         <item name="android:displayOptions">showTitle</item>
+        <item name="android:background">@color/primary</item>
     </style>
 </resources>
