@@ -26,28 +26,12 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.logging.Logger as JulLogger
 
-fun ByteArray.toBitmap() : Bitmap =
-        BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
-
-val threadPool = Executors.newCachedThreadPool().asCoroutineDispatcher()
-
 private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
-
-fun start(block: suspend CoroutineScope.() -> Unit) = launch(
-        myLooper()?.let { Handler(it).asCoroutineDispatcher() } ?: Unconfined,
-        start = UNDISPATCHED,
-        block = block)
-
-fun Context.file(name: String) = File(noBackupFilesDir, name)
-
-fun File.dataIn() = DataInputStream(FileInputStream(this))
-
-fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
 suspend fun fetchUrl(
         context: Context, url: String, onlyIfNew: Boolean

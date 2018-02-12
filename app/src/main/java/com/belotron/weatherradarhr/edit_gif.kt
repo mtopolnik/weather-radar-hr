@@ -1,5 +1,6 @@
 package com.belotron.weatherradarhr
 
+import kotlinx.coroutines.experimental.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
 import java.nio.charset.Charset
@@ -13,12 +14,8 @@ private const val BLOCK_TYPE_TRAILER = 0x3b
 private const val EXT_TYPE_GRAPHIC_CONTROL = 0xf9
 private const val EXT_TYPE_APPLICATION = 0xff
 
-fun editGif(buf: ByteBuffer, framesToKeep: Int) {
-    GifEditor(buf, framesToKeep).go()
-}
-
-fun checkGif(buf: ByteBuffer) {
-    GifEditor(buf, 1).checkGif()
+suspend fun editGif(gifData: ByteArray, framesToKeep: Int) = withContext(threadPool) {
+    GifEditor(ByteBuffer.wrap(gifData), framesToKeep).go()
 }
 
 private class GifEditor
@@ -27,11 +24,12 @@ constructor(
         private val framesToKeep: Int
 ) {
 
-    fun go() {
+    fun go(): ByteArray {
         buf.order(LITTLE_ENDIAN)
         val frameList = parseGif()
         rewriteFramesInBuffer(frameList)
         buf.rewind()
+        return buf.toArray()
     }
 
     fun checkGif() {
@@ -285,6 +283,8 @@ constructor(
         }
     }
 }
+
+private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }
 
 private fun copy(src: ByteBuffer, srcPos: Int, srcLimit: Int, dest: ByteBuffer) {
     if (srcPos == dest.position()) {

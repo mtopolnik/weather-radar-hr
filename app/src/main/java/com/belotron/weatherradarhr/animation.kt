@@ -14,39 +14,58 @@ import java.util.ArrayDeque
 import java.util.Queue
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
-class AnimationLooper {
-    val animators = arrayOfNulls<GifAnimator>(2)
-    private val animatorJobs = arrayOfNulls<Job>(2)
+class AnimationLooper(numViews: Int) {
+    val animators = arrayOfNulls<GifAnimator>(numViews)
+    private val animatorJobs = arrayOfNulls<Job>(numViews)
     private var loopingJob: Job? = null
+    private var animationDuration: Int? = null
 
-    fun restart(animationDuration: Int, frameDelayFactor: Int) {
-        MyLog.i { "AnimationLooper.restart. Animation duration $animationDuration" }
+    fun restart(newDuration: Int, newDelayFactor: Int) {
+        animationDuration = newDuration
+        animators.forEach { it?.frameDelayFactor = newDelayFactor }
+        restart()
+    }
+
+    fun restart() {
+        MyLog.i { "AnimationLooper.restart" }
         if (animators.none()) {
             return
         }
-        cancel()
+        stop()
         loopingJob = start {
             while (true) {
                 animatorJobs.forEach { it?.join() }
                 animators.forEachIndexed { i, it ->
-                    it?.frameDelayFactor = frameDelayFactor
                     animatorJobs[i] = it?.animate()
                 }
-                delay(animationDuration)
+                delay(animationDuration!!)
             }
         }
     }
 
-    fun cancel() {
+    fun animateOne(index: Int) {
+        MyLog.i { "AnimationLooper.animateOne $index" }
+        val animator = animators[index]!!
+        loopingJob = start {
+            while (true) {
+                animatorJobs[index]?.join()
+                animatorJobs[index] = animator.animate()
+                delay(animationDuration!!)
+            }
+        }
+    }
+
+    fun stop() {
         animatorJobs.forEach { it?.cancel() }
         loopingJob?.cancel()
     }
+
 }
 
 class GifAnimator(
+        private val imgDesc: ImgDescriptor,
         gifData: ByteArray,
-        private val imgViews: Array<ImageView?>,
-        private val imgDesc: ImgDescriptor
+        var imgView: ImageView?
 ) {
     private val bitmapProvider = FreeLists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
@@ -60,21 +79,20 @@ class GifAnimator(
         }
     }
     var frameDelayFactor: Int = 100
-    private val frameDelay: Int
-        get() = frameDelayFactor * imgDesc.minutesPerFrame
-    private var currFrame: Bitmap? = null
+    private val frameDelay get() = frameDelayFactor * imgDesc.minutesPerFrame
 
+    private var currFrame: Bitmap? = null
     private var currFrameShownAt = 0L
 
-    fun setAgeText(textView: TextView) {
+    fun pushAgeTextToView(textView: TextView) {
         textView.text = textView.context.ageText(timestamp)
     }
 
     fun animate(): Job? {
         with(gifDecoder) {
-            rewind()
-            advance()
-        }
+                rewind()
+                advance()
+            }
         if (!replaceCurrentFrame(gifDecoder.currentFrame)) {
             MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
             return null
@@ -89,7 +107,7 @@ class GifAnimator(
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
                 val remainingTillNextFrame = frameDelay - elapsedSinceFrameShown
                 MyLog.d { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
-                remainingTillNextFrame.takeIf { it > 0 } ?.also {
+                remainingTillNextFrame.takeIf { it > 0 }?.also {
                     delay(it)
                 }
                 if (!replaceCurrentFrame(nextFrame)) {
@@ -100,7 +118,7 @@ class GifAnimator(
     }
 
     private fun replaceCurrentFrame(nextFrame: Bitmap): Boolean {
-        val view = imgViews[imgDesc.index] ?: return false
+        val view = imgView ?: return false
         view.setImageBitmap(nextFrame)
         currFrameShownAt = System.nanoTime()
         currFrame?.also { bitmapProvider.release(it) }

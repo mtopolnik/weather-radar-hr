@@ -24,7 +24,6 @@ import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.*;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
@@ -47,11 +46,9 @@ public class TouchImageView extends ImageView {
     // when the image is stretched to fit view.
     private float normalizedScale;
 
-    //
     // Matrix applied to image. MSCALE_X and MSCALE_Y should always be equal.
     // MTRANS_X and MTRANS_Y are the other values used. prevMatrix is the matrix
     // saved prior to the screen rotating.
-    //
     private final Matrix matrix = new Matrix();
     private final Matrix prevMatrix = new Matrix();
     private float[] m;
@@ -140,28 +137,24 @@ public class TouchImageView extends ImageView {
     public void setImageResource(int resId) {
         super.setImageResource(resId);
         savePreviousImageValues();
-        fitImageToView();
     }
 
     @Override
     public void setImageBitmap(Bitmap bm) {
         super.setImageBitmap(bm);
         savePreviousImageValues();
-        fitImageToView();
     }
 
     @Override
     public void setImageDrawable(Drawable drawable) {
         super.setImageDrawable(drawable);
         savePreviousImageValues();
-        fitImageToView();
     }
 
     @Override
     public void setImageURI(Uri uri) {
         super.setImageURI(uri);
         savePreviousImageValues();
-        fitImageToView();
     }
 
     @Override
@@ -253,21 +246,9 @@ public class TouchImageView extends ImageView {
         savePreviousImageValues();
     }
 
-    public void doubleTapZoom(MotionEvent e) {
-        boolean zoomingIn = normalizedScale == minScale;
-        float targetZoom = zoomingIn ? maxScale : minScale;
-        if (zoomingIn) {
-            // Set view height to the height of the zoomed-in image.
-            getLayoutParams().height = (int) (viewHeight * targetZoom);
-        } else {
-            // set view height to match the aspect ratio of the image, given
-            // the existing view width
-            Drawable drawable = getDrawable();
-            float widthFittingScale = (float) viewWidth / drawable.getIntrinsicWidth();
-            getLayoutParams().height = (int) (drawable.getIntrinsicHeight() * widthFittingScale) + 1;
-        }
-        requestLayout();
-        postOnAnimation(new AnimateZoom(targetZoom, e.getX(), e.getY(), false));
+    public void animateZoom(MotionEvent e, Runnable andThen) {
+        float targetZoom = normalizedScale == minScale ? maxScale : minScale;
+        postOnAnimation(new AnimateZoom(targetZoom, e.getX(), e.getY(), false, andThen));
     }
 
     /**
@@ -460,6 +441,7 @@ public class TouchImageView extends ImageView {
         viewWidth = computeViewSize(widthMode, widthSize, drawableWidth);
         float scaleX = (float) viewWidth / drawableWidth;
         viewHeight = computeViewSize(heightMode, heightSize, (int) (drawableHeight * scaleX) + 1);
+        MyLog.ii("onMeasure: " + widthSize + ", " + heightSize);
 
         // Set view dimensions
         setMeasuredDimension(viewWidth, viewHeight);
@@ -561,27 +543,19 @@ public class TouchImageView extends ImageView {
             case CENTER:
                 scaleX = scaleY = 1;
                 break;
-
             case CENTER_CROP:
                 scaleX = scaleY = Math.max(scaleX, scaleY);
                 break;
-
             case CENTER_INSIDE:
                 scaleX = scaleY = Math.min(1, Math.min(scaleX, scaleY));
-
+                break;
             case FIT_CENTER:
                 scaleX = scaleY = Math.min(scaleX, scaleY);
                 break;
-
             case FIT_XY:
                 break;
-
             default:
-                //
-                // FIT_START and FIT_END not supported
-                //
                 throw new UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END");
-
         }
 
         // Center the image
@@ -590,6 +564,7 @@ public class TouchImageView extends ImageView {
         matchViewWidth = viewWidth - redundantXSpace;
         matchViewHeight = viewHeight - redundantYSpace;
         if (!isZoomed() && !imageRenderedAtLeastOnce) {
+            MyLog.ii("Set initial scale: " + viewWidth + ", " + viewHeight);
             // Stretch and center image to fit view
             matrix.setScale(scaleX, scaleY);
             matrix.postTranslate(redundantXSpace / 2, redundantYSpace / 2);
@@ -598,6 +573,8 @@ public class TouchImageView extends ImageView {
             setImageMatrix(matrix);
             return;
         }
+
+        MyLog.ii("is zoomed? " + isZoomed() + " imageRenderedAtLeastOnce? " + imageRenderedAtLeastOnce);
 
         // These values should never be 0 or we will set viewWidth and viewHeight
         // to NaN in translateMatrixAfterRotate. To avoid this, call savePreviousImageValues
@@ -748,6 +725,15 @@ public class TouchImageView extends ImageView {
         fixScaleTrans();
     }
 
+    private void printMatrixInfo(String msg) {
+        float[] n = new float[9];
+        matrix.getValues(n);
+        MyLog.ii(msg
+                + " Scale: " + n[Matrix.MSCALE_X]
+                + " TransX: " + n[Matrix.MTRANS_X]
+                + " TransY: " + n[Matrix.MTRANS_Y]);
+    }
+
     private static float getFixTrans(float trans, float viewSize, float contentSize) {
         float minTrans, maxTrans;
 
@@ -795,6 +781,7 @@ public class TouchImageView extends ImageView {
      */
     private class AnimateZoom implements Runnable {
 
+        private final Runnable andThen;
         private long startTime;
         private float startZoom, zoomChange;
         private float bitmapX, bitmapY;
@@ -803,7 +790,7 @@ public class TouchImageView extends ImageView {
         private PointF startTouch;
         private PointF endTouch;
 
-        AnimateZoom(float targetZoom, float focusX, float focusY, boolean stretchImageToSuper) {
+        AnimateZoom(float targetZoom, float focusX, float focusY, boolean stretchImageToSuper, Runnable andThen) {
             setState(State.ANIMATE_ZOOM);
             startTime = System.nanoTime();
             this.startZoom = normalizedScale;
@@ -812,6 +799,7 @@ public class TouchImageView extends ImageView {
             PointF bitmapPoint = transformCoordTouchToBitmap(focusX, focusY, false);
             this.bitmapX = bitmapPoint.x;
             this.bitmapY = bitmapPoint.y;
+            this.andThen = andThen;
 
             // Used for translating image during scaling
             startTouch = transformCoordBitmapToTouch(bitmapX, bitmapY);
@@ -826,7 +814,6 @@ public class TouchImageView extends ImageView {
             double deltaScale = zoom / normalizedScale;
             scaleImage(deltaScale, bitmapX, bitmapY, stretchImageToSuper);
             translateImageToCenterTouchPosition(zoomProgress);
-            fixScaleTrans();
             setImageMatrix(matrix);
 
             // OnTouchImageViewListener is set: double tap runnable updates listener
@@ -838,6 +825,7 @@ public class TouchImageView extends ImageView {
                 postOnAnimation(this);
             } else { // Finished zooming
                 setState(State.NONE);
+                andThen.run();
             }
         }
 
@@ -853,6 +841,7 @@ public class TouchImageView extends ImageView {
             float targetY = startTouch.y + t * (endTouch.y - startTouch.y);
             PointF curr = transformCoordBitmapToTouch(bitmapX, bitmapY);
             matrix.postTranslate(targetX - curr.x, targetY - curr.y);
+            fixScaleTrans();
         }
     }
 
@@ -946,26 +935,14 @@ public class TouchImageView extends ImageView {
                         break;
                 }
             }
-
             setImageMatrix(matrix);
-
-            //
-            // User-defined OnTouchListener
-            //
             if (userTouchListener != null) {
                 userTouchListener.onTouch(v, event);
             }
-
-            //
             // OnTouchImageViewListener is set: TouchImageView dragged by user.
-            //
             if (touchImageViewListener != null) {
                 touchImageViewListener.onMove();
             }
-
-            //
-            // indicate event was handled
-            //
             return true;
         }
     }
@@ -1011,7 +988,7 @@ public class TouchImageView extends ImageView {
             }
 
             if (animateToZoomBoundary) {
-                AnimateZoom doubleTap = new AnimateZoom(targetZoom, viewWidth / 2, viewHeight / 2, true);
+                AnimateZoom doubleTap = new AnimateZoom(targetZoom, viewWidth / 2, viewHeight / 2, true, null);
                 postOnAnimation(doubleTap);
             }
         }
@@ -1178,15 +1155,6 @@ public class TouchImageView extends ImageView {
             this.focusX = focusX;
             this.focusY = focusY;
             this.scaleType = scaleType;
-        }
-    }
-
-    private void printMatrixInfo() {
-        float[] n = new float[9];
-        matrix.getValues(n);
-        if (BuildConfig.DEBUG) {
-            Log.d(DEBUG, "Scale: " + n[Matrix.MSCALE_X] + " TransX: " + n[Matrix.MTRANS_X] +
-                    " TransY: " + n[Matrix.MTRANS_Y]);
         }
     }
 

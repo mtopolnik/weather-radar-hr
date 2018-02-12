@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ViewGroup
+<LinearLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
         android:layout_height="match_parent"
-        android:layout_width="match_parent">
+        android:layout_width="match_parent"
+>
     <ScrollView
             android:id="@+id/radar_overview"
             android:layout_height="match_parent"
@@ -26,11 +28,12 @@
                     android:shadowDy="2"
                     android:shadowRadius="2"
             />
-            <com.belotron.weatherradarhr.TouchImageView
+            <ImageView
                     android:id="@+id/img_kradar"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:adjustViewBounds="true"
                     android:paddingBottom="8dp"
             />
             <ImageView
@@ -65,11 +68,12 @@
                     android:shadowDy="2"
                     android:shadowRadius="2"
             />
-            <com.belotron.weatherradarhr.TouchImageView
+            <ImageView
                     android:id="@+id/img_lradar"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:adjustViewBounds="true"
             />
             <ImageView
                     android:id="@+id/broken_img_lradar"
@@ -118,6 +122,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
         />
     </LinearLayout>
-</ViewGroup>
+</LinearLayout>

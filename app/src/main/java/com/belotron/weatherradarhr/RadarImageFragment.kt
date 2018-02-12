@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.preference.PreferenceManager
 import android.preference.PreferenceManager.getDefaultSharedPreferences
 import android.view.GestureDetector
+import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -25,7 +26,9 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.ImgStatus.BROKEN
 import com.belotron.weatherradarhr.ImgStatus.LOADING
 import com.belotron.weatherradarhr.ImgStatus.SHOWING
-import java.nio.ByteBuffer
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.delay
+import kotlinx.coroutines.experimental.launch
 
 const val KEY_FRAME_DELAY = "frame_delay"
 const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
@@ -92,13 +95,18 @@ class RadarImageFragment : Fragment() {
     private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
     private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
     private lateinit var animationLooper: AnimationLooper
+    private lateinit var vgOverview: ViewGroup
+    private lateinit var vgZoomed: ViewGroup
+    private lateinit var imgZoomed: TouchImageView
+    private lateinit var textZoomed: TextView
+    private var indexOfZoomedImg: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
-        animationLooper = AnimationLooper()
+        animationLooper = AnimationLooper(2)
     }
 
     override fun onCreateView(
@@ -106,22 +114,72 @@ class RadarImageFragment : Fragment() {
     ): View {
         MyLog.i { "RadarImageFragment.onCreateView" }
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
-        imgDescs.forEach {
-            textViews[it.index] = rootView.findViewById(it.textViewId)
-            brokenImgViews[it.index] = rootView.findViewById<ImageView>(it.brokenImgViewId).also {
+        vgOverview = rootView.findViewById(R.id.radar_overview)
+        vgZoomed = rootView.findViewById(R.id.radar_zoomed)
+        imgZoomed = rootView.findViewById(R.id.img_radar_zoomed)
+        imgZoomed.setOnDoubleTapListener(object: SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent) = doubleTapZoomOut(e)
+        })
+        textZoomed = rootView.findViewById(R.id.text_radar_zoomed)
+        imgDescs.forEachIndexed { i, desc ->
+            textViews[i] = rootView.findViewById(desc.textViewId)
+            progressBars[i] = rootView.findViewById<ProgressBar>(desc.progressBarId).also {
+                it.setOnClickListener { switchActionBarVisible() }
+            }
+            brokenImgViews[i] = rootView.findViewById<ImageView>(desc.brokenImgViewId).also {
                 it.setOnClickListener { switchActionBarVisible() }
                 it.visibility = GONE
             }
-            progressBars[it.index] = rootView.findViewById<ProgressBar>(it.progressBarId).also {
-                it.setOnClickListener { switchActionBarVisible() }
+            imgViews[i] = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
+                val gl = object : SimpleOnGestureListener() {
+                    override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
+                    override fun onDoubleTap(e: MotionEvent) = doubleTapZoomIn(i, e)
+                }
+                GestureDetector(activity, gl).let {
+                    imgView.setOnTouchListener { _, e ->
+                        it.onTouchEvent(e)
+                        true
+                    }
+                }
             }
-            imgViews[it.index] = rootView.findViewById<TouchImageView>(it.imgViewId).also {
-                it.setOnDoubleTapListener(object: GestureDetector.SimpleOnGestureListener() {
-                    override fun onSingleTapConfirmed(e: MotionEvent?): Boolean = switchActionBarVisible()
-                })
-            }
+            animationLooper.animators[i]?.imgView = imgViews[i]
         }
         return rootView
+    }
+
+    private fun doubleTapZoomIn(index: Int, e: MotionEvent): Boolean {
+        with(animationLooper) {
+            stop()
+            animators[index]!!.imgView = imgZoomed
+        }
+        vgOverview.visibility = GONE
+        vgZoomed.visibility = VISIBLE
+        indexOfZoomedImg = index
+        textZoomed.text = textViews[index]!!.text
+        imgZoomed.setImageDrawable(imgViews[index]!!.drawable)
+        start {
+            delay(1)
+            imgZoomed.animateZoom(e) {
+                animationLooper.animateOne(index)
+            }
+        }
+        return true
+    }
+
+    private fun doubleTapZoomOut(e: MotionEvent): Boolean {
+        val indexOfZoomedImg = indexOfZoomedImg!!
+        this.indexOfZoomedImg = null
+        with(animationLooper) {
+            stop()
+            animators[indexOfZoomedImg]!!.imgView = imgViews[indexOfZoomedImg]
+        }
+        imgZoomed.animateZoom(e) {
+            vgZoomed.visibility = GONE
+            vgOverview.visibility = VISIBLE
+            imgZoomed.setImageBitmap(null)
+            animationLooper.restart()
+        }
+        return true
     }
 
     override fun onResume() {
@@ -137,11 +195,11 @@ class RadarImageFragment : Fragment() {
             startReloadAnimations()
             startFetchWidgetImages(activity.applicationContext)
         } else {
-            imgDescs.forEach {
-                val animator = animationLooper.animators[it.index]?.apply {
-                    setAgeText(textViews[it.index]!!)
+            imgDescs.indices.forEach { i ->
+                val animator = animationLooper.animators[i]?.apply {
+                    pushAgeTextToView(textViews[i]!!)
                 }
-                setImageStatus(it.index, if (animator != null) SHOWING else BROKEN)
+                setImageStatus(i, if (animator != null) SHOWING else BROKEN)
             }
             animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
         }
@@ -152,6 +210,7 @@ class RadarImageFragment : Fragment() {
         super.onDestroyView()
         textViews.fill(null)
         imgViews.fill(null)
+        animationLooper.animators.forEach { it?.imgView = null }
         brokenImgViews.fill(null)
         progressBars.fill(null)
     }
@@ -159,7 +218,7 @@ class RadarImageFragment : Fragment() {
     override fun onPause() {
         MyLog.i { "RadarImageFragment.onPause" }
         super.onPause()
-        animationLooper.cancel()
+        animationLooper.stop()
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -209,10 +268,11 @@ class RadarImageFragment : Fragment() {
                     if (imgBytes == null || imgViews[desc.index] == null) {
                         return@start
                     }
-                    val buf = ByteBuffer.wrap(imgBytes)
-                    editGif(buf, desc.framesToKeep)
-                    animationLooper.animators[desc.index] = GifAnimator(buf.toArray(), imgViews, desc).apply {
-                        setAgeText(textViews[desc.index]!!)
+                    val gifData = editGif(imgBytes, desc.framesToKeep)
+                    desc.index.let { i ->
+                        animationLooper.animators[i] = GifAnimator(desc, gifData, imgViews[i]).apply {
+                            pushAgeTextToView(textViews[i]!!)
+                        }
                     }
                     animationLooper.restart(animationDuration, frameDelayFactor)
                     setImageStatus(desc.index, SHOWING)
@@ -240,8 +300,6 @@ private fun View.setVisible(state: Boolean) {
 private enum class ImgStatus {
     LOADING, SHOWING, BROKEN
 }
-
-private fun ByteBuffer.toArray() = ByteArray(this.remaining()).also { this.get(it) }
 
 private fun Context.animationDuration(): Int {
     with(PreferenceManager.getDefaultSharedPreferences(this)) {
