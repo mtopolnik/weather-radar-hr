@@ -564,7 +564,6 @@ public class TouchImageView extends ImageView {
         matchViewWidth = viewWidth - redundantXSpace;
         matchViewHeight = viewHeight - redundantYSpace;
         if (!isZoomed() && !imageRenderedAtLeastOnce) {
-            MyLog.ii("Set initial scale: " + viewWidth + ", " + viewHeight);
             // Stretch and center image to fit view
             matrix.setScale(scaleX, scaleY);
             matrix.postTranslate(redundantXSpace / 2, redundantYSpace / 2);
@@ -573,8 +572,6 @@ public class TouchImageView extends ImageView {
             setImageMatrix(matrix);
             return;
         }
-
-        MyLog.ii("is zoomed? " + isZoomed() + " imageRenderedAtLeastOnce? " + imageRenderedAtLeastOnce);
 
         // These values should never be 0 or we will set viewWidth and viewHeight
         // to NaN in translateMatrixAfterRotate. To avoid this, call savePreviousImageValues
@@ -825,7 +822,9 @@ public class TouchImageView extends ImageView {
                 postOnAnimation(this);
             } else { // Finished zooming
                 setState(State.NONE);
-                andThen.run();
+                if (andThen != null) {
+                    andThen.run();
+                }
             }
         }
 
