@@ -26,9 +26,7 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.ImgStatus.BROKEN
 import com.belotron.weatherradarhr.ImgStatus.LOADING
 import com.belotron.weatherradarhr.ImgStatus.SHOWING
-import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.launch
 
 const val KEY_FRAME_DELAY = "frame_delay"
 const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
@@ -156,12 +154,10 @@ class RadarImageFragment : Fragment() {
         vgZoomed.visibility = VISIBLE
         indexOfZoomedImg = index
         textZoomed.text = textViews[index]!!.text
-        imgZoomed.setImageDrawable(imgViews[index]!!.drawable)
         start {
-            delay(1)
-            imgZoomed.animateZoom(e) {
-                animationLooper.animateOne(index)
-            }
+            imgZoomed.showImageDrawable(imgViews[index]!!.drawable)
+            imgZoomed.animateZoom(e)
+            animationLooper.animateOne(index)
         }
         return true
     }
@@ -173,7 +169,8 @@ class RadarImageFragment : Fragment() {
             stop()
             animators[indexOfZoomedImg]!!.imgView = imgViews[indexOfZoomedImg]
         }
-        imgZoomed.animateZoom(e) {
+        start {
+            imgZoomed.animateZoom(e)
             vgZoomed.visibility = GONE
             vgOverview.visibility = VISIBLE
             imgZoomed.setImageBitmap(null)

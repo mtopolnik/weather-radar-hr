@@ -82,7 +82,6 @@ class TouchImageView : ImageView {
 
     private var imageRenderedAtLeastOnce = false
     private var onDrawReady = false
-    private var delayedZoomVariables: ZoomVariables? = null
     private var drawReadyContinuation: Continuation<Unit>? = null
     private var fling: Fling? = null
     private var userTouchListener: View.OnTouchListener? = null
@@ -115,7 +114,6 @@ class TouchImageView : ImageView {
     }
 
     override fun setImageDrawable(drawable: Drawable) {
-        MyLog.i {"Set image drawable"}
         super.setImageDrawable(drawable)
         savePreviousImageValues()
     }
@@ -135,9 +133,9 @@ class TouchImageView : ImageView {
         } else {
             scaleType = type
             if (onDrawReady) {
-                // If the image is already rendered, scaleType has been called programmatically
-                // and the TouchImageView should be updated with the new scaleType.
-                setZoom(this)
+                // setScaleType() has been called programmatically, update TouchImageView
+                // with the new scaleType.
+                start { setZoom(this@TouchImageView) }
             }
         }
     }
@@ -170,7 +168,6 @@ class TouchImageView : ImageView {
         viewWidth = computeViewSize(widthMode, widthSize, drawableWidth)
         val scaleX = viewWidth.toFloat() / drawableWidth
         viewHeight = computeViewSize(heightMode, heightSize, (drawableHeight * scaleX).toInt() + 1)
-        MyLog.i {"onMeasure: $widthSize, $heightSize" }
         setMeasuredDimension(viewWidth, viewHeight)
         fitImageToView()
     }
@@ -178,13 +175,8 @@ class TouchImageView : ImageView {
     override fun onDraw(canvas: Canvas) {
         onDrawReady = true
         imageRenderedAtLeastOnce = true
-        delayedZoomVariables?.also {
-            delayedZoomVariables = null
-            setZoom(it.scale, it.focusX, it.focusY, it.scaleType)
-        }
         drawReadyContinuation?.apply {
             drawReadyContinuation = null
-            MyLog.i {"Resume draw continuation"}
             resume(Unit)
         }
         super.onDraw(canvas)
@@ -227,11 +219,7 @@ class TouchImageView : ImageView {
 
     suspend fun showImageDrawable(drawable: Drawable) {
         setImageDrawable(drawable)
-        if (!onDrawReady) {
-            MyLog.i {"draw not ready, suspending"}
-            require(drawReadyContinuation == null) { "Dangling drawReadyContinuation" }
-            suspendCoroutine<Unit> { drawReadyContinuation = it }
-        }
+        suspendIfNotDrawReady()
     }
 
     /**
@@ -340,16 +328,13 @@ class TouchImageView : ImageView {
      * @param focusY
      * @param scaleType
      */
-    fun setZoom(scale: Float, focusX: Float = 0.5f, focusY: Float = 0.5f,
+    suspend fun setZoom(scale: Float, focusX: Float = 0.5f, focusY: Float = 0.5f,
                 scaleType: ImageView.ScaleType = this.scaleType
     ) {
         // setZoom can be called before the image is on the screen, but at this point,
-        // image and view sizes have not yet been calculated in onMeasure. Thus, we should
-        // delay calling setZoom until the view has been measured.
-        if (!onDrawReady) {
-            delayedZoomVariables = ZoomVariables(scale, focusX, focusY, scaleType)
-            return
-        }
+        // image and view sizes have not yet been calculated in onMeasure. Delay calling
+        // setZoom until the view has been measured.
+        suspendIfNotDrawReady()
         if (scaleType != this.scaleType) {
             setScaleType(scaleType)
         }
@@ -367,7 +352,7 @@ class TouchImageView : ImageView {
      * Set zoom parameters equal to another TouchImageView. Including scale, position,
      * and ScaleType.
      */
-    fun setZoom(img: TouchImageView) {
+    suspend fun setZoom(img: TouchImageView) {
         val center = img.scrollPosition
         setZoom(img.currentZoom, center!!.x, center.y, img.getScaleType())
     }
@@ -379,8 +364,14 @@ class TouchImageView : ImageView {
      * @param focusX
      * @param focusY
      */
-    fun setScrollPosition(focusX: Float, focusY: Float) {
+    suspend fun setScrollPosition(focusX: Float, focusY: Float) {
         setZoom(currentZoom, focusX, focusY)
+    }
+
+    private suspend fun suspendIfNotDrawReady() {
+        if (onDrawReady) return
+        require(drawReadyContinuation == null) { "Dangling drawReadyContinuation" }
+        suspendCoroutine<Unit> { drawReadyContinuation = it }
     }
 
     /**
@@ -865,10 +856,6 @@ class TouchImageView : ImageView {
         }
     }
 }
-
-private class ZoomVariables(
-        var scale: Float, var focusX: Float, var focusY: Float,
-        var scaleType: ImageView.ScaleType)
 
 // SuperMin and SuperMax multipliers. Determine how much the image can be
 // zoomed below or above the zoom boundaries, before animating back to the
