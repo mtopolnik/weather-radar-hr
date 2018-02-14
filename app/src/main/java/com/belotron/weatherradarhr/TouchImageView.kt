@@ -37,6 +37,8 @@ import android.widget.ImageView.ScaleType.FIT_CENTER
 import android.widget.ImageView.ScaleType.FIT_XY
 import android.widget.OverScroller
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.Continuation
+import kotlin.coroutines.experimental.suspendCoroutine
 
 private val ZOOM_TIME = TimeUnit.MILLISECONDS.toNanos(500).toFloat()
 
@@ -45,13 +47,6 @@ private enum class State {
 }
 
 class TouchImageView : ImageView {
-
-    /**
-     * The current zoom. This is the zoom relative to the initial
-     * scale, not the original resource.
-     */
-    var currentZoom: Float = 1F
-        private set
 
     // Matrix applied to image. MSCALE_X and MSCALE_Y should always be equal.
     // MTRANS_X and MTRANS_Y are the other values used. prevMatrix is the matrix
@@ -64,33 +59,32 @@ class TouchImageView : ImageView {
 
     private var minScale = 1F
     private var maxScale = 3F
-    private var superMinScale: Float = 0.toFloat()
-    private var superMaxScale: Float = 0.toFloat()
-
-    private var fling: Fling? = null
+    private var superMinScale = 0f
+    private var superMaxScale = 0f
 
     private var scaleType: ImageView.ScaleType
 
-    private var imageRenderedAtLeastOnce: Boolean = false
-    private var onDrawReady: Boolean = false
-
-    private var delayedZoomVariables: ZoomVariables? = null
-
     // Size of view and previous view size (ie before rotation)
-    private var viewWidth: Int = 0
-    private var viewHeight: Int = 0
-    private var prevViewWidth: Int = 0
-    private var prevViewHeight: Int = 0
+    private var viewWidth = 0
+    private var viewHeight = 0
+    private var prevViewWidth = 0
+    private var prevViewHeight = 0
 
     // Size of image when it is stretched to fit view. Before and After rotation.
-    private var matchViewWidth: Float = 0.toFloat()
-    private var matchViewHeight: Float = 0.toFloat()
-    private var prevMatchViewWidth: Float = 0.toFloat()
-    private var prevMatchViewHeight: Float = 0.toFloat()
+    private var matchViewWidth = 0f
+    private var matchViewHeight = 0f
+    private var prevMatchViewWidth = 0f
+    private var prevMatchViewHeight = 0f
 
     private val scaleDetector: ScaleGestureDetector
     private val gestureDetector: GestureDetector
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
+
+    private var imageRenderedAtLeastOnce = false
+    private var onDrawReady = false
+    private var delayedZoomVariables: ZoomVariables? = null
+    private var drawReadyContinuation: Continuation<Unit>? = null
+    private var fling: Fling? = null
     private var userTouchListener: View.OnTouchListener? = null
     private var touchImageViewListener: (() -> Unit)? = null
 
@@ -110,10 +104,141 @@ class TouchImageView : ImageView {
         super.setOnTouchListener(PrivateOnTouchListener())
     }
 
+    override fun setImageResource(resId: Int) {
+        super.setImageResource(resId)
+        savePreviousImageValues()
+    }
+
+    override fun setImageBitmap(bm: Bitmap?) {
+        super.setImageBitmap(bm)
+        savePreviousImageValues()
+    }
+
+    override fun setImageDrawable(drawable: Drawable) {
+        MyLog.i {"Set image drawable"}
+        super.setImageDrawable(drawable)
+        savePreviousImageValues()
+    }
+
+    override fun setImageURI(uri: Uri) {
+        super.setImageURI(uri)
+        savePreviousImageValues()
+    }
+
+    override fun setScaleType(type: ImageView.ScaleType) {
+        MyLog.i {"setScaleType $type"}
+        if (type == ImageView.ScaleType.FIT_START || type == ImageView.ScaleType.FIT_END) {
+            throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
+        }
+        if (type == ImageView.ScaleType.MATRIX) {
+            super.setScaleType(ImageView.ScaleType.MATRIX)
+        } else {
+            scaleType = type
+            if (onDrawReady) {
+                // If the image is already rendered, scaleType has been called programmatically
+                // and the TouchImageView should be updated with the new scaleType.
+                setZoom(this)
+            }
+        }
+    }
+
+    override fun getScaleType(): ImageView.ScaleType = scaleType
+
+    override fun canScrollHorizontally(direction: Int): Boolean {
+        currMatrix.getValues(m)
+        val x = m[Matrix.MTRANS_X]
+        return when {
+            imageWidth < viewWidth -> false
+            x >= -1 && direction < 0 -> false
+            Math.abs(x) + viewWidth.toFloat() + 1f >= imageWidth && direction > 0 -> false
+            else -> true
+        }
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val drawable = drawable
+        if (drawable == null || drawable.intrinsicWidth == 0 || drawable.intrinsicHeight == 0) {
+            setMeasuredDimension(0, 0)
+            return
+        }
+        val drawableWidth = drawable.intrinsicWidth
+        val drawableHeight = drawable.intrinsicHeight
+        val widthSize = View.MeasureSpec.getSize(widthMeasureSpec)
+        val widthMode = View.MeasureSpec.getMode(widthMeasureSpec)
+        val heightSize = View.MeasureSpec.getSize(heightMeasureSpec)
+        val heightMode = View.MeasureSpec.getMode(heightMeasureSpec)
+        viewWidth = computeViewSize(widthMode, widthSize, drawableWidth)
+        val scaleX = viewWidth.toFloat() / drawableWidth
+        viewHeight = computeViewSize(heightMode, heightSize, (drawableHeight * scaleX).toInt() + 1)
+        MyLog.i {"onMeasure: $widthSize, $heightSize" }
+        setMeasuredDimension(viewWidth, viewHeight)
+        fitImageToView()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        onDrawReady = true
+        imageRenderedAtLeastOnce = true
+        delayedZoomVariables?.also {
+            delayedZoomVariables = null
+            setZoom(it.scale, it.focusX, it.focusY, it.scaleType)
+        }
+        drawReadyContinuation?.apply {
+            drawReadyContinuation = null
+            MyLog.i {"Resume draw continuation"}
+            resume(Unit)
+        }
+        super.onDraw(canvas)
+    }
+
+    override fun onSaveInstanceState(): Parcelable {
+        val state = Bundle()
+        state.putParcelable("instanceState", super.onSaveInstanceState())
+        state.putFloat("saveScale", currentZoom)
+        state.putFloat("matchViewHeight", matchViewHeight)
+        state.putFloat("matchViewWidth", matchViewWidth)
+        state.putInt("viewWidth", viewWidth)
+        state.putInt("viewHeight", viewHeight)
+        currMatrix.getValues(m)
+        state.putFloatArray("matrix", m)
+        state.putBoolean("imageRendered", imageRenderedAtLeastOnce)
+        return state
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable) {
+        if (state !is Bundle) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+        currentZoom = state.getFloat("saveScale")
+        m = state.getFloatArray("matrix")
+        prevMatrix.setValues(m)
+        prevMatchViewHeight = state.getFloat("matchViewHeight")
+        prevMatchViewWidth = state.getFloat("matchViewWidth")
+        prevViewHeight = state.getInt("viewHeight")
+        prevViewWidth = state.getInt("viewWidth")
+        imageRenderedAtLeastOnce = state.getBoolean("imageRendered")
+        super.onRestoreInstanceState(state.getParcelable("instanceState"))
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        savePreviousImageValues()
+    }
+
+    suspend fun showImageDrawable(drawable: Drawable) {
+        setImageDrawable(drawable)
+        if (!onDrawReady) {
+            MyLog.i {"draw not ready, suspending"}
+            require(drawReadyContinuation == null) { "Dangling drawReadyContinuation" }
+            suspendCoroutine<Unit> { drawReadyContinuation = it }
+        }
+    }
+
     /**
-     * False if image is in initial, unzoomed state. True otherwise.
+     * The current zoom. This is the zoom relative to the initial
+     * scale, not the original resource.
      */
-    private val isZoomed get() = currentZoom != 1f
+    var currentZoom: Float = 1F; private set
 
     /**
      * A Rect representing the zoomed image.
@@ -157,17 +282,21 @@ class TouchImageView : ImageView {
      * and top of the view. For example, the top left corner of the image would be (0, 0).
      * And the bottom right corner would be (1, 1).
      */
-    val scrollPosition: PointF?
-        get() {
-            val drawable = drawable ?: return null
-            val drawableWidth = drawable.intrinsicWidth
-            val drawableHeight = drawable.intrinsicHeight
+    val scrollPosition: PointF? get() {
+        val drawable = drawable ?: return null
+        val drawableWidth = drawable.intrinsicWidth
+        val drawableHeight = drawable.intrinsicHeight
 
-            val point = transformCoordTouchToBitmap((viewWidth / 2).toFloat(), (viewHeight / 2).toFloat(), true)
-            point.x /= drawableWidth.toFloat()
-            point.y /= drawableHeight.toFloat()
-            return point
-        }
+        val point = transformCoordTouchToBitmap((viewWidth / 2).toFloat(), (viewHeight / 2).toFloat(), true)
+        point.x /= drawableWidth.toFloat()
+        point.y /= drawableHeight.toFloat()
+        return point
+    }
+
+    /**
+     * False if image is in initial, unzoomed state. True otherwise.
+     */
+    private val isZoomed get() = currentZoom != 1f
 
     private val imageWidth: Float get() = matchViewWidth * currentZoom
 
@@ -185,86 +314,15 @@ class TouchImageView : ImageView {
         doubleTapListener = l
     }
 
-    override fun setImageResource(resId: Int) {
-        super.setImageResource(resId)
-        savePreviousImageValues()
-    }
-
-    override fun setImageBitmap(bm: Bitmap?) {
-        super.setImageBitmap(bm)
-        savePreviousImageValues()
-    }
-
-    override fun setImageDrawable(drawable: Drawable) {
-        super.setImageDrawable(drawable)
-        savePreviousImageValues()
-    }
-
-    override fun setImageURI(uri: Uri) {
-        super.setImageURI(uri)
-        savePreviousImageValues()
-    }
-
-    override fun setScaleType(type: ImageView.ScaleType) {
-        if (type == ImageView.ScaleType.FIT_START || type == ImageView.ScaleType.FIT_END) {
-            throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
-        }
-        if (type == ImageView.ScaleType.MATRIX) {
-            super.setScaleType(ImageView.ScaleType.MATRIX)
-        } else {
-            scaleType = type
-            if (onDrawReady) {
-                // If the image is already rendered, scaleType has been called programmatically
-                // and the TouchImageView should be updated with the new scaleType.
-                setZoom(this)
-            }
-        }
-    }
-
-    override fun getScaleType(): ImageView.ScaleType = scaleType
-
-    public override fun onSaveInstanceState(): Parcelable {
-        val state = Bundle()
-        state.putParcelable("instanceState", super.onSaveInstanceState())
-        state.putFloat("saveScale", currentZoom)
-        state.putFloat("matchViewHeight", matchViewHeight)
-        state.putFloat("matchViewWidth", matchViewWidth)
-        state.putInt("viewWidth", viewWidth)
-        state.putInt("viewHeight", viewHeight)
-        currMatrix.getValues(m)
-        state.putFloatArray("matrix", m)
-        state.putBoolean("imageRendered", imageRenderedAtLeastOnce)
-        return state
-    }
-
-    public override fun onRestoreInstanceState(state: Parcelable) {
-        if (state !is Bundle) {
-            super.onRestoreInstanceState(state)
-            return
-        }
-        currentZoom = state.getFloat("saveScale")
-        m = state.getFloatArray("matrix")
-        prevMatrix.setValues(m)
-        prevMatchViewHeight = state.getFloat("matchViewHeight")
-        prevMatchViewWidth = state.getFloat("matchViewWidth")
-        prevViewHeight = state.getInt("viewHeight")
-        prevViewWidth = state.getInt("viewWidth")
-        imageRenderedAtLeastOnce = state.getBoolean("imageRendered")
-        super.onRestoreInstanceState(state.getParcelable("instanceState"))
-    }
-
-    public override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        savePreviousImageValues()
-    }
-
-    fun animateZoom(e: MotionEvent, andThen: () -> Unit) {
+    suspend fun animateZoom(e: MotionEvent) {
         val targetZoom = if (currentZoom == minScale) maxScale else minScale
-        postOnAnimation(AnimateZoom(targetZoom, e.x, e.y, false, andThen))
+        suspendCoroutine<Unit> {
+            postOnAnimation(AnimateZoom(targetZoom, e.x, e.y, false, it))
+        }
     }
 
     /**
-     * Reset zoom and translation to initial state.
+     * Resets the zoom and the translation to the initial state.
      */
     fun resetZoom() {
         currentZoom = 1f
@@ -323,48 +381,6 @@ class TouchImageView : ImageView {
      */
     fun setScrollPosition(focusX: Float, focusY: Float) {
         setZoom(currentZoom, focusX, focusY)
-    }
-
-    override fun canScrollHorizontally(direction: Int): Boolean {
-        currMatrix.getValues(m)
-        val x = m[Matrix.MTRANS_X]
-        return when {
-            imageWidth < viewWidth -> false
-            x >= -1 && direction < 0 -> false
-            Math.abs(x) + viewWidth.toFloat() + 1f >= imageWidth && direction > 0 -> false
-            else -> true
-        }
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val drawable = drawable
-        if (drawable == null || drawable.intrinsicWidth == 0 || drawable.intrinsicHeight == 0) {
-            setMeasuredDimension(0, 0)
-            return
-        }
-        val drawableWidth = drawable.intrinsicWidth
-        val drawableHeight = drawable.intrinsicHeight
-        val widthSize = View.MeasureSpec.getSize(widthMeasureSpec)
-        val widthMode = View.MeasureSpec.getMode(widthMeasureSpec)
-        val heightSize = View.MeasureSpec.getSize(heightMeasureSpec)
-        val heightMode = View.MeasureSpec.getMode(heightMeasureSpec)
-        viewWidth = computeViewSize(widthMode, widthSize, drawableWidth)
-        val scaleX = viewWidth.toFloat() / drawableWidth
-        viewHeight = computeViewSize(heightMode, heightSize, (drawableHeight * scaleX).toInt() + 1)
-        MyLog.i {"onMeasure: $widthSize, $heightSize" }
-        setMeasuredDimension(viewWidth, viewHeight)
-        fitImageToView()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        onDrawReady = true
-        imageRenderedAtLeastOnce = true
-        if (delayedZoomVariables != null) {
-            setZoom(delayedZoomVariables!!.scale, delayedZoomVariables!!.focusX, delayedZoomVariables!!.focusY,
-                    delayedZoomVariables!!.scaleType)
-            delayedZoomVariables = null
-        }
-        super.onDraw(canvas)
     }
 
     /**
@@ -614,7 +630,7 @@ class TouchImageView : ImageView {
     internal constructor(
             targetZoom: Float, focusX: Float, focusY: Float,
             private val stretchImageToSuper: Boolean,
-            private val andThen: () -> Unit = {}
+            private val continuation: Continuation<Unit>? = null
     ) : Runnable {
         private val startTime: Long
         private val startZoom: Float
@@ -657,7 +673,7 @@ class TouchImageView : ImageView {
                 postOnAnimation(this)
             } else {
                 state = State.NONE
-                andThen.invoke()
+                continuation?.resume(Unit)
             }
         }
 
