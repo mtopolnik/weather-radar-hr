@@ -17,6 +17,10 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.Matrix.MSCALE_X
+import android.graphics.Matrix.MSCALE_Y
+import android.graphics.Matrix.MTRANS_X
+import android.graphics.Matrix.MTRANS_Y
 import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -69,6 +73,7 @@ class TouchImageView : ImageView {
 
     private var state = State.NONE
 
+    private var initialScale = 0f
     private var minScale = 1f
     private var maxScale = 3f
     private var superMinScale = 0f
@@ -154,7 +159,7 @@ class TouchImageView : ImageView {
 
     override fun canScrollHorizontally(direction: Int): Boolean {
         currMatrix.getValues(m)
-        val x = m[Matrix.MTRANS_X]
+        val x = m[MTRANS_X]
         return when {
             imageWidth < viewWidth -> false
             x >= -1 && direction < 0 -> false
@@ -183,13 +188,13 @@ class TouchImageView : ImageView {
     }
 
     override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
         onDrawCalled = true
         imageRenderedAtLeastOnce = true
         onDrawContinuation?.apply {
             onDrawContinuation = null
             resume(Unit)
         }
-        super.onDraw(canvas)
     }
 
     override fun onSaveInstanceState(): Parcelable {
@@ -301,22 +306,25 @@ class TouchImageView : ImageView {
         doubleTapListener = l
     }
 
-    suspend fun animateZoomEnter(e: MotionEvent) {
+    fun resetToNeverDrawn() {
+        onDrawCalled = false
         imageRenderedAtLeastOnce = false
+    }
+
+    suspend fun animateZoomEnter(e: MotionEvent) {
         val drawable = drawable!!
-        val initialScale = viewWidth.toFloat() / drawable.intrinsicWidth
-        val targetScale = viewHeight.toFloat() / drawable.intrinsicHeight
-        val targetZoom = targetScale / initialScale
-        minScale = Math.min(1f, targetZoom)
-        maxScale = 8 / initialScale
+        val zoomTo = (viewHeight.toFloat() / drawable.intrinsicHeight) / initialScale
+        minScale = Math.min(1f, zoomTo)
+        maxScale = 8 / currentZoom
         suspendCoroutine<Unit> {
-            postOnAnimation(AnimateZoom(targetZoom, e.x, e.y, false, it))
+            postOnAnimation(AnimateZoom(zoomTo, e.x, e.y, false, it))
         }
     }
 
     suspend fun animateZoomExit(e: MotionEvent) {
+        val zoomTo = (viewWidth.toFloat() / drawable!!.intrinsicWidth) / initialScale
         suspendCoroutine<Unit> {
-            postOnAnimation(AnimateZoom(1f, e.x, e.y, false, it))
+            postOnAnimation(AnimateZoom(zoomTo, e.x, e.y, false, it))
         }
     }
 
@@ -345,15 +353,15 @@ class TouchImageView : ImageView {
         // setZoom can be called before the image is on the screen, but at this point,
         // image and view sizes have not yet been calculated in onMeasure. Delay calling
         // setZoom until the view has been measured.
-        awaitDrawReady()
+        awaitOnDraw()
         if (scaleType != this.scaleType) {
             setScaleType(scaleType)
         }
         resetZoom()
         scaleImage(scale.toDouble(), (viewWidth / 2).toFloat(), (viewHeight / 2).toFloat(), true)
         currMatrix.getValues(m)
-        m[Matrix.MTRANS_X] = -(focusX * imageWidth - viewWidth * 0.5f)
-        m[Matrix.MTRANS_Y] = -(focusY * imageHeight - viewHeight * 0.5f)
+        m[MTRANS_X] = -(focusX * imageWidth - viewWidth * 0.5f)
+        m[MTRANS_Y] = -(focusY * imageHeight - viewHeight * 0.5f)
         currMatrix.setValues(m)
         fixTrans()
         imageMatrix = currMatrix
@@ -379,7 +387,7 @@ class TouchImageView : ImageView {
         setZoom(currentZoom, focusX, focusY)
     }
 
-    suspend fun awaitDrawReady() {
+    suspend fun awaitOnDraw() {
         if (onDrawCalled) return
         require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
         suspendCoroutine<Unit> { onDrawContinuation = it }
@@ -405,8 +413,8 @@ class TouchImageView : ImageView {
      */
     private fun fixTrans() {
         currMatrix.getValues(m)
-        val transX = m[Matrix.MTRANS_X]
-        val transY = m[Matrix.MTRANS_Y]
+        val transX = m[MTRANS_X]
+        val transY = m[MTRANS_Y]
 
         val fixTransX = getFixTrans(transX, viewWidth.toFloat(), imageWidth)
         val fixTransY = getFixTrans(transY, viewHeight.toFloat(), imageHeight)
@@ -427,22 +435,16 @@ class TouchImageView : ImageView {
         fixTrans()
         currMatrix.getValues(m)
         if (imageWidth < viewWidth) {
-            m[Matrix.MTRANS_X] = (viewWidth - imageWidth) / 2
+            m[MTRANS_X] = (viewWidth - imageWidth) / 2
         }
         if (imageHeight < viewHeight) {
-            m[Matrix.MTRANS_Y] = (viewHeight - imageHeight) / 2
+            m[MTRANS_Y] = (viewHeight - imageHeight) / 2
         }
         currMatrix.setValues(m)
     }
 
-    /**
-     * If the normalizedScale is equal to 1, make the image fit the screen.
-     * Otherwise make it fit the screen according to the dimensions of the
-     * previous image matrix. This allows the image to maintain its zoom after
-     * rotation.
-     */
     private fun fitImageToView() {
-        val drawable = drawable
+        val drawable: Drawable? = drawable
         if (drawable == null || drawable.intrinsicWidth == 0 || drawable.intrinsicHeight == 0) {
             return
         }
@@ -450,32 +452,31 @@ class TouchImageView : ImageView {
         val drawableHeight = drawable.intrinsicHeight
 
         // Scale image for view
-        var scaleX = viewWidth.toFloat() / drawableWidth
-        var scaleY = viewHeight.toFloat() / drawableHeight
-        val scale = when (scaleType) {
-            CENTER -> 1f
-            CENTER_CROP -> Math.max(scaleX, scaleY)
-            CENTER_INSIDE -> Math.min(1f, Math.min(scaleX, scaleY))
-            FIT_CENTER -> Math.min(scaleX, scaleY)
-            FIT_XY -> scaleX
-            else -> throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
-        }
-        scaleX = scale
-        scaleY = scale
+        val scale = findInitialScale()
+        initialScale = scale
 
         // Center the image
-        val redundantXSpace = viewWidth - scaleX * drawableWidth
-        val redundantYSpace = viewHeight - scaleY * drawableHeight
+        val redundantXSpace = viewWidth - scale * drawableWidth
+        val redundantYSpace = viewHeight - scale * drawableHeight
         matchViewWidth = viewWidth - redundantXSpace
         matchViewHeight = viewHeight - redundantYSpace
+
         if (!isZoomed && !imageRenderedAtLeastOnce) {
-            // Stretch and center image to fit view
-            currMatrix.setScale(scaleX, scaleY)
+            // The view has been freshly created. Stretch and center image to fit.
+            currMatrix.setScale(scale, scale)
             currMatrix.postTranslate(redundantXSpace / 2, redundantYSpace / 2)
             fixTrans()
+            // Set the initial zoom so that the image covers the width of the view.
+            // This matches the scale in radar image overview.
+            val initialZoom = (viewWidth.toDouble() / drawableWidth) / scale
+            scaleImage(initialZoom, (viewWidth / 2).toFloat(), (viewHeight / 2).toFloat(), false)
             imageMatrix = currMatrix
             return
         }
+        // Reaching this point means the view was reconstructed after rotation.
+        // Place the image on the screen according to the dimensions of the
+        // previous image matrix.
+
         // These values should never be 0 or we will set viewWidth and viewHeight
         // to NaN in translateMatrixAfterRotate. To avoid this, call
         // savePreviousImageValues to set them equal to the current values.
@@ -485,29 +486,43 @@ class TouchImageView : ImageView {
         prevMatrix.getValues(m)
 
         // Rescale Matrix after rotation
-        m[Matrix.MSCALE_X] = matchViewWidth / drawableWidth * currentZoom
-        m[Matrix.MSCALE_Y] = matchViewHeight / drawableHeight * currentZoom
+        m[MSCALE_X] = matchViewWidth / drawableWidth * currentZoom
+        m[MSCALE_Y] = matchViewHeight / drawableHeight * currentZoom
 
         // TransX and TransY from previous matrix
-        val transX = m[Matrix.MTRANS_X]
-        val transY = m[Matrix.MTRANS_Y]
+        val transX = m[MTRANS_X]
+        val transY = m[MTRANS_Y]
 
         // Width
         val prevActualWidth = prevMatchViewWidth * currentZoom
         val actualWidth = imageWidth
-        translateMatrixAfterRotate(Matrix.MTRANS_X, transX, prevActualWidth, actualWidth,
+        translateMatrixAfterRotate(MTRANS_X, transX, prevActualWidth, actualWidth,
                 prevViewWidth, viewWidth, drawableWidth)
 
         // Height
         val prevActualHeight = prevMatchViewHeight * currentZoom
         val actualHeight = imageHeight
-        translateMatrixAfterRotate(Matrix.MTRANS_Y, transY, prevActualHeight, actualHeight,
+        translateMatrixAfterRotate(MTRANS_Y, transY, prevActualHeight, actualHeight,
                 prevViewHeight, viewHeight, drawableHeight)
 
         // Set the matrix to the adjusted scale and translate values.
         currMatrix.setValues(m)
         fixTrans()
         setImageMatrix(currMatrix)
+    }
+
+    private fun findInitialScale(): Float {
+        val drawable = drawable!!
+        val scaleX = viewWidth.toFloat() / drawable.intrinsicWidth
+        val scaleY = viewHeight.toFloat() / drawable.intrinsicHeight
+        return when (scaleType) {
+            CENTER -> 1f
+            CENTER_CROP -> Math.max(scaleX, scaleY)
+            CENTER_INSIDE -> Math.min(1f, Math.min(scaleX, scaleY))
+            FIT_CENTER -> Math.min(scaleX, scaleY)
+            FIT_XY -> scaleX
+            else -> throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
+        }
     }
 
     /**
@@ -530,7 +545,7 @@ class TouchImageView : ImageView {
         when {
             imageSize < viewSize -> {
                 // The width/height of image is less than the view's width/height. Center it.
-                m[axis] = (viewSize - drawableSize * m[Matrix.MSCALE_X]) * 0.5f
+                m[axis] = (viewSize - drawableSize * m[MSCALE_X]) * 0.5f
             }
             trans > 0 -> {
                 // The image is larger than the view, but was not before rotation. Center it.
@@ -560,8 +575,8 @@ class TouchImageView : ImageView {
         currMatrix.getValues(m)
         val origW = drawable.intrinsicWidth.toFloat()
         val origH = drawable.intrinsicHeight.toFloat()
-        val transX = m[Matrix.MTRANS_X]
-        val transY = m[Matrix.MTRANS_Y]
+        val transX = m[MTRANS_X]
+        val transY = m[MTRANS_Y]
         var finalX = (x - transX) * origW / imageWidth
         var finalY = (y - transY) * origH / imageHeight
         if (clipToBitmap) {
@@ -586,8 +601,8 @@ class TouchImageView : ImageView {
         val origH = drawable.intrinsicHeight.toFloat()
         val px = bx / origW
         val py = by / origH
-        val finalX = m[Matrix.MTRANS_X] + imageWidth * px
-        val finalY = m[Matrix.MTRANS_Y] + imageHeight * py
+        val finalX = m[MTRANS_X] + imageWidth * px
+        val finalY = m[MTRANS_Y] + imageHeight * py
         return PointF(finalX, finalY)
     }
 
@@ -616,9 +631,9 @@ class TouchImageView : ImageView {
         val n = FloatArray(9)
         currMatrix.getValues(n)
         MyLog.i { msg +
-                " Scale: " + n[Matrix.MSCALE_X] +
-                " TransX: " + n[Matrix.MTRANS_X] +
-                " TransY: " + n[Matrix.MTRANS_Y]
+                " Scale: " + n[MSCALE_X] +
+                " TransX: " + n[MTRANS_X] +
+                " TransY: " + n[MTRANS_Y]
         }
     }
 
@@ -824,8 +839,8 @@ class TouchImageView : ImageView {
         init {
             state = State.FLING
             currMatrix.getValues(m)
-            val startX = m[Matrix.MTRANS_X].toInt()
-            val startY = m[Matrix.MTRANS_Y].toInt()
+            val startX = m[MTRANS_X].toInt()
+            val startY = m[MTRANS_Y].toInt()
             val (minX, maxX) = if (imageWidth > viewWidth)
                 Pair(viewWidth - imageWidth.toInt(), 0) else
                 Pair(startX, startX)

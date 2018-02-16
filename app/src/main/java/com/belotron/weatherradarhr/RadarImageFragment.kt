@@ -164,8 +164,9 @@ class RadarImageFragment : Fragment() {
         updateFullScreenVisibility()
         start {
             with(imgViewFullScreen) {
+                resetToNeverDrawn()
                 setImageDrawable(imgViews[index]!!.drawable)
-                awaitDrawReady()
+                awaitOnDraw()
                 animateZoomEnter(e)
             }
             animationLooper.animateOne(index)
