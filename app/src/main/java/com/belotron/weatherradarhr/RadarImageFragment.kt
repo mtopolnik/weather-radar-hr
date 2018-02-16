@@ -26,7 +26,6 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.ImgStatus.BROKEN
 import com.belotron.weatherradarhr.ImgStatus.LOADING
 import com.belotron.weatherradarhr.ImgStatus.SHOWING
-import kotlinx.coroutines.experimental.delay
 
 const val KEY_FRAME_DELAY = "frame_delay"
 const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
@@ -93,11 +92,11 @@ class RadarImageFragment : Fragment() {
     private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
     private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
     private lateinit var animationLooper: AnimationLooper
-    private lateinit var vgOverview: ViewGroup
-    private lateinit var vgZoomed: ViewGroup
-    private lateinit var imgZoomed: TouchImageView
-    private lateinit var textZoomed: TextView
-    private var indexOfZoomedImg: Int? = null
+    private lateinit var vGroupOverview: ViewGroup
+    private lateinit var vGroupFullScreen: ViewGroup
+    private lateinit var imgViewFullScreen: TouchImageView
+    private lateinit var textViewFullScreen: TextView
+    private var indexOfImgInFullScreen: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i { "RadarImageFragment.onCreate" }
@@ -112,13 +111,13 @@ class RadarImageFragment : Fragment() {
     ): View {
         MyLog.i { "RadarImageFragment.onCreateView" }
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
-        vgOverview = rootView.findViewById(R.id.radar_overview)
-        vgZoomed = rootView.findViewById(R.id.radar_zoomed)
-        imgZoomed = rootView.findViewById(R.id.img_radar_zoomed)
-        imgZoomed.setOnDoubleTapListener(object: SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent) = doubleTapZoomOut(e)
+        vGroupOverview = rootView.findViewById(R.id.radar_overview)
+        vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
+        imgViewFullScreen = rootView.findViewById(R.id.img_radar_zoomed)
+        imgViewFullScreen.setOnDoubleTapListener(object: SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent) = exitFullScreen(e)
         })
-        textZoomed = rootView.findViewById(R.id.text_radar_zoomed)
+        textViewFullScreen = rootView.findViewById(R.id.text_radar_zoomed)
         imgDescs.forEachIndexed { i, desc ->
             textViews[i] = rootView.findViewById(desc.textViewId)
             progressBars[i] = rootView.findViewById<ProgressBar>(desc.progressBarId).also {
@@ -131,7 +130,7 @@ class RadarImageFragment : Fragment() {
             imgViews[i] = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
                 val gl = object : SimpleOnGestureListener() {
                     override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
-                    override fun onDoubleTap(e: MotionEvent) = doubleTapZoomIn(i, e)
+                    override fun onDoubleTap(e: MotionEvent) = enterFullScreen(i, e)
                 }
                 GestureDetector(activity, gl).let {
                     imgView.setOnTouchListener { _, e ->
@@ -142,38 +141,48 @@ class RadarImageFragment : Fragment() {
             }
             animationLooper.animators[i]?.imgView = imgViews[i]
         }
+        updateFullScreenVisibility()
         return rootView
     }
 
-    private fun doubleTapZoomIn(index: Int, e: MotionEvent): Boolean {
-        with(animationLooper) {
-            stop()
-            animators[index]!!.imgView = imgZoomed
+    private fun updateFullScreenVisibility() {
+        vGroupFullScreen.visibility = if (indexOfImgInFullScreen != null) VISIBLE else GONE
+        vGroupOverview.visibility = if (indexOfImgInFullScreen == null) VISIBLE else GONE
+        if (indexOfImgInFullScreen != null) {
+            val index = indexOfImgInFullScreen!!
+            textViewFullScreen.text = textViews[index]!!.text
+            animationLooper.animators[index]!!.imgView = imgViewFullScreen
+        } else {
+            textViewFullScreen.text = ""
+            imgViewFullScreen.setImageDrawable(null)
         }
-        vgOverview.visibility = GONE
-        vgZoomed.visibility = VISIBLE
-        indexOfZoomedImg = index
-        textZoomed.text = textViews[index]!!.text
+    }
+
+    private fun enterFullScreen(index: Int, e: MotionEvent): Boolean {
+        animationLooper.stop()
+        indexOfImgInFullScreen = index
+        updateFullScreenVisibility()
         start {
-            imgZoomed.showImageDrawable(imgViews[index]!!.drawable)
-            imgZoomed.animateZoom(e)
+            with(imgViewFullScreen) {
+                setImageDrawable(imgViews[index]!!.drawable)
+                awaitDrawReady()
+                animateZoomEnter(e)
+            }
             animationLooper.animateOne(index)
         }
         return true
     }
 
-    private fun doubleTapZoomOut(e: MotionEvent): Boolean {
-        val indexOfZoomedImg = indexOfZoomedImg!!
-        this.indexOfZoomedImg = null
+    private fun exitFullScreen(e: MotionEvent): Boolean {
+        val index = indexOfImgInFullScreen!!
         with(animationLooper) {
             stop()
-            animators[indexOfZoomedImg]!!.imgView = imgViews[indexOfZoomedImg]
+            animators[index]!!.imgView = imgViews[index]
         }
         start {
-            imgZoomed.animateZoom(e)
-            vgZoomed.visibility = GONE
-            vgOverview.visibility = VISIBLE
-            imgZoomed.setImageBitmap(null)
+            imgViewFullScreen.animateZoomExit(e)
+            indexOfImgInFullScreen = null
+            updateFullScreenVisibility()
             animationLooper.restart()
         }
         return true

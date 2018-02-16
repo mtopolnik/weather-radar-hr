@@ -28,13 +28,19 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.View.MeasureSpec.AT_MOST
+import android.view.View.MeasureSpec.EXACTLY
+import android.view.View.MeasureSpec.UNSPECIFIED
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageView
 import android.widget.ImageView.ScaleType.CENTER
 import android.widget.ImageView.ScaleType.CENTER_CROP
 import android.widget.ImageView.ScaleType.CENTER_INSIDE
 import android.widget.ImageView.ScaleType.FIT_CENTER
+import android.widget.ImageView.ScaleType.FIT_END
+import android.widget.ImageView.ScaleType.FIT_START
 import android.widget.ImageView.ScaleType.FIT_XY
+import android.widget.ImageView.ScaleType.MATRIX
 import android.widget.OverScroller
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.Continuation
@@ -48,6 +54,12 @@ private enum class State {
 
 class TouchImageView : ImageView {
 
+    /**
+     * The current zoom. This is the zoom relative to the initial
+     * scale, not the original resource.
+     */
+    var currentZoom: Float = 1f; private set
+
     // Matrix applied to image. MSCALE_X and MSCALE_Y should always be equal.
     // MTRANS_X and MTRANS_Y are the other values used. prevMatrix is the matrix
     // saved prior to the screen rotating.
@@ -57,12 +69,12 @@ class TouchImageView : ImageView {
 
     private var state = State.NONE
 
-    private var minScale = 1F
-    private var maxScale = 3F
+    private var minScale = 1f
+    private var maxScale = 3f
     private var superMinScale = 0f
     private var superMaxScale = 0f
 
-    private var scaleType: ImageView.ScaleType
+    private lateinit var scaleType: ImageView.ScaleType
 
     // Size of view and previous view size (ie before rotation)
     private var viewWidth = 0
@@ -76,16 +88,16 @@ class TouchImageView : ImageView {
     private var prevMatchViewWidth = 0f
     private var prevMatchViewHeight = 0f
 
+    private var onDrawCalled = false
+    private var imageRenderedAtLeastOnce = false
+    private var onDrawContinuation: Continuation<Unit>? = null
+
     private val scaleDetector: ScaleGestureDetector
     private val gestureDetector: GestureDetector
-    private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
-
-    private var imageRenderedAtLeastOnce = false
-    private var onDrawReady = false
-    private var drawReadyContinuation: Continuation<Unit>? = null
     private var fling: Fling? = null
     private var userTouchListener: View.OnTouchListener? = null
     private var touchImageViewListener: (() -> Unit)? = null
+    private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
     constructor(context: Context) : this(context, null, 0)
 
@@ -98,8 +110,7 @@ class TouchImageView : ImageView {
         superMinScale = SUPER_MIN_MULTIPLIER * minScale
         superMaxScale = SUPER_MAX_MULTIPLIER * maxScale
         imageMatrix = currMatrix
-        scaleType = FIT_CENTER
-        setScaleType(ImageView.ScaleType.MATRIX)
+        setScaleType(MATRIX)
         super.setOnTouchListener(PrivateOnTouchListener())
     }
 
@@ -113,7 +124,7 @@ class TouchImageView : ImageView {
         savePreviousImageValues()
     }
 
-    override fun setImageDrawable(drawable: Drawable) {
+    override fun setImageDrawable(drawable: Drawable?) {
         super.setImageDrawable(drawable)
         savePreviousImageValues()
     }
@@ -124,15 +135,14 @@ class TouchImageView : ImageView {
     }
 
     override fun setScaleType(type: ImageView.ScaleType) {
-        MyLog.i {"setScaleType $type"}
-        if (type == ImageView.ScaleType.FIT_START || type == ImageView.ScaleType.FIT_END) {
+        if (type == FIT_START || type == FIT_END) {
             throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
         }
-        if (type == ImageView.ScaleType.MATRIX) {
-            super.setScaleType(ImageView.ScaleType.MATRIX)
+        if (type == MATRIX) {
+            super.setScaleType(MATRIX)
         } else {
             scaleType = type
-            if (onDrawReady) {
+            if (onDrawCalled) {
                 // setScaleType() has been called programmatically, update TouchImageView
                 // with the new scaleType.
                 start { setZoom(this@TouchImageView) }
@@ -166,17 +176,17 @@ class TouchImageView : ImageView {
         val heightSize = View.MeasureSpec.getSize(heightMeasureSpec)
         val heightMode = View.MeasureSpec.getMode(heightMeasureSpec)
         viewWidth = computeViewSize(widthMode, widthSize, drawableWidth)
-        val scaleX = viewWidth.toFloat() / drawableWidth
-        viewHeight = computeViewSize(heightMode, heightSize, (drawableHeight * scaleX).toInt() + 1)
+        viewHeight = computeViewSize(heightMode, heightSize, drawableHeight)
         setMeasuredDimension(viewWidth, viewHeight)
+        MyLog.i {"onMeasure"}
         fitImageToView()
     }
 
     override fun onDraw(canvas: Canvas) {
-        onDrawReady = true
+        onDrawCalled = true
         imageRenderedAtLeastOnce = true
-        drawReadyContinuation?.apply {
-            drawReadyContinuation = null
+        onDrawContinuation?.apply {
+            onDrawContinuation = null
             resume(Unit)
         }
         super.onDraw(canvas)
@@ -216,17 +226,6 @@ class TouchImageView : ImageView {
         super.onConfigurationChanged(newConfig)
         savePreviousImageValues()
     }
-
-    suspend fun showImageDrawable(drawable: Drawable) {
-        setImageDrawable(drawable)
-        suspendIfNotDrawReady()
-    }
-
-    /**
-     * The current zoom. This is the zoom relative to the initial
-     * scale, not the original resource.
-     */
-    var currentZoom: Float = 1F; private set
 
     /**
      * A Rect representing the zoomed image.
@@ -302,10 +301,22 @@ class TouchImageView : ImageView {
         doubleTapListener = l
     }
 
-    suspend fun animateZoom(e: MotionEvent) {
-        val targetZoom = if (currentZoom == minScale) maxScale else minScale
+    suspend fun animateZoomEnter(e: MotionEvent) {
+        imageRenderedAtLeastOnce = false
+        val drawable = drawable!!
+        val initialScale = viewWidth.toFloat() / drawable.intrinsicWidth
+        val targetScale = viewHeight.toFloat() / drawable.intrinsicHeight
+        val targetZoom = targetScale / initialScale
+        minScale = Math.min(1f, targetZoom)
+        maxScale = 8 / initialScale
         suspendCoroutine<Unit> {
             postOnAnimation(AnimateZoom(targetZoom, e.x, e.y, false, it))
+        }
+    }
+
+    suspend fun animateZoomExit(e: MotionEvent) {
+        suspendCoroutine<Unit> {
+            postOnAnimation(AnimateZoom(1f, e.x, e.y, false, it))
         }
     }
 
@@ -334,7 +345,7 @@ class TouchImageView : ImageView {
         // setZoom can be called before the image is on the screen, but at this point,
         // image and view sizes have not yet been calculated in onMeasure. Delay calling
         // setZoom until the view has been measured.
-        suspendIfNotDrawReady()
+        awaitDrawReady()
         if (scaleType != this.scaleType) {
             setScaleType(scaleType)
         }
@@ -368,25 +379,24 @@ class TouchImageView : ImageView {
         setZoom(currentZoom, focusX, focusY)
     }
 
-    private suspend fun suspendIfNotDrawReady() {
-        if (onDrawReady) return
-        require(drawReadyContinuation == null) { "Dangling drawReadyContinuation" }
-        suspendCoroutine<Unit> { drawReadyContinuation = it }
+    suspend fun awaitDrawReady() {
+        if (onDrawCalled) return
+        require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
+        suspendCoroutine<Unit> { onDrawContinuation = it }
     }
 
     /**
-     * Save the current matrix and view dimensions
+     * Saves the current matrix and view dimensions
      * in the prevMatrix and prevView variables.
      */
     private fun savePreviousImageValues() {
-        if (viewHeight != 0 && viewWidth != 0) {
-            currMatrix.getValues(m)
-            prevMatrix.setValues(m)
-            prevMatchViewHeight = matchViewHeight
-            prevMatchViewWidth = matchViewWidth
-            prevViewHeight = viewHeight
-            prevViewWidth = viewWidth
-        }
+        if (viewHeight == 0 || viewWidth == 0) return
+        currMatrix.getValues(m)
+        prevMatrix.setValues(m)
+        prevMatchViewHeight = matchViewHeight
+        prevMatchViewWidth = matchViewWidth
+        prevViewHeight = viewHeight
+        prevViewWidth = viewWidth
     }
 
     /**
@@ -462,7 +472,6 @@ class TouchImageView : ImageView {
             // Stretch and center image to fit view
             currMatrix.setScale(scaleX, scaleY)
             currMatrix.postTranslate(redundantXSpace / 2, redundantYSpace / 2)
-            currentZoom = 1f
             fixTrans()
             imageMatrix = currMatrix
             return
@@ -498,7 +507,7 @@ class TouchImageView : ImageView {
         // Set the matrix to the adjusted scale and translate values.
         currMatrix.setValues(m)
         fixTrans()
-        imageMatrix = currMatrix
+        setImageMatrix(currMatrix)
     }
 
     /**
@@ -880,9 +889,9 @@ private fun getFixDragTrans(delta: Float, viewSize: Float, contentSize: Float): 
 
 private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): Int {
     return when (mode) {
-        View.MeasureSpec.AT_MOST -> Math.min(drawableSize, requestedSize)
-        View.MeasureSpec.UNSPECIFIED -> drawableSize
-        View.MeasureSpec.EXACTLY -> requestedSize
+        AT_MOST -> Math.min(drawableSize, requestedSize)
+        UNSPECIFIED -> drawableSize
+        EXACTLY -> requestedSize
         else -> throw IllegalArgumentException("Undefined measure specification mode " + mode)
     }
 }
