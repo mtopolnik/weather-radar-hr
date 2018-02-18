@@ -45,6 +45,7 @@ class AnimationLooper(numViews: Int) {
 
     fun animateOne(index: Int) {
         MyLog.i { "AnimationLooper.animateOne $index" }
+        stop()
         val animator = animators[index]!!
         loopingJob = start {
             while (true) {

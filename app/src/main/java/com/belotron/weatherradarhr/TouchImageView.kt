@@ -188,13 +188,13 @@ class TouchImageView : ImageView {
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
         onDrawCalled = true
         imageRenderedAtLeastOnce = true
         onDrawContinuation?.apply {
             onDrawContinuation = null
             resume(Unit)
         }
+        super.onDraw(canvas)
     }
 
     override fun onSaveInstanceState(): Parcelable {
@@ -321,10 +321,11 @@ class TouchImageView : ImageView {
         }
     }
 
-    suspend fun animateZoomExit(e: MotionEvent) {
+    suspend fun animateZoomExit() {
         val zoomTo = (viewWidth.toFloat() / drawable!!.intrinsicWidth) / initialScale
+        if (Math.abs(currentZoom - zoomTo) < 0.05) return
         suspendCoroutine<Unit> {
-            postOnAnimation(AnimateZoom(zoomTo, e.x, e.y, false, it))
+            postOnAnimation(AnimateZoom(zoomTo, 0f, 0f, false, it))
         }
     }
 
@@ -661,7 +662,7 @@ class TouchImageView : ImageView {
             startTime = System.nanoTime()
             this.startZoom = currentZoom
             this.zoomChange = targetZoom - currentZoom
-            val bitmapPoint = transformCoordTouchToBitmap(focusX, focusY, false)
+            val bitmapPoint = transformCoordTouchToBitmap(focusX, viewHeight / 2f, false)
             this.bitmapX = bitmapPoint.x
             this.bitmapY = bitmapPoint.y
 
@@ -671,24 +672,28 @@ class TouchImageView : ImageView {
         }
 
         override fun run() {
-            val timeProgress = Math.min(1f, (System.nanoTime() - startTime) / ZOOM_TIME)
-            val zoomProgress = accelDecelCurve.getInterpolation(timeProgress)
-            val zoom = (startZoom + zoomProgress * zoomChange).toDouble()
-            val deltaScale = zoom / currentZoom
-            scaleImage(deltaScale, bitmapX, bitmapY, stretchImageToSuper)
-            translateImageToCenterTouchPosition(zoomProgress)
-            imageMatrix = currMatrix
+            try {
+                val timeProgress = Math.min(1f, (System.nanoTime() - startTime) / ZOOM_TIME)
+                val zoomProgress = accelDecelCurve.getInterpolation(timeProgress)
+                val zoom = (startZoom + zoomProgress * zoomChange).toDouble()
+                val deltaScale = zoom / currentZoom
+                scaleImage(deltaScale, bitmapX, bitmapY, stretchImageToSuper)
+                translateImageToCenterTouchPosition(zoomProgress)
+                imageMatrix = currMatrix
 
-            // OnTouchImageViewListener is set: double tap runnable updates listener
-            // with every frame.
-            if (touchImageViewListener != null) {
-                touchImageViewListener!!.invoke()
-            }
-            if (zoomProgress < 1f) {
-                postOnAnimation(this)
-            } else {
+                // OnTouchImageViewListener is set: double tap runnable updates listener
+                // with every frame.
+                if (touchImageViewListener != null) {
+                    touchImageViewListener!!.invoke()
+                }
+                if (zoomProgress < 1f) {
+                    postOnAnimation(this)
+                } else {
+                    state = State.NONE
+                    continuation?.resume(Unit)
+                }
+            } catch (e: Throwable) {
                 state = State.NONE
-                continuation?.resume(Unit)
             }
         }
 
