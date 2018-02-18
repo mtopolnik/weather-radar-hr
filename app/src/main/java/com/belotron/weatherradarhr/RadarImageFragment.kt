@@ -115,7 +115,8 @@ class RadarImageFragment : Fragment() {
         vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
         imgViewFullScreen = rootView.findViewById(R.id.img_radar_zoomed)
         imgViewFullScreen.setOnDoubleTapListener(object: SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent) = exitFullScreen(e)
+            override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
+            override fun onDoubleTap(e: MotionEvent) = exitFullScreen()
         })
         textViewFullScreen = rootView.findViewById(R.id.text_radar_zoomed)
         imgDescs.forEachIndexed { i, desc ->
@@ -146,13 +147,18 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun updateFullScreenVisibility() {
-        vGroupFullScreen.visibility = if (indexOfImgInFullScreen != null) VISIBLE else GONE
-        vGroupOverview.visibility = if (indexOfImgInFullScreen == null) VISIBLE else GONE
-        if (indexOfImgInFullScreen != null) {
-            val index = indexOfImgInFullScreen!!
+        val index = indexOfImgInFullScreen
+        val mainActivity = activity as MainActivity
+        if (index != null) {
+            mainActivity.isFullScreenMode = true
+            vGroupFullScreen.visibility = VISIBLE
+            vGroupOverview.visibility = GONE
             textViewFullScreen.text = textViews[index]!!.text
             animationLooper.animators[index]!!.imgView = imgViewFullScreen
         } else {
+            mainActivity.isFullScreenMode = false
+            vGroupFullScreen.visibility = GONE
+            vGroupOverview.visibility = VISIBLE
             textViewFullScreen.text = ""
             imgViewFullScreen.setImageDrawable(null)
         }
@@ -174,14 +180,14 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun exitFullScreen(e: MotionEvent): Boolean {
+    fun exitFullScreen(): Boolean {
         val index = indexOfImgInFullScreen!!
         with(animationLooper) {
             stop()
             animators[index]!!.imgView = imgViews[index]
         }
         start {
-            imgViewFullScreen.animateZoomExit(e)
+            imgViewFullScreen.animateZoomExit()
             indexOfImgInFullScreen = null
             updateFullScreenVisibility()
             animationLooper.restart()

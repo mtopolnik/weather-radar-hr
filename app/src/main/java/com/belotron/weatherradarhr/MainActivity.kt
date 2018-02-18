@@ -14,6 +14,8 @@ const val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = 10L * 60 * 1000 // 10 minutes
 var lastReloadedTimestamp = 0L
 
 class MainActivity : Activity()  {
+    var isFullScreenMode: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MyLog.i { "MainActivity.onCreate" }
@@ -50,6 +52,17 @@ class MainActivity : Activity()  {
         if (didRotate && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
             actionBar.hide()
         }
+    }
+
+    override fun onBackPressed() {
+        fragmentManager.findFragmentById(R.id.radar_img_fragment)
+                ?.takeIf { isFullScreenMode }
+                ?.let { it as RadarImageFragment? }
+                ?.also {
+                    it.exitFullScreen()
+                    return
+                }
+        super.onBackPressed()
     }
 }
 
