@@ -10,17 +10,18 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.ACTION_MAIN
 import android.graphics.Bitmap
 import android.graphics.Bitmap.createBitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.os.PersistableBundle
-import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.formatElapsedTime
-import android.text.format.DateUtils.getRelativeDateTimeString
 import android.widget.RemoteViews
+import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
+import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import java.io.IOException
@@ -77,10 +78,6 @@ private data class WidgetDescriptor(
 }
 
 private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
-
-fun Context.ageText(timestamp: Long) =
-    getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
-
 
 fun startFetchWidgetImages(context : Context) {
     val appContext = context.applicationContext
@@ -187,7 +184,7 @@ private class WidgetContext (
 
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
-            val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, onlyIfNew)
+            val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
             if (imgBytes == null) {
                 return null
             }
@@ -279,10 +276,12 @@ private fun Context.jobScheduler() =
         getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
 
 private fun intentLaunchMainActivity(context: Context): PendingIntent {
-    val intent = Intent(context, MainActivity::class.java)
-    intent.addCategory("android.intent.category.LAUNCHER")
-    intent.component = ComponentName(context.packageName, MainActivity::class.java.name)
-    return PendingIntent.getActivity(context, 0, intent, 0)
+    val launchIntent = with(Intent(ACTION_MAIN)) {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        component = ComponentName(context.packageName, MainActivity::class.java.name)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    return PendingIntent.getActivity(context, 0, launchIntent, 0)
 }
 
 private fun reportScheduleResult(task: String, resultCode: Int) {

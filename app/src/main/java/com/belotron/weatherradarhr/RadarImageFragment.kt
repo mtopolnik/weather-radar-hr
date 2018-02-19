@@ -7,8 +7,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.preference.PreferenceManager
-import android.preference.PreferenceManager.getDefaultSharedPreferences
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.LayoutInflater
@@ -23,23 +21,28 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
+import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImgStatus.BROKEN
 import com.belotron.weatherradarhr.ImgStatus.LOADING
 import com.belotron.weatherradarhr.ImgStatus.SHOWING
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
+import java.util.concurrent.TimeUnit
 
-const val TAG_ABOUT = "dialog_about"
+private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
 
-const val KEY_ADS_ENABLED = "ads_enabled"
-const val KEY_FREEZE_TIME = "freeze_time"
-const val KEY_FRAME_DELAY = "frame_delay"
+private const val TAG_ABOUT = "dialog_about"
 
-const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
-const val DEFAULT_VALUE_FRAME_DELAY = 12
+private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
+private const val KEY_FREEZE_TIME = "freeze_time"
+private const val KEY_FRAME_DELAY = "frame_delay"
 
-const val DEFAULT_STR_FREEZE_TIME = "freeze0"
-const val DEFAULT_VALUE_FREEZE_TIME = 1500
+private const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
+private const val DEFAULT_VALUE_FRAME_DELAY = 12
+
+private const val DEFAULT_STR_FREEZE_TIME = "freeze0"
+private const val DEFAULT_VALUE_FREEZE_TIME = 1500
 
 val imgDescs = arrayOf(
         ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
@@ -65,32 +68,25 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-private fun SharedPreferences.frameDelayFactor() = getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
-    when (delayStr) {
-        DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY
-        "frameDelay1" -> return 26
-        "frameDelay2" -> return 47
-        else -> replaceSetting(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY, DEFAULT_VALUE_FRAME_DELAY)
+private val SharedPreferences.frameDelayFactor: Int get() =
+    getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
+        when (delayStr) {
+            DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY
+            "frameDelay1" -> return 26
+            "frameDelay2" -> return 47
+            else -> replaceSetting(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY, DEFAULT_VALUE_FRAME_DELAY)
+        }
     }
-}
 
-private fun SharedPreferences.freezeTime() = getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
-    when (freezeStr) {
-        DEFAULT_STR_FREEZE_TIME -> return DEFAULT_VALUE_FREEZE_TIME
-        "freeze1" -> return 2500
-        "freeze2" -> return 3500
-        else -> replaceSetting(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME, DEFAULT_VALUE_FREEZE_TIME)
+private val SharedPreferences.freezeTime: Int get() =
+    getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
+        when (freezeStr) {
+            DEFAULT_STR_FREEZE_TIME -> return DEFAULT_VALUE_FREEZE_TIME
+            "freeze1" -> return 2500
+            "freeze2" -> return 3500
+            else -> replaceSetting(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME, DEFAULT_VALUE_FREEZE_TIME)
+        }
     }
-}
-
-@SuppressLint("CommitPrefEdits")
-private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
-    with(edit()) {
-        putString(keyStr, valStr)
-        apply()
-    }
-    return value
-}
 
 class RadarImageFragment : Fragment() {
     private val textViews: Array<TextView?> = arrayOf(null, null)
@@ -104,6 +100,8 @@ class RadarImageFragment : Fragment() {
     private lateinit var imgViewFullScreen: TouchImageView
     private lateinit var textViewFullScreen: TextView
     private var indexOfImgInFullScreen: Int? = null
+    private var lastReloadedTimestamp = 0L
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MyLog.i { "RadarImageFragment.onCreate" }
@@ -208,14 +206,15 @@ class RadarImageFragment : Fragment() {
     override fun onResume() {
         MyLog.i { "RadarImageFragment.onResume" }
         super.onResume()
+        lastReloadedTimestamp = activity.sharedPrefs.getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
         val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
         val noAnimationsLoaded = animationLooper.animators.all { it == null }
-        if (noAnimationsLoaded || isTimeToReload) {
+        if (isTimeToReload || noAnimationsLoaded) {
             MyLog.i {
-                "Reloading animations. Was it time to reload? $isTimeToReload." +
+                "Reloading animations. Is it time to reload? $isTimeToReload." +
                         " No animations loaded? $noAnimationsLoaded"
             }
-            startReloadAnimations()
+            startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
             startFetchWidgetImages(activity.applicationContext)
         } else {
             imgDescs.indices.forEach { i ->
@@ -224,7 +223,7 @@ class RadarImageFragment : Fragment() {
                 }
                 setImageStatus(i, if (animator != null) SHOWING else BROKEN)
             }
-            animationLooper.restart(activity.animationDuration(), activity.frameDelayFactor())
+            animationLooper.restart(activity.animationDuration(), activity.sharedPrefs.frameDelayFactor)
         }
     }
 
@@ -242,6 +241,9 @@ class RadarImageFragment : Fragment() {
         MyLog.i { "RadarImageFragment.onPause" }
         super.onPause()
         animationLooper.stop()
+        activity.sharedPrefs.applyUpdate {
+            putLong(KEY_LAST_RELOADED_TIMESTAMP, lastReloadedTimestamp)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -255,7 +257,7 @@ class RadarImageFragment : Fragment() {
         when (item.itemId) {
             R.id.refresh ->
                 if (imgViews[0] != null) {
-                    startReloadAnimations()
+                    startReloadAnimations(UP_TO_DATE)
                 }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
             R.id.about -> AboutDialogFragment().show(activity.fragmentManager, TAG_ABOUT)
@@ -273,18 +275,18 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun startReloadAnimations() {
+    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         imgDescs.forEach {
             setImageStatus(it.index, LOADING)
         }
         val context = activity
-        val frameDelayFactor = context.frameDelayFactor()
+        val frameDelayFactor = context.sharedPrefs.frameDelayFactor
         val animationDuration = context.animationDuration()
         for (desc in imgDescs) {
             start {
                 try {
                     val (_, imgBytes) = try {
-                        fetchUrl(context, desc.url, onlyIfNew = false)
+                        fetchUrl(context, desc.url, fetchPolicy)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
@@ -295,6 +297,7 @@ class RadarImageFragment : Fragment() {
                         setImageStatus(desc.index, BROKEN)
                         return@start
                     }
+                    lastReloadedTimestamp = System.currentTimeMillis()
                     val gifData = editGif(imgBytes, desc.framesToKeep)
                     desc.index.let { i ->
                         animationLooper.animators[i] = GifAnimator(desc, gifData, imgViews[i]).apply {
@@ -308,7 +311,6 @@ class RadarImageFragment : Fragment() {
                     MyLog.e("Failed to load animated GIF ${desc.filename}", t)
                     setImageStatus(desc.index, BROKEN)
                 }
-                lastReloadedTimestamp = System.currentTimeMillis()
             }
         }
     }
@@ -329,11 +331,28 @@ private enum class ImgStatus {
 }
 
 private fun Context.animationDuration(): Int {
-    with(PreferenceManager.getDefaultSharedPreferences(this)) {
-        return ANIMATION_COVERS_MINUTES * frameDelayFactor() + freezeTime()
+    with(sharedPrefs) {
+        return ANIMATION_COVERS_MINUTES * frameDelayFactor + freezeTime
     }
 }
 
-private fun Context.frameDelayFactor(): Int {
-    return getDefaultSharedPreferences(this).frameDelayFactor()
+private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
+    applyUpdate { putString(keyStr, valStr) }
+    return value
+}
+
+@SuppressLint("CommitPrefEdits")
+private fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        commit()
+    }
+}
+
+@SuppressLint("CommitPrefEdits")
+private fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        apply()
+    }
 }

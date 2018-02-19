@@ -8,11 +8,8 @@ import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import com.google.android.gms.ads.MobileAds
 
 private const val KEY_INSTANCE_STATE_SAVED_AT = "instance-state-saved-at"
-private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
-const val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = 10L * 60 * 1000 // 10 minutes
 
-var lastReloadedTimestamp = 0L
 
 class MainActivity : Activity()  {
     var isFullScreenMode: Boolean = false
@@ -39,18 +36,16 @@ class MainActivity : Activity()  {
         super.onSaveInstanceState(outState)
         outState.putLong(KEY_INSTANCE_STATE_SAVED_AT, System.currentTimeMillis())
         outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar.isShowing)
-        outState.putLong(KEY_LAST_RELOADED_TIMESTAMP, lastReloadedTimestamp)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         MyLog.i { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
-        lastReloadedTimestamp = savedInstanceState.getLong(KEY_LAST_RELOADED_TIMESTAMP)
-        val restoredTimestamp = savedInstanceState.getLong(KEY_INSTANCE_STATE_SAVED_AT)
-        if (restoredTimestamp == 0L) {
+        val stateSavedTimestamp = savedInstanceState.getLong(KEY_INSTANCE_STATE_SAVED_AT)
+        if (stateSavedTimestamp == 0L) {
             return
         }
-        val timeDiff = System.currentTimeMillis() - restoredTimestamp
+        val timeDiff = System.currentTimeMillis() - stateSavedTimestamp
         val didRotate = timeDiff < SECOND_IN_MILLIS
         MyLog.i { "Time diff $timeDiff, did rotate? $didRotate" }
         if (didRotate && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
