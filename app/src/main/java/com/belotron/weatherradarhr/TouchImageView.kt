@@ -73,9 +73,9 @@ class TouchImageView : ImageView {
 
     private var state = State.NONE
 
-    private var initialScale = 0f
+    private var defaultScale = 0f
     private var minScale = 1f
-    private var maxScale = 3f
+    private var maxScale = 128f
     private var superMinScale = 0f
     private var superMaxScale = 0f
 
@@ -313,16 +313,14 @@ class TouchImageView : ImageView {
 
     suspend fun animateZoomEnter(e: MotionEvent) {
         val drawable = drawable!!
-        val zoomTo = (viewHeight.toFloat() / drawable.intrinsicHeight) / initialScale
-        minScale = Math.min(1f, zoomTo)
-        maxScale = 8 / currentZoom
+        val zoomTo = (viewHeight.toFloat() / drawable.intrinsicHeight) / defaultScale
         suspendCoroutine<Unit> {
             postOnAnimation(AnimateZoom(zoomTo, e.x, e.y, false, it))
         }
     }
 
     suspend fun animateZoomExit() {
-        val zoomTo = (viewWidth.toFloat() / drawable!!.intrinsicWidth) / initialScale
+        val zoomTo = (viewWidth.toFloat() / drawable!!.intrinsicWidth) / defaultScale
         if (Math.abs(currentZoom - zoomTo) < 0.05) return
         suspendCoroutine<Unit> {
             postOnAnimation(AnimateZoom(zoomTo, 0f, 0f, false, it))
@@ -452,9 +450,8 @@ class TouchImageView : ImageView {
         val drawableWidth = drawable.intrinsicWidth
         val drawableHeight = drawable.intrinsicHeight
 
-        // Scale image for view
-        val scale = findInitialScale()
-        initialScale = scale
+        val scale = findDefaultScale()
+        defaultScale = scale
 
         // Center the image
         val redundantXSpace = viewWidth - scale * drawableWidth
@@ -512,7 +509,7 @@ class TouchImageView : ImageView {
         setImageMatrix(currMatrix)
     }
 
-    private fun findInitialScale(): Float {
+    private fun findDefaultScale(): Float {
         val drawable = drawable!!
         val scaleX = viewWidth.toFloat() / drawable.intrinsicWidth
         val scaleY = viewHeight.toFloat() / drawable.intrinsicHeight

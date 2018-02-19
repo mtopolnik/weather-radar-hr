@@ -26,12 +26,18 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.ImgStatus.BROKEN
 import com.belotron.weatherradarhr.ImgStatus.LOADING
 import com.belotron.weatherradarhr.ImgStatus.SHOWING
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
 
+const val TAG_ABOUT = "dialog_about"
+
+const val KEY_ADS_ENABLED = "ads_enabled"
+const val KEY_FREEZE_TIME = "freeze_time"
 const val KEY_FRAME_DELAY = "frame_delay"
+
 const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
 const val DEFAULT_VALUE_FRAME_DELAY = 12
 
-const val KEY_FREEZE_TIME = "freeze_time"
 const val DEFAULT_STR_FREEZE_TIME = "freeze0"
 const val DEFAULT_VALUE_FREEZE_TIME = 1500
 
@@ -59,7 +65,7 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-fun SharedPreferences.frameDelayFactor() = getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
+private fun SharedPreferences.frameDelayFactor() = getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
     when (delayStr) {
         DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY
         "frameDelay1" -> return 26
@@ -68,7 +74,7 @@ fun SharedPreferences.frameDelayFactor() = getString(KEY_FRAME_DELAY, DEFAULT_ST
     }
 }
 
-fun SharedPreferences.freezeTime() = getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
+private fun SharedPreferences.freezeTime() = getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
     when (freezeStr) {
         DEFAULT_STR_FREEZE_TIME -> return DEFAULT_VALUE_FREEZE_TIME
         "freeze1" -> return 2500
@@ -91,6 +97,7 @@ class RadarImageFragment : Fragment() {
     private val imgViews: Array<ImageView?> = arrayOf(null, null)
     private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
     private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
+    private lateinit var rootView: View
     private lateinit var animationLooper: AnimationLooper
     private lateinit var vGroupOverview: ViewGroup
     private lateinit var vGroupFullScreen: ViewGroup
@@ -110,7 +117,7 @@ class RadarImageFragment : Fragment() {
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         MyLog.i { "RadarImageFragment.onCreateView" }
-        val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
         vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
         imgViewFullScreen = rootView.findViewById(R.id.img_radar_zoomed)
@@ -134,15 +141,18 @@ class RadarImageFragment : Fragment() {
                     override fun onDoubleTap(e: MotionEvent) = enterFullScreen(i, e)
                 }
                 GestureDetector(activity, gl).let {
-                    imgView.setOnTouchListener { _, e ->
-                        it.onTouchEvent(e)
-                        true
-                    }
+                    imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
                 }
             }
             animationLooper.animators[i]?.imgView = imgViews[i]
         }
         updateFullScreenVisibility()
+        val adView = rootView.findViewById<AdView>(R.id.adView)
+        if (activity.adsEnabled()) {
+            adView.loadAd(AdRequest.Builder().build())
+        } else {
+            adView.visibility = GONE
+        }
         return rootView
     }
 
@@ -248,7 +258,7 @@ class RadarImageFragment : Fragment() {
                     startReloadAnimations()
                 }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
-            R.id.about -> Unit
+            R.id.about -> AboutDialogFragment().show(activity.fragmentManager, TAG_ABOUT)
         }
         return true
     }
@@ -278,7 +288,11 @@ class RadarImageFragment : Fragment() {
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
-                    if (imgBytes == null || imgViews[desc.index] == null) {
+                    if (imgViews[desc.index] == null) {
+                        return@start
+                    }
+                    if (imgBytes == null) {
+                        setImageStatus(desc.index, BROKEN)
                         return@start
                     }
                     val gifData = editGif(imgBytes, desc.framesToKeep)

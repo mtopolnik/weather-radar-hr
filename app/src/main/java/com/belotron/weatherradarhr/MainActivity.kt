@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.preference.PreferenceManager
 import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+import com.google.android.gms.ads.MobileAds
 
 private const val KEY_INSTANCE_STATE_SAVED_AT = "instance-state-saved-at"
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
@@ -19,6 +20,9 @@ class MainActivity : Activity()  {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MyLog.i { "MainActivity.onCreate" }
+        if (adsEnabled()) {
+            MobileAds.initialize(this, ADMOB_ID)
+        }
         PreferenceManager.setDefaultValues(this, R.xml.settings, false)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)

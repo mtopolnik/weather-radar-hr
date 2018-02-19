@@ -31,4 +31,11 @@
         <item>freeze1</item>
         <item>freeze2</item>
     </string-array>
+    <string name="about_text">
+© 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com
+    </string>
+    <string name="ads_disabled">Ads disabled</string>
+    <string name="help_text">
+
+    </string>
 </resources>

@@ -20,4 +20,11 @@
         <item>2.5 sekundi</item>
         <item>3.5 sekundi</item>
     </string-array>
+    <string name="about_text">
+© 2018 Belotron d.o.o.\n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com
+    </string>
+    <string name="help_text">
+
+    </string>
+    <string name="ads_disabled">Reklame isključene</string>
 </resources>
