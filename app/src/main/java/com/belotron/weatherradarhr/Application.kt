@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.preference.PreferenceManager
 import android.text.format.DateUtils
+import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart
 import kotlinx.coroutines.experimental.Unconfined
@@ -51,6 +52,9 @@ fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        initOcr(applicationContext)
+        initOcr(this)
+        if (adsEnabled()) {
+            MobileAds.initialize(this, ADMOB_ID)
+        }
     }
 }
