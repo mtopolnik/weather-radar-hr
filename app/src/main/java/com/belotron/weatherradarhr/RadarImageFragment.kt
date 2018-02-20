@@ -255,10 +255,14 @@ class RadarImageFragment : Fragment() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         MyLog.i { "RadarImageFragment.onOptionsItemSelected" }
         when (item.itemId) {
-            R.id.refresh ->
+            R.id.refresh -> {
+                if (activity.adsEnabled()) {
+                    rootView.findViewById<AdView>(R.id.adView).loadAd(AdRequest.Builder().build())
+                }
                 if (imgViews[0] != null) {
                     startReloadAnimations(UP_TO_DATE)
                 }
+            }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
             R.id.about -> AboutDialogFragment().show(activity.fragmentManager, TAG_ABOUT)
         }
@@ -342,7 +346,7 @@ private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, val
 }
 
 @SuppressLint("CommitPrefEdits")
-private fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
+private inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
     with (edit()) {
         block()
         commit()
@@ -350,7 +354,7 @@ private fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() ->
 }
 
 @SuppressLint("CommitPrefEdits")
-private fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
+private inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
     with (edit()) {
         block()
         apply()
