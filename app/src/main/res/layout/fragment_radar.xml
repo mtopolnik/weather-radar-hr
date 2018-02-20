@@ -5,15 +5,14 @@
         android:layout_height="match_parent"
         android:layout_width="match_parent"
 >
-    <LinearLayout
+    <FrameLayout
             android:id="@+id/radar_overview"
             android:orientation="vertical"
             android:layout_height="match_parent"
             android:layout_width="match_parent"
     >
         <ScrollView
-                android:layout_height="0dp"
-                android:layout_weight="1"
+                android:layout_height="match_parent"
                 android:layout_width="match_parent">
             <LinearLayout
                     android:orientation="vertical"
@@ -80,6 +79,7 @@
                         android:layout_height="0dp"
                         android:layout_weight="1"
                         android:adjustViewBounds="true"
+                        android:paddingBottom="60dp"
                 />
                 <ImageView
                         android:id="@+id/broken_img_lradar"
@@ -106,10 +106,11 @@
                 android:id="@+id/adView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                ads:adSize="SMART_BANNER"
+                android:layout_gravity="bottom|start"
+                ads:adSize="BANNER"
                 ads:adUnitId="@string/adunit_id">
         </com.google.android.gms.ads.AdView>
-    </LinearLayout>
+    </FrameLayout>
     <LinearLayout
             android:id="@+id/radar_zoomed"
             android:orientation="vertical"

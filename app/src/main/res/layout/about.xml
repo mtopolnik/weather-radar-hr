@@ -18,6 +18,7 @@
             android:id="@+id/about_text_ads_disabled"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_margin="28dp"
             android:textAlignment="center"
             android:text="@string/ads_disabled"
             android:visibility="gone"
