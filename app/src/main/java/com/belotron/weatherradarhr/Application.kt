@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -52,6 +53,21 @@ fun Context.ageText(timestamp: Long): CharSequence =
         DateUtils.getRelativeDateTimeString(this, timestamp, DateUtils.MINUTE_IN_MILLIS, DateUtils.DAY_IN_MILLIS, 0)
 
 fun Context.adsEnabled() = sharedPrefs.getBoolean(KEY_ADS_ENABLED, true)
+
+fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
+    applyUpdate { putString(keyStr, valStr) }
+    return value
+}
+
+fun Activity.switchActionBarVisible():Boolean {
+    val actionBar = actionBar!!
+    if (actionBar.isShowing) {
+        actionBar.hide()
+    } else {
+        actionBar.show()
+    }
+    return true
+}
 
 @SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {

@@ -26,13 +26,15 @@ suspend fun fetchUrl(
         context: Context, url: String, fetchPolicy: FetchPolicy
 ): Pair<Long, ByteArray?> = withContext(threadPool) {
     if (fetchPolicy == PREFER_CACHED) {
-        loadCachedResult(context, url)?.also { return@withContext it }
+        loadCachedResult(context, url)?.also {
+            return@withContext it
+        }
     }
     val conn = URL(url).openConnection() as HttpURLConnection
     val ifModifiedSince = loadCachedLastModified(context, url)
     ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
-    conn.connect()
     try {
+        conn.connect()
         when {
             conn.responseCode == 200 ->
                 fetchContentAndUpdateCache(conn, context)
@@ -47,6 +49,9 @@ suspend fun fetchUrl(
                 loadCachedResult(context, url)!!
             }
         }
+    } catch (e: Exception) {
+        MyLog.e("Error fetching $url", e)
+        throw ImageFetchException(if (fetchPolicy == ONLY_IF_NEW) null else loadCachedImage(context, url))
     } finally {
         conn.disconnect()
     }

@@ -9,7 +9,6 @@ import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 private const val KEY_INSTANCE_STATE_SAVED_AT = "instance-state-saved-at"
 private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
 
-
 class MainActivity : Activity()  {
     var isFullScreenMode: Boolean = false
 

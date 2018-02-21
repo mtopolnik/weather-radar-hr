@@ -84,6 +84,12 @@ private val SharedPreferences.freezeTime: Int get() =
         }
     }
 
+private fun Context.animationDuration(): Int {
+    with(sharedPrefs) {
+        return ANIMATION_COVERS_MINUTES * frameDelayFactor + freezeTime
+    }
+}
+
 class RadarImageFragment : Fragment() {
     private val textViews: Array<TextView?> = arrayOf(null, null)
     private val imgViews: Array<ImageView?> = arrayOf(null, null)
@@ -274,16 +280,6 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun switchActionBarVisible():Boolean {
-        val toolbar = activity.actionBar
-        if (toolbar.isShowing) {
-            toolbar.hide()
-        } else {
-            toolbar.show()
-        }
-        return true
-    }
-
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         imgDescs.forEach {
             setImageStatus(it.index, LOADING)
@@ -294,7 +290,7 @@ class RadarImageFragment : Fragment() {
         for (desc in imgDescs) {
             start {
                 try {
-                    val (_, imgBytes) = try {
+                    val (lastModified, imgBytes) = try {
                         fetchUrl(context, desc.url, fetchPolicy)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
@@ -309,7 +305,8 @@ class RadarImageFragment : Fragment() {
                     lastReloadedTimestamp = System.currentTimeMillis()
                     val gifData = editGif(imgBytes, desc.framesToKeep)
                     desc.index.let { i ->
-                        animationLooper.animators[i] = GifAnimator(desc, gifData, imgViews[i]).apply {
+                        val gifAnimator = GifAnimator(desc, gifData, imgViews[i], isOffline = lastModified == 0L)
+                        animationLooper.animators[i] = gifAnimator.apply {
                             pushAgeTextToView(textViews[i]!!)
                         }
                     }
@@ -328,20 +325,14 @@ class RadarImageFragment : Fragment() {
         progressBars[i]?.setVisible(status == LOADING)
         imgViews[i]?.setVisible(status == SHOWING)
         brokenImgViews[i]?.setVisible(status == BROKEN)
+        if (status != SHOWING) {
+            textViews[i]?.text = ""
+        }
     }
+
+    private fun switchActionBarVisible() = activity.switchActionBarVisible()
 }
 
 private enum class ImgStatus {
     LOADING, SHOWING, BROKEN
-}
-
-private fun Context.animationDuration(): Int {
-    with(sharedPrefs) {
-        return ANIMATION_COVERS_MINUTES * frameDelayFactor + freezeTime
-    }
-}
-
-private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
-    applyUpdate { putString(keyStr, valStr) }
-    return value
 }

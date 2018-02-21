@@ -1,5 +1,6 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.widget.ImageView
 import android.widget.TextView
@@ -60,13 +61,13 @@ class AnimationLooper(numViews: Int) {
         animatorJobs.forEach { it?.cancel() }
         loopingJob?.cancel()
     }
-
 }
 
 class GifAnimator(
         private val imgDesc: ImgDescriptor,
         gifData: ByteArray,
-        var imgView: ImageView?
+        var imgView: ImageView?,
+        private val isOffline: Boolean
 ) {
     private val bitmapProvider = FreeLists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
@@ -86,7 +87,7 @@ class GifAnimator(
     private var currFrameShownAt = 0L
 
     fun pushAgeTextToView(textView: TextView) {
-        textView.text = textView.context.ageText(timestamp)
+        textView.text = (if (isOffline) "Offline - " else "") + textView.context.ageText(timestamp)
     }
 
     fun animate(): Job? {
