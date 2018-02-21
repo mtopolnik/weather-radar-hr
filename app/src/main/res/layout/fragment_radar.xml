@@ -36,8 +36,7 @@
                 <ImageView
                         android:id="@+id/img_kradar"
                         android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
                         android:adjustViewBounds="true"
                         android:paddingBottom="8dp"
                 />
@@ -75,8 +74,7 @@
                 <ImageView
                         android:id="@+id/img_lradar"
                         android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
                         android:adjustViewBounds="true"
                         android:paddingBottom="60dp"
                 />
