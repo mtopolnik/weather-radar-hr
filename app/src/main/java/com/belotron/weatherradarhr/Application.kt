@@ -1,13 +1,18 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
 import android.preference.PreferenceManager
 import android.text.format.DateUtils
+import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart
@@ -32,18 +37,37 @@ fun start(block: suspend CoroutineScope.() -> Unit) = launch(
         start = CoroutineStart.UNDISPATCHED,
         block = block)
 
-fun ByteArray.toBitmap() : Bitmap =
+fun ByteArray.toBitmap(): Bitmap =
         BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 
-val Context.sharedPrefs get() = PreferenceManager.getDefaultSharedPreferences(this)
+fun View.setVisible(state: Boolean) {
+    visibility = if (state) VISIBLE else GONE
+}
+
+val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
 fun Context.file(name: String) = File(noBackupFilesDir, name)
 
 fun Context.ageText(timestamp: Long): CharSequence =
         DateUtils.getRelativeDateTimeString(this, timestamp, DateUtils.MINUTE_IN_MILLIS, DateUtils.DAY_IN_MILLIS, 0)
 
-fun Context.adsEnabled() =
-        PreferenceManager.getDefaultSharedPreferences(this).getBoolean(KEY_ADS_ENABLED, true)
+fun Context.adsEnabled() = sharedPrefs.getBoolean(KEY_ADS_ENABLED, true)
+
+@SuppressLint("CommitPrefEdits")
+inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        commit()
+    }
+}
+
+@SuppressLint("CommitPrefEdits")
+inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        apply()
+    }
+}
 
 fun File.dataIn() = DataInputStream(FileInputStream(this))
 

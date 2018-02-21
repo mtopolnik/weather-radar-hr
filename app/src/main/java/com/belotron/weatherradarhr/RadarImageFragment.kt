@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.app.Fragment
 import android.content.Context
 import android.content.Intent
@@ -16,7 +15,6 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.GONE
-import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
@@ -31,8 +29,6 @@ import com.google.android.gms.ads.AdView
 import java.util.concurrent.TimeUnit
 
 private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
-
-private const val TAG_ABOUT = "dialog_about"
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time"
@@ -145,31 +141,33 @@ class RadarImageFragment : Fragment() {
             animationLooper.animators[i]?.imgView = imgViews[i]
         }
         updateFullScreenVisibility()
-        val adView = rootView.findViewById<AdView>(R.id.adView)
-        if (activity.adsEnabled()) {
-            adView.loadAd(AdRequest.Builder().build())
-        } else {
-            adView.visibility = GONE
-        }
+        updateAdVisibility()
         return rootView
     }
 
+    private fun updateAdVisibility() {
+        val adView = rootView.findViewById<AdView>(R.id.adView)
+        val adsEnabled = activity.adsEnabled()
+        adView.setVisible(adsEnabled)
+        if (adsEnabled) {
+            adView.loadAd(AdRequest.Builder().build())
+        }
+    }
+
     private fun updateFullScreenVisibility() {
-        val index = indexOfImgInFullScreen
         val mainActivity = activity as MainActivity
+        val index = indexOfImgInFullScreen
         if (index != null) {
-            mainActivity.isFullScreenMode = true
-            vGroupFullScreen.visibility = VISIBLE
-            vGroupOverview.visibility = GONE
             textViewFullScreen.text = textViews[index]!!.text
             animationLooper.animators[index]!!.imgView = imgViewFullScreen
         } else {
-            mainActivity.isFullScreenMode = false
-            vGroupFullScreen.visibility = GONE
-            vGroupOverview.visibility = VISIBLE
             textViewFullScreen.text = ""
             imgViewFullScreen.setImageDrawable(null)
         }
+        val makeFullScreenVisible = index != null
+        mainActivity.isFullScreenMode = makeFullScreenVisible
+        vGroupFullScreen.setVisible(makeFullScreenVisible)
+        vGroupOverview.setVisible(!makeFullScreenVisible)
     }
 
     private fun enterFullScreen(index: Int, e: MotionEvent): Boolean {
@@ -213,6 +211,9 @@ class RadarImageFragment : Fragment() {
             MyLog.i {
                 "Reloading animations. Is it time to reload? $isTimeToReload." +
                         " No animations loaded? $noAnimationsLoaded"
+            }
+            if (indexOfImgInFullScreen != null) {
+                exitFullScreen()
             }
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
             startFetchWidgetImages(activity.applicationContext)
@@ -264,7 +265,11 @@ class RadarImageFragment : Fragment() {
                 }
             }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
-            R.id.about -> AboutDialogFragment().show(activity.fragmentManager, TAG_ABOUT)
+            R.id.about -> start {
+                showAboutDialogFragment(activity)
+                updateAdVisibility()
+                switchActionBarVisible()
+            }
         }
         return true
     }
@@ -326,10 +331,6 @@ class RadarImageFragment : Fragment() {
     }
 }
 
-private fun View.setVisible(state: Boolean) {
-    visibility = if (state) VISIBLE else GONE
-}
-
 private enum class ImgStatus {
     LOADING, SHOWING, BROKEN
 }
@@ -343,20 +344,4 @@ private fun Context.animationDuration(): Int {
 private fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
     applyUpdate { putString(keyStr, valStr) }
     return value
-}
-
-@SuppressLint("CommitPrefEdits")
-private inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        commit()
-    }
-}
-
-@SuppressLint("CommitPrefEdits")
-private inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        apply()
-    }
 }

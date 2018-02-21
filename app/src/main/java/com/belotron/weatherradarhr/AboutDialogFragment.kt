@@ -1,23 +1,36 @@
 package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DialogFragment
 import android.content.Context
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
-import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.widget.TextView
 import com.belotron.weatherradarhr.Side.*
 import com.google.android.gms.ads.MobileAds
+import kotlin.coroutines.experimental.Continuation
+import kotlin.coroutines.experimental.suspendCoroutine
 
-class AboutDialogFragment : DialogFragment() {
+const val TAG_ABOUT = "dialog_about"
+
+suspend fun showAboutDialogFragment(activity: Activity) {
+    suspendCoroutine<Unit> { cont ->
+        AboutDialogFragment(cont).show(activity.fragmentManager, TAG_ABOUT)
+    }
+}
+
+class AboutDialogFragment(
+        private val continuation: Continuation<Unit>?
+) : DialogFragment() {
+
+    constructor(): this(null)
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val inflater = activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
@@ -32,7 +45,7 @@ class AboutDialogFragment : DialogFragment() {
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
                 .setView(view)
-                .setPositiveButton(android.R.string.ok) { _, _ -> }
+                .setPositiveButton(android.R.string.ok) { _, _ -> continuation?.resume(Unit) }
                 .create()
     }
 }
@@ -62,18 +75,13 @@ private class EasterEggDetector(
 
     @SuppressLint("CommitPrefEdits")
     private fun invertAdsEnabled() {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(view.context)
-        with(prefs.edit()) {
-            val adsEnabled = !prefs.getBoolean(KEY_ADS_ENABLED, true)
-            putBoolean(KEY_ADS_ENABLED, adsEnabled)
-            commit()
-            val adsDisabledText = view.findViewById<View>(R.id.about_text_ads_disabled)
-            if (adsEnabled) {
-                adsDisabledText.visibility = GONE
-                MobileAds.initialize(view.context, ADMOB_ID)
-            } else {
-                adsDisabledText.visibility = VISIBLE
-            }
+        val enableAds = !view.context.adsEnabled()
+        view.context.sharedPrefs.commitUpdate {
+            putBoolean(KEY_ADS_ENABLED, enableAds)
+        }
+        view.findViewById<View>(R.id.about_text_ads_disabled).setVisible(!enableAds)
+        if (enableAds) {
+            MobileAds.initialize(view.context, ADMOB_ID)
         }
     }
 }
