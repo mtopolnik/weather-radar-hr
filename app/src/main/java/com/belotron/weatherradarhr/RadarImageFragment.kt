@@ -67,9 +67,9 @@ class ImgDescriptor(
 private val SharedPreferences.frameDelayFactor: Int get() =
     getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
         when (delayStr) {
-            DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY
-            "frameDelay1" -> return 26
-            "frameDelay2" -> return 47
+            DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY // 85 min/sec
+            "frameDelay1" -> return 26 // 40 min/sec
+            "frameDelay2" -> return 47 // 20 min/sec
             else -> replaceSetting(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY, DEFAULT_VALUE_FRAME_DELAY)
         }
     }
