@@ -92,9 +92,11 @@ fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        migratePrefs()
         initOcr(this)
         if (adsEnabled()) {
             MobileAds.initialize(this, ADMOB_ID)
         }
     }
 }
+

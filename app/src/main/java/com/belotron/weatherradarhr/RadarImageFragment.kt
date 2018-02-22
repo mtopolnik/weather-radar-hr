@@ -1,9 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.app.Fragment
-import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.GestureDetector
@@ -30,16 +28,6 @@ import java.util.concurrent.TimeUnit
 
 private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
 
-private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
-private const val KEY_FREEZE_TIME = "freeze_time"
-private const val KEY_FRAME_DELAY = "frame_delay"
-
-private const val DEFAULT_STR_FRAME_DELAY = "frameDelay0"
-private const val DEFAULT_VALUE_FRAME_DELAY = 12
-
-private const val DEFAULT_STR_FREEZE_TIME = "freeze0"
-private const val DEFAULT_VALUE_FREEZE_TIME = 1500
-
 val imgDescs = arrayOf(
         ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
                 R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
@@ -62,32 +50,6 @@ class ImgDescriptor(
 ) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
     val filename = url.substringAfterLast('/')
-}
-
-private val SharedPreferences.frameDelayFactor: Int get() =
-    getString(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY).let { delayStr ->
-        when (delayStr) {
-            DEFAULT_STR_FRAME_DELAY -> return DEFAULT_VALUE_FRAME_DELAY // 85 min/sec
-            "frameDelay1" -> return 26 // 40 min/sec
-            "frameDelay2" -> return 47 // 20 min/sec
-            else -> replaceSetting(KEY_FRAME_DELAY, DEFAULT_STR_FRAME_DELAY, DEFAULT_VALUE_FRAME_DELAY)
-        }
-    }
-
-private val SharedPreferences.freezeTime: Int get() =
-    getString(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME).let { freezeStr ->
-        when (freezeStr) {
-            DEFAULT_STR_FREEZE_TIME -> return DEFAULT_VALUE_FREEZE_TIME
-            "freeze1" -> return 2500
-            "freeze2" -> return 3500
-            else -> replaceSetting(KEY_FREEZE_TIME, DEFAULT_STR_FREEZE_TIME, DEFAULT_VALUE_FREEZE_TIME)
-        }
-    }
-
-private fun Context.animationDuration(): Int {
-    with(sharedPrefs) {
-        return ANIMATION_COVERS_MINUTES * frameDelayFactor + freezeTime
-    }
 }
 
 class RadarImageFragment : Fragment() {
@@ -210,7 +172,7 @@ class RadarImageFragment : Fragment() {
     override fun onResume() {
         MyLog.i { "RadarImageFragment.onResume" }
         super.onResume()
-        lastReloadedTimestamp = activity.sharedPrefs.getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
+        lastReloadedTimestamp = activity.sharedPrefs.lastReloadedTimestamp
         val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
         val noAnimationsLoaded = animationLooper.animators.all { it == null }
         if (isTimeToReload || noAnimationsLoaded) {
@@ -230,7 +192,9 @@ class RadarImageFragment : Fragment() {
                 }
                 setImageStatus(i, if (animator != null) SHOWING else BROKEN)
             }
-            animationLooper.restart(activity.animationDuration(), activity.sharedPrefs.frameDelayFactor)
+            with(activity.sharedPrefs) {
+                animationLooper.restart(animationDuration, frameDelayFactor)
+            }
         }
     }
 
@@ -248,9 +212,7 @@ class RadarImageFragment : Fragment() {
         MyLog.i { "RadarImageFragment.onPause" }
         super.onPause()
         animationLooper.stop()
-        activity.sharedPrefs.applyUpdate {
-            putLong(KEY_LAST_RELOADED_TIMESTAMP, lastReloadedTimestamp)
-        }
+        activity.sharedPrefs.lastReloadedTimestamp = lastReloadedTimestamp
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -286,7 +248,7 @@ class RadarImageFragment : Fragment() {
         }
         val context = activity
         val frameDelayFactor = context.sharedPrefs.frameDelayFactor
-        val animationDuration = context.animationDuration()
+        val animationDuration = context.sharedPrefs.animationDuration
         for (desc in imgDescs) {
             start {
                 try {
@@ -336,3 +298,4 @@ class RadarImageFragment : Fragment() {
 private enum class ImgStatus {
     LOADING, SHOWING, BROKEN
 }
+

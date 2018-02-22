@@ -8,7 +8,7 @@ import android.view.View
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 
-class SeekBarPreference(
+class SeekBarPreference @JvmOverloads constructor(
         context: Context, attrs: AttributeSet? = null, defStyle: Int = 0
 ) : Preference(context, attrs, defStyle), OnSeekBarChangeListener {
     init {
@@ -29,8 +29,12 @@ class SeekBarPreference(
 
     override fun onSetInitialValue(restoreValue: Boolean, defaultValue: Any?) {
         value = if (restoreValue)
-            getPersistedInt(value) else
-            defaultValue as Int
+            getPersistedInt(value)
+        else when (defaultValue) {
+            is String -> defaultValue.toInt()
+            is Int -> defaultValue
+            else -> 0
+        }
     }
 
     override fun onBindView(view: View) {

@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-    <ListPreference
+    <com.belotron.weatherradarhr.SeekBarPreference
             android:key="frame_delay"
             android:title="@string/animation_rate"
-            android:entries="@array/animation_rates"
-            android:entryValues="@array/frame_delay_values"
-            android:defaultValue="@string/frame_delay_default"
+            android:defaultValue="12"
             android:summary="%s"
     />
-    <ListPreference
+    <com.belotron.weatherradarhr.SeekBarPreference
             android:key="freeze_time"
             android:title="@string/freeze_time"
-            android:entries="@array/freeze_times"
-            android:entryValues="@array/freeze_time_values"
-            android:defaultValue="@string/freeze_time_default"
+            android:defaultValue="15"
             android:summary="%s"
     />
 </PreferenceScreen>
