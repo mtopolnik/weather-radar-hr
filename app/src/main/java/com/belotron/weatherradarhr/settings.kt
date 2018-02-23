@@ -14,6 +14,8 @@ class SettingsActivity : Activity() {
 class SettingsFragment : PreferenceFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        addPreferencesFromResource(R.xml.settings)
+        addPreferencesFromResource(R.xml.preference_screen)
+        val frameDelayPref = preferenceScreen.getPreference(0) as SeekBarPreference
+        val freezeTimePref = preferenceScreen.getPreference(1) as SeekBarPreference
     }
 }

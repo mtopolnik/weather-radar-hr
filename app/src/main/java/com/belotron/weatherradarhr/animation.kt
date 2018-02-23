@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.widget.ImageView
 import android.widget.TextView
@@ -21,9 +20,9 @@ class AnimationLooper(numViews: Int) {
     private var loopingJob: Job? = null
     private var animationDuration: Int? = null
 
-    fun restart(newDuration: Int, newDelayFactor: Int) {
+    fun restart(newDuration: Int, newRateMinsPerSec: Int) {
         animationDuration = newDuration
-        animators.forEach { it?.frameDelayFactor = newDelayFactor }
+        animators.forEach { it?.rateMinsPerSec = newRateMinsPerSec }
         restart()
     }
 
@@ -80,8 +79,8 @@ class GifAnimator(
             result
         }
     }
-    var frameDelayFactor: Int = 100
-    private val frameDelay get() = frameDelayFactor * imgDesc.minutesPerFrame
+    var rateMinsPerSec: Int = DEFAULT_ANIMATION_RATE
+    private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
 
     private var currFrame: Bitmap? = null
     private var currFrameShownAt = 0L

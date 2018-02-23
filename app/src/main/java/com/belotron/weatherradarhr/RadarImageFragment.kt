@@ -193,7 +193,7 @@ class RadarImageFragment : Fragment() {
                 setImageStatus(i, if (animator != null) SHOWING else BROKEN)
             }
             with(activity.sharedPrefs) {
-                animationLooper.restart(animationDuration, frameDelayFactor)
+                animationLooper.restart(animationDurationMillis, rateMinsPerSec)
             }
         }
     }
@@ -247,8 +247,8 @@ class RadarImageFragment : Fragment() {
             setImageStatus(it.index, LOADING)
         }
         val context = activity
-        val frameDelayFactor = context.sharedPrefs.frameDelayFactor
-        val animationDuration = context.sharedPrefs.animationDuration
+        val frameDelayFactor = context.sharedPrefs.rateMinsPerSec
+        val animationDuration = context.sharedPrefs.animationDurationMillis
         for (desc in imgDescs) {
             start {
                 try {

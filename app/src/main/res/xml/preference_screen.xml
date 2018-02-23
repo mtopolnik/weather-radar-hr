@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:belotron="http://belotron.com">
+    <com.belotron.weatherradarhr.SeekBarPreference
+            android:key="animation_rate_mins_per_sec"
+            android:title="@string/animation_rate"
+            android:summary="%d min/s"
+            android:defaultValue="85"
+            belotron:min="10"
+            belotron:max="180"
+    />
+    <com.belotron.weatherradarhr.SeekBarPreference
+            android:key="freeze_time_millis"
+            android:title="@string/freeze_time"
+            android:summary="%.1f s"
+            android:defaultValue="1500"
+            belotron:min="100"
+            belotron:max="6000"
+    />
+</PreferenceScreen>
