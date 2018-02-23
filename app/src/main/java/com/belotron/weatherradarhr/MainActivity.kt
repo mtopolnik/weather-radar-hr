@@ -14,8 +14,8 @@ class MainActivity : Activity()  {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        MyLog.i { "MainActivity.onCreate" }
-        PreferenceManager.setDefaultValues(this, R.xml.settings, false)
+        info { "MainActivity.onCreate" }
+        PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         if (fragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {
@@ -27,14 +27,14 @@ class MainActivity : Activity()  {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        MyLog.i { "MainActivity.onSaveInstanceState" }
+        info { "MainActivity.onSaveInstanceState" }
         super.onSaveInstanceState(outState)
         outState.putLong(KEY_INSTANCE_STATE_SAVED_AT, System.currentTimeMillis())
         outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar.isShowing)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        MyLog.i { "MainActivity.onRestoreInstanceState" }
+        info { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
         val stateSavedTimestamp = savedInstanceState.getLong(KEY_INSTANCE_STATE_SAVED_AT)
         if (stateSavedTimestamp == 0L) {
@@ -42,7 +42,7 @@ class MainActivity : Activity()  {
         }
         val timeDiff = System.currentTimeMillis() - stateSavedTimestamp
         val didRotate = timeDiff < SECOND_IN_MILLIS
-        MyLog.i { "Time diff $timeDiff, did rotate? $didRotate" }
+        info { "Time diff $timeDiff, did rotate? $didRotate" }
         if (didRotate && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
             actionBar.hide()
         }

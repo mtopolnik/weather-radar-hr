@@ -52,25 +52,25 @@ constructor(
                     val extensionLabel = nextByte()
                     when (extensionLabel) {
                         EXT_TYPE_APPLICATION -> {
-                            MyLog.d { "Application extension at $blockPos" }
+                            debug { "Application extension at $blockPos" }
                             parseApplicationExtension()
                         }
                         EXT_TYPE_GRAPHIC_CONTROL -> {
-                            MyLog.d { "Graphic control ext at $blockPos" }
+                            debug { "Graphic control ext at $blockPos" }
                             frameList.acceptGraphicControlExt()
                         }
                         else -> {
-                            MyLog.d { "Ext $extensionLabel at $blockPos" }
+                            debug { "Ext $extensionLabel at $blockPos" }
                             logSubBlocks()
                         }
                     }
                 }
                 BLOCK_TYPE_IMAGE -> {
-                    MyLog.d { "Image desc at $blockPos" }
+                    debug { "Image desc at $blockPos" }
                     frameList.acceptImageDescriptor()
                 }
                 BLOCK_TYPE_TRAILER -> {
-                    MyLog.d { "Trailer at $blockPos" }
+                    debug { "Trailer at $blockPos" }
                     buf.limit(buf.position())
                     break@readingLoop
                 }
@@ -107,14 +107,14 @@ constructor(
                 if (subBlockId == 1) {
                     if (len != 3) throw AssertionError("Invalid Netscape Looping Extension block size: " + len)
                     val loopCount = buf.char.toInt()
-                    MyLog.d { "Netscape Extension Loop Count $loopCount" }
+                    debug { "Netscape Extension Loop Count $loopCount" }
                     val terminatorByte = nextByte()
                     if (terminatorByte != 0) throw AssertionError("Invalid terminator byte " + terminatorByte)
                 }
                 return
             }
             else -> {
-                MyLog.d { "Application Identifier $appId" }
+                debug { "Application Identifier $appId" }
                 skipSubBlocks()
             }
         }
@@ -149,7 +149,7 @@ constructor(
             val len = nextByte()
             if (len == 0) break
             val block = getString(len)
-            MyLog.d { "sub-block $block" }
+            debug { "sub-block $block" }
         }
     }
 
@@ -224,7 +224,7 @@ constructor(
                 addFrame()
                 distinctFrameCount++
             } else {
-                MyLog.d { "Dropping identical frame" }
+                debug { "Dropping identical frame" }
             }
             currFrame = null
         }

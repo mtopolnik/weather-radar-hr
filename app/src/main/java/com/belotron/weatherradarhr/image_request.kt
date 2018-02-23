@@ -45,12 +45,12 @@ suspend fun fetchUrl(
             fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                 Pair(0L, null)
             else -> { // responseCode == 304, fetch from cache
-                MyLog.i { "Not Modified since $ifModifiedSince: $url" }
+                info { "Not Modified since $ifModifiedSince: $url" }
                 loadCachedResult(context, url)!!
             }
         }
     } catch (e: Exception) {
-        MyLog.e("Error fetching $url", e)
+        error("Error fetching $url", e)
         throw ImageFetchException(if (fetchPolicy == ONLY_IF_NEW) null else loadCachedImage(context, url))
     } finally {
         conn.disconnect()
@@ -62,7 +62,7 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
     val lastModified = lastModifiedStr.parseLastModified()
     val url = conn.url.toExternalForm()
-    MyLog.i { "Last-Modified $lastModifiedStr: $url" }
+    info { "Last-Modified $lastModifiedStr: $url" }
     return synchronized(threadPool) {
         try {
             val cachedIn = runOrNull { cachedDataIn(context, url) }
@@ -84,7 +84,7 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
         } catch (t: Throwable) {
-            MyLog.e("Failed to handle a successful image response", t)
+            error("Failed to handle a successful image response", t)
             throw t
         }
     }
@@ -97,7 +97,7 @@ private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: 
             cachedOut.write(responseBody)
         }
     } catch (e: IOException) {
-        MyLog.e("Failed to write cached image to $cacheFile", e)
+        error("Failed to write cached image to $cacheFile", e)
     }
 }
 
@@ -116,7 +116,7 @@ private fun loadCachedImage(context: Context, url: String) = runOrNull {
 
 private fun logErrorResponse(conn: HttpURLConnection, url: String) {
     val responseBody = conn.inputStream.use { it.readBytes() }
-    MyLog.e("Failed to retrieve $url: ${conn.responseCode}\n${String(responseBody)}")
+    error("Failed to retrieve $url: ${conn.responseCode}\n${String(responseBody)}")
 }
 
 private fun parseHourRelativeModTime(lastModifiedStr: String): Long {

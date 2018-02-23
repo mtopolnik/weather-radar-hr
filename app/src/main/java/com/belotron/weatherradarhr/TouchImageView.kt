@@ -183,7 +183,7 @@ class TouchImageView : ImageView {
         viewWidth = computeViewSize(widthMode, widthSize, drawableWidth)
         viewHeight = computeViewSize(heightMode, heightSize, drawableHeight)
         setMeasuredDimension(viewWidth, viewHeight)
-        MyLog.i {"onMeasure"}
+        info {"onMeasure"}
         fitImageToView()
     }
 
@@ -628,7 +628,7 @@ class TouchImageView : ImageView {
     private fun printMatrixInfo(msg: String) {
         val n = FloatArray(9)
         currMatrix.getValues(n)
-        MyLog.i { msg +
+        info { msg +
                 " Scale: " + n[MSCALE_X] +
                 " TransX: " + n[MTRANS_X] +
                 " TransY: " + n[MTRANS_Y]

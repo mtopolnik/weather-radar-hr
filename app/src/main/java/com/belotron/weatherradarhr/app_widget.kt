@@ -108,7 +108,7 @@ class RefreshImageService : JobService() {
         try {
             val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
             val wDesc = widgetDescriptors[wDescIndex]
-            MyLog.i { "RefreshImageService: ${wDesc.name}" }
+            info { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse()) {
                 start {
@@ -124,13 +124,13 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            MyLog.e("Error in RefreshImageService", e)
+            error("Error in RefreshImageService", e)
             throw e
         }
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        MyLog.i { "RefreshImageService stop job" }
+        info { "RefreshImageService stop job" }
         return true
     }
 
@@ -141,7 +141,7 @@ class UpdateAgeService : JobService() {
         try {
             val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
             val wDesc = widgetDescriptors[wDescIndex]
-            MyLog.i { "UpdateAgeService: ${wDesc.name}" }
+            info { "UpdateAgeService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             if (wCtx.isWidgetInUse()) {
                 wCtx.updateRemoteViews(wCtx.readImgAndTimestamp())
@@ -150,13 +150,13 @@ class UpdateAgeService : JobService() {
             }
             return false
         } catch (e: Throwable) {
-            MyLog.e("error in UpdateAgeService", e)
+            error("error in UpdateAgeService", e)
             throw e
         }
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        MyLog.i { "UpdateAgeService stop job" }
+        info { "UpdateAgeService stop job" }
         return true
     }
 }
@@ -171,7 +171,7 @@ private class WidgetContext (
             AppWidgetManager.getInstance(context).getAppWidgetIds(providerName()).isNotEmpty()
 
     fun onUpdateWidget() {
-        MyLog.w("onUpdate ${wDesc.name}")
+        warn("onUpdate ${wDesc.name}")
         start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
@@ -196,14 +196,14 @@ private class WidgetContext (
             if (e.cached != null) {
                 updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached))
             } else if (!onlyIfNew) {
-                MyLog.w("Failed to fetch ${wDesc.imgFilename()}, using preview")
+                warn("Failed to fetch ${wDesc.imgFilename()}, using preview")
                 updateRemoteViews(TimestampedBitmap(
                         0L,
                         (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap))
             }
             return null
         } catch (t: Throwable) {
-            MyLog.e("Widget refresh failure", t)
+            error("Widget refresh failure", t)
             return null
         }
     }
@@ -220,7 +220,7 @@ private class WidgetContext (
             remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
         }
         AppWidgetManager.getInstance(context).updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
-        MyLog.i { "Updated Remote Views" }
+        info { "Updated Remote Views" }
     }
 
     fun scheduleWidgetUpdate(latencyMillis: Long) {
@@ -237,7 +237,7 @@ private class WidgetContext (
     }
 
     fun cancelUpdateAge() {
-        MyLog.i { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
+        info { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
         context.jobScheduler().cancel(wDesc.updateAgeJobId())
     }
 
@@ -286,8 +286,8 @@ private fun intentLaunchMainActivity(context: Context): PendingIntent {
 
 private fun reportScheduleResult(task: String, resultCode: Int) {
     when (resultCode) {
-        JobScheduler.RESULT_SUCCESS -> MyLog.i { "Scheduled to $task" }
-        JobScheduler.RESULT_FAILURE -> MyLog.e("Failed to schedule to $task")
+        JobScheduler.RESULT_SUCCESS -> info { "Scheduled to $task" }
+        JobScheduler.RESULT_FAILURE -> error("Failed to schedule to $task")
         else -> throw AssertionError("Unknown scheduler result code $resultCode")
     }
 }

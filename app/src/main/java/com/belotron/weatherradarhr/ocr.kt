@@ -23,7 +23,7 @@ object LradarOcr {
 
     fun ocrLradarTimestamp(bitmap: Bitmap): Long {
         val dt = ocrDateTime(bitmap)
-        MyLog.i { "OCRed date/time: $dt" }
+        info { "OCRed date/time: $dt" }
         return dt.toTimestamp()
     }
 
@@ -57,7 +57,7 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(bitmap: Bitmap): Long {
         val dt = ocrDateTime(bitmap)
-        MyLog.i { "OCRed date/time: $dt" }
+        info { "OCRed date/time: $dt" }
         return dt.toTimestamp()
     }
 

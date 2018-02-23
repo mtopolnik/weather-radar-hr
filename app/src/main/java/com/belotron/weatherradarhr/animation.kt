@@ -28,7 +28,7 @@ class AnimationLooper(numViews: Int) {
     }
 
     fun restart() {
-        MyLog.i { "AnimationLooper.restart" }
+        info { "AnimationLooper.restart" }
         if (animators.none()) {
             return
         }
@@ -45,7 +45,7 @@ class AnimationLooper(numViews: Int) {
     }
 
     fun animateOne(index: Int) {
-        MyLog.i { "AnimationLooper.animateOne $index" }
+        info { "AnimationLooper.animateOne $index" }
         stop()
         val animator = animators[index]!!
         loopingJob = start {
@@ -96,19 +96,19 @@ class GifAnimator(
                 advance()
             }
         if (!replaceCurrentFrame(gifDecoder.currentFrame)) {
-            MyLog.i { "Animator stop: replaceCurrentFrame() returned false" }
+            info { "Animator stop: replaceCurrentFrame() returned false" }
             return null
         }
         return launch(UI) {
             while (true) {
                 if (!gifDecoder.advance()) {
-                    MyLog.d { "Animator stop: gifDecoder.advance() returned false" }
+                    debug { "Animator stop: gifDecoder.advance() returned false" }
                     break
                 }
                 val nextFrame = withContext(threadPool) { gifDecoder.currentFrame }
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
-                val remainingTillNextFrame = frameDelay - elapsedSinceFrameShown
-                MyLog.d { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
+                val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
+                debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
                 remainingTillNextFrame.takeIf { it > 0 }?.also {
                     delay(it)
                 }
@@ -139,14 +139,14 @@ class FreeLists : GifDecoder.BitmapProvider {
     private val intArrayQueues = HashMap<Int, Queue<IntArray>>()
 
     override fun obtain(width: Int, height: Int, config: Bitmap.Config): Bitmap {
-        MyLog.d { "Obtain $width x $height bitmap" }
+        debug { "Obtain $width x $height bitmap" }
         val bitmap = bitmapQueues[Pair(width, height)]?.poll()
         return bitmap?.apply { this.config = config }
                 ?: Bitmap.createBitmap(width, height, config)
     }
 
     override fun release(bitmap: Bitmap) {
-        MyLog.d { "Release ${bitmap.width} x ${bitmap.height} bitmap" }
+        debug { "Release ${bitmap.width} x ${bitmap.height} bitmap" }
         val key = Pair(bitmap.width, bitmap.height)
         val freelist = bitmapQueues[key] ?: ArrayDeque<Bitmap>().also { bitmapQueues[key] = it }
         if (freelist.any { bitmap === it }) {
@@ -156,13 +156,13 @@ class FreeLists : GifDecoder.BitmapProvider {
     }
 
     override fun obtainByteArray(size: Int): ByteArray {
-        MyLog.d { "Obtain $size bytes" }
+        debug { "Obtain $size bytes" }
         return if (size == 0) emptyByteArray
         else byteArrayQueues[size]?.poll() ?: ByteArray(size)
     }
 
     override fun release(bytes: ByteArray) {
-        MyLog.d { "Release ${bytes.size} bytes" }
+        debug { "Release ${bytes.size} bytes" }
         val freelist = byteArrayQueues[bytes.size] ?: ArrayDeque<ByteArray>().also { byteArrayQueues[bytes.size] = it }
         if (freelist.any { bytes === it }) {
             throw IllegalStateException("Double release of ByteArray")
@@ -171,13 +171,13 @@ class FreeLists : GifDecoder.BitmapProvider {
     }
 
     override fun obtainIntArray(size: Int): IntArray {
-        MyLog.d { "Obtain $size ints" }
+        debug { "Obtain $size ints" }
         return if (size == 0) emptyIntArray
         else intArrayQueues[size]?.poll() ?: IntArray(size)
     }
 
     override fun release(array: IntArray) {
-        MyLog.d { "Release ${array.size} ints" }
+        debug { "Release ${array.size} ints" }
         val freelist = intArrayQueues[array.size] ?: ArrayDeque<IntArray>().also { intArrayQueues[array.size] = it }
         if (freelist.any { array === it }) {
             throw IllegalStateException("Double release of IntArray")

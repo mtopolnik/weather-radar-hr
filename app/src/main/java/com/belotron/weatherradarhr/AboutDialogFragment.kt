@@ -59,13 +59,13 @@ private class EasterEggDetector(
     override fun onSingleTapUp(e: MotionEvent): Boolean {
         val middle = view.width / 2
         val tapSide = if (e.x < middle) L else R
-        MyLog.i { "Tap side: $tapSide" }
+        info { "Tap side: $tapSide" }
         if (tapSide == sequence[indexInSequence]) {
             indexInSequence++
             if (indexInSequence == sequence.size) {
                 indexInSequence = 0
                 invertAdsEnabled()
-                MyLog.i { "Easter egg!" }
+                info { "Easter egg!" }
             }
         } else {
             indexInSequence = 0

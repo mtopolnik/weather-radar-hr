@@ -68,7 +68,7 @@ class RadarImageFragment : Fragment() {
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        MyLog.i { "RadarImageFragment.onCreate" }
+        info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
@@ -78,7 +78,7 @@ class RadarImageFragment : Fragment() {
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        MyLog.i { "RadarImageFragment.onCreateView" }
+        info { "RadarImageFragment.onCreateView" }
         rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
         vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
@@ -170,13 +170,13 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onResume() {
-        MyLog.i { "RadarImageFragment.onResume" }
+        info { "RadarImageFragment.onResume" }
         super.onResume()
         lastReloadedTimestamp = activity.sharedPrefs.lastReloadedTimestamp
         val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
         val noAnimationsLoaded = animationLooper.animators.all { it == null }
         if (isTimeToReload || noAnimationsLoaded) {
-            MyLog.i {
+            info {
                 "Reloading animations. Is it time to reload? $isTimeToReload." +
                         " No animations loaded? $noAnimationsLoaded"
             }
@@ -199,7 +199,7 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        MyLog.i { "RadarImageFragment.onDestroyView" }
+        info { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
         textViews.fill(null)
         imgViews.fill(null)
@@ -209,20 +209,20 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onPause() {
-        MyLog.i { "RadarImageFragment.onPause" }
+        info { "RadarImageFragment.onPause" }
         super.onPause()
         animationLooper.stop()
         activity.sharedPrefs.lastReloadedTimestamp = lastReloadedTimestamp
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        MyLog.i { "RadarImageFragment.onCreateOptionsMenu" }
+        info { "RadarImageFragment.onCreateOptionsMenu" }
         inflater.inflate(R.menu.main_menu, menu)
         super.onCreateOptionsMenu(menu, inflater)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        MyLog.i { "RadarImageFragment.onOptionsItemSelected" }
+        info { "RadarImageFragment.onOptionsItemSelected" }
         when (item.itemId) {
             R.id.refresh -> {
                 if (activity.adsEnabled()) {
@@ -276,7 +276,7 @@ class RadarImageFragment : Fragment() {
                     setImageStatus(desc.index, SHOWING)
                     activity.actionBar.hide()
                 } catch (t: Throwable) {
-                    MyLog.e("Failed to load animated GIF ${desc.filename}", t)
+                    error("Failed to load animated GIF ${desc.filename}", t)
                     setImageStatus(desc.index, BROKEN)
                 }
             }
