@@ -96,9 +96,13 @@ object KradarOcr {
         val imgY = 168
         return when {
             (0 until 13).all { rectY -> bitmap.getPixel(imgX + 1, imgY + rectY) != -1 } -> 0 // blank space
-            else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) }
-                    ?: throw AssertionError("Couldn't read kradar date digit at $pos, stripe was " +
-                            "${stripeData(bitmap, imgX, imgY, 13, 1)}")
+            else -> {
+                val inputStripe = stripeData(bitmap, imgX, imgY, 13, 1)
+                val digit2Stripe = stripeData(dateDigitBitmaps[2], 0, 0, 13, 1)
+                (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) }
+                        ?: throw AssertionError("Couldn't read kradar date digit at $pos," +
+                                "input stripe was $inputStripe and digit 2 stripe is $digit2Stripe")
+            }
         }
     }
 }
