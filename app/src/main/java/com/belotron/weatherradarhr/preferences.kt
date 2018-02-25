@@ -55,7 +55,7 @@ private val SharedPreferences.animationRateFromOldSetting: Int? get() =
 private val SharedPreferences.freezeTimeFromOldSetting: Int? get() =
     getString(KEY_FREEZE_TIME_OLD, null).let { freezeStr ->
         when (freezeStr) {
-            "freeze0" -> DEFAULT_ANIMATION_RATE
+            "freeze0" -> DEFAULT_FREEZE_TIME
             "freeze1" -> return 2500
             "freeze2" -> return 3500
             else -> null
