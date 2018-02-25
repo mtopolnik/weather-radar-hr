@@ -97,18 +97,21 @@ object KradarOcr {
         return when {
             (0 until 13).all { rectY -> bitmap.getPixel(imgX + 1, imgY + rectY) != -1 } -> 0 // blank space
             else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) }
-                    ?: throw AssertionError("Couldn't read kradar date digit at $pos")
+                    ?: throw AssertionError("Couldn't read kradar date digit at $pos, stripe was " +
+                            "${stripeData(bitmap, imgX, imgY, 13, 1)}")
         }
     }
 }
+
+private fun stripeData(img: Bitmap, imgX: Int, imgY: Int, rectHeight: Int, rectX: Int): List<Int> =
+        (0 until rectHeight).map { rectY -> img.getPixel(imgX + rectX, imgY + rectY) }
 
 /**
  * Returns true if the vertical stripe of `rect` at `rectX` is equal to
  * the vertical stripe in `img` at `(imgX + rectX, imgY)`
  */
 private fun stripeEqual(img: Bitmap, imgX: Int, imgY: Int, rect: Bitmap, rectX: Int) =
-    (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY)
-}
+    (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY) }
 
 private fun loadDigits(context: Context, path : String) =
         (0..9).map { context.assets.open("$path/$it.gif").use { it.readBytes() }.toBitmap() }
