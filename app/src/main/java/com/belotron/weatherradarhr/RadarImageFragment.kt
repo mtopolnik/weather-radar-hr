@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.app.Fragment
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
@@ -19,11 +20,15 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
-import com.belotron.weatherradarhr.ImgStatus.BROKEN
-import com.belotron.weatherradarhr.ImgStatus.LOADING
-import com.belotron.weatherradarhr.ImgStatus.SHOWING
+import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
+import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
+import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
+import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
+import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.launch
 import java.util.concurrent.TimeUnit
 
 private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
@@ -52,121 +57,139 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
+class ImageBundle {
+    var textView: TextView? = null
+    var imgView: ImageView? = null
+    private var brokenImgView: ImageView? = null
+    private var progressBar: ProgressBar? = null
+
+    var status = UNKNOWN
+        set(value) {
+            field = value
+            progressBar?.setVisible(value == LOADING)
+            imgView?.setVisible(value == SHOWING)
+            brokenImgView?.setVisible(value == BROKEN)
+            if (value != SHOWING) {
+                textView?.text = ""
+            }
+        }
+
+    var text: CharSequence
+        get() = textView!!.text
+        set(value) { textView!!.text = value }
+
+    var bitmap: Bitmap?
+        get() = imgView!!.drawable?.let { it as BitmapDrawable }?.bitmap
+        set(value) { imgView!!.setImageBitmap(value) }
+
+    fun updateFrom(that: ImageBundle) {
+        this.text = that.text
+        this.bitmap = that.bitmap
+        this.status = that.status
+    }
+
+    fun copyTo(that: ImageBundle) {
+        that.textView = this.textView!!
+        that.imgView = this.imgView!!
+        that.brokenImgView = this.brokenImgView!!
+        that.progressBar = this.progressBar!!
+        that.status = this.status
+    }
+
+    fun clear() {
+        destroyViews()
+        status = HIDDEN
+    }
+
+    fun destroyViews() {
+        this.textView = null
+        this.imgView = null
+        this.brokenImgView = null
+        this.progressBar = null
+    }
+
+    fun restoreViews(
+            textView: TextView,
+            imgView: ImageView,
+            brokenImgView: ImageView,
+            progressBar: ProgressBar
+    ) {
+        this.textView = textView
+        this.imgView = imgView
+        this.brokenImgView = brokenImgView
+        this.progressBar = progressBar
+        this.status = status // reapplies the status to view visibility
+    }
+
+    enum class Status {
+        UNKNOWN, HIDDEN, LOADING, BROKEN, SHOWING
+    }
+}
+
 class RadarImageFragment : Fragment() {
-    private val textViews: Array<TextView?> = arrayOf(null, null)
-    private val imgViews: Array<ImageView?> = arrayOf(null, null)
-    private val brokenImgViews: Array<ImageView?> = arrayOf(null, null)
-    private val progressBars: Array<ProgressBar?> = arrayOf(null, null)
-    private lateinit var rootView: View
-    private lateinit var animationLooper: AnimationLooper
-    private lateinit var vGroupOverview: ViewGroup
-    private lateinit var vGroupFullScreen: ViewGroup
-    private lateinit var imgViewFullScreen: TouchImageView
-    private lateinit var textViewFullScreen: TextView
+    var isInFullScreen: Boolean = false
+
+    private val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
+    private val fullScreenBundle = ImageBundle()
+    private var stashedImgBundle = ImageBundle()
+    private val animationLooper = AnimationLooper(imgBundles)
+    private var rootView: View? = null
+    private var vGroupOverview: ViewGroup? = null
+    private var vGroupFullScreen: ViewGroup? = null
     private var indexOfImgInFullScreen: Int? = null
     private var lastReloadedTimestamp = 0L
-
+    private var wasFastResume = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
-        animationLooper = AnimationLooper(2)
     }
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         info { "RadarImageFragment.onCreateView" }
-        rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        wasFastResume = savedInstanceState?.wasFastResume ?: false
+        val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        this.rootView = rootView
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
         vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
-        imgViewFullScreen = rootView.findViewById(R.id.img_radar_zoomed)
-        imgViewFullScreen.setOnDoubleTapListener(object: SimpleOnGestureListener() {
-            override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
-            override fun onDoubleTap(e: MotionEvent) = exitFullScreen()
-        })
-        textViewFullScreen = rootView.findViewById(R.id.text_radar_zoomed)
-        imgDescs.forEachIndexed { i, desc ->
-            textViews[i] = rootView.findViewById(desc.textViewId)
-            progressBars[i] = rootView.findViewById<ProgressBar>(desc.progressBarId).also {
-                it.setOnClickListener { switchActionBarVisible() }
-            }
-            brokenImgViews[i] = rootView.findViewById<ImageView>(desc.brokenImgViewId).also {
-                it.setOnClickListener { switchActionBarVisible() }
-                it.visibility = GONE
-            }
-            imgViews[i] = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
-                val gl = object : SimpleOnGestureListener() {
-                    override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
-                    override fun onDoubleTap(e: MotionEvent) = enterFullScreen(i, e)
+        fullScreenBundle.restoreViews(
+                textView = rootView.findViewById(R.id.text_radar_zoomed),
+                imgView = rootView.findViewById<TouchImageView>(R.id.img_radar_zoomed).apply {
+                    setOnDoubleTapListener(object: SimpleOnGestureListener() {
+                        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
+                        override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
+                    })
+                },
+                brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
+                progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
+        )
+        imgDescs.forEachIndexed { i, desc -> imgBundles[i].restoreViews(
+                textView = rootView.findViewById(desc.textViewId),
+                imgView = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
+                    val gl = object : SimpleOnGestureListener() {
+                        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
+                        override fun onDoubleTap(e: MotionEvent) = enterFullScreen(i, e)
+                    }
+                    GestureDetector(activity, gl).let {
+                        imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                    }
+                },
+                brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId).apply {
+                    setOnClickListener { switchActionBarVisible() }
+                    visibility = GONE
+                },
+                progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId).apply {
+                    setOnClickListener { switchActionBarVisible() }
                 }
-                GestureDetector(activity, gl).let {
-                    imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
-                }
-            }
-            animationLooper.animators[i]?.imgView = imgViews[i]
-        }
+        ) }
+        initFullScreenBundle()
         updateFullScreenVisibility()
         updateAdVisibility()
         return rootView
-    }
-
-    private fun updateAdVisibility() {
-        val adView = rootView.findViewById<AdView>(R.id.adView)
-        val adsEnabled = activity.adsEnabled()
-        adView.setVisible(adsEnabled)
-        if (adsEnabled) {
-            adView.loadAd(AdRequest.Builder().build())
-        }
-    }
-
-    private fun updateFullScreenVisibility() {
-        val mainActivity = activity as MainActivity
-        val index = indexOfImgInFullScreen
-        if (index != null) {
-            textViewFullScreen.text = textViews[index]!!.text
-            animationLooper.animators[index]!!.imgView = imgViewFullScreen
-        } else {
-            textViewFullScreen.text = ""
-            imgViewFullScreen.setImageDrawable(null)
-        }
-        val makeFullScreenVisible = index != null
-        mainActivity.isFullScreenMode = makeFullScreenVisible
-        vGroupFullScreen.setVisible(makeFullScreenVisible)
-        vGroupOverview.setVisible(!makeFullScreenVisible)
-    }
-
-    private fun enterFullScreen(index: Int, e: MotionEvent): Boolean {
-        animationLooper.stop()
-        indexOfImgInFullScreen = index
-        updateFullScreenVisibility()
-        start {
-            with(imgViewFullScreen) {
-                resetToNeverDrawn()
-                setImageDrawable(imgViews[index]!!.drawable)
-                awaitOnDraw()
-                animateZoomEnter(e)
-            }
-            animationLooper.animateOne(index)
-        }
-        return true
-    }
-
-    fun exitFullScreen(): Boolean {
-        val index = indexOfImgInFullScreen!!
-        with(animationLooper) {
-            stop()
-            animators[index]!!.imgView = imgViews[index]
-        }
-        start {
-            imgViewFullScreen.animateZoomExit()
-            indexOfImgInFullScreen = null
-            updateFullScreenVisibility()
-            animationLooper.restart()
-        }
-        return true
     }
 
     override fun onResume() {
@@ -174,43 +197,34 @@ class RadarImageFragment : Fragment() {
         super.onResume()
         lastReloadedTimestamp = activity.sharedPrefs.lastReloadedTimestamp
         val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
-        val noAnimationsLoaded = animationLooper.animators.all { it == null }
-        if (isTimeToReload || noAnimationsLoaded) {
-            info {
-                "Reloading animations. Is it time to reload? $isTimeToReload." +
-                        " No animations loaded? $noAnimationsLoaded"
-            }
-            if (indexOfImgInFullScreen != null) {
-                exitFullScreen()
-            }
-            startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
-            startFetchWidgetImages(activity.applicationContext)
-        } else {
-            imgDescs.indices.forEach { i ->
-                val animator = animationLooper.animators[i]?.apply {
-                    pushAgeTextToView(textViews[i]!!)
-                }
-                setImageStatus(i, if (animator != null) SHOWING else BROKEN)
-            }
-            with(activity.sharedPrefs) {
+        val statusIsKnown = imgBundles.none { it.status == UNKNOWN }
+        if (statusIsKnown && (wasFastResume || !isTimeToReload)) {
+            with (activity.sharedPrefs) {
                 animationLooper.restart(animationDurationMillis, rateMinsPerSec)
             }
+        } else {
+            info { "Reloading animations" }
+            startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
+            activity.startFetchWidgetImages()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.recordSavingTime()
     }
 
     override fun onDestroyView() {
         info { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
-        textViews.fill(null)
-        imgViews.fill(null)
-        animationLooper.animators.forEach { it?.imgView = null }
-        brokenImgViews.fill(null)
-        progressBars.fill(null)
+        imgBundles.forEach { it.destroyViews() }
+        fullScreenBundle.destroyViews()
+        stashedImgBundle.destroyViews()
     }
 
     override fun onPause() {
         info { "RadarImageFragment.onPause" }
         super.onPause()
+        wasFastResume = false
         animationLooper.stop()
         activity.sharedPrefs.lastReloadedTimestamp = lastReloadedTimestamp
     }
@@ -225,15 +239,11 @@ class RadarImageFragment : Fragment() {
         info { "RadarImageFragment.onOptionsItemSelected" }
         when (item.itemId) {
             R.id.refresh -> {
-                if (activity.adsEnabled()) {
-                    rootView.findViewById<AdView>(R.id.adView).loadAd(AdRequest.Builder().build())
-                }
-                if (imgViews[0] != null) {
-                    startReloadAnimations(UP_TO_DATE)
-                }
+                startReloadAnimations(UP_TO_DATE)
+                activity.startFetchWidgetImages()
             }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
-            R.id.about -> start {
+            R.id.about -> launch(UI) {
                 showAboutDialogFragment(activity)
                 updateAdVisibility()
                 switchActionBarVisible()
@@ -242,60 +252,101 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
-        imgDescs.forEach {
-            setImageStatus(it.index, LOADING)
+    private fun enterFullScreen(index: Int, e: MotionEvent): Boolean {
+        indexOfImgInFullScreen = index
+        initFullScreenBundle()
+        updateFullScreenVisibility()
+        launch(UI) {
+            fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
+                resetToNeverDrawn()
+                setImageBitmap(imgBundles[index].bitmap)
+                awaitOnDraw()
+                animateZoomEnter(e)
+            }
         }
-        val context = activity
+        return true
+    }
+
+    fun exitFullScreen() {
+        val index = indexOfImgInFullScreen ?: return
+        indexOfImgInFullScreen = null
+        launch(UI) {
+            val target = imgBundles[index]
+            if (target.status == SHOWING) {
+                target.imgView?.let { it as TouchImageView }?.animateZoomExit()
+            }
+            stashedImgBundle.takeIf { it.imgView != null }?.apply {
+                updateFrom(target)
+                copyTo(target)
+                clear()
+            }
+            fullScreenBundle.bitmap = null
+            updateFullScreenVisibility()
+        }
+    }
+
+    private fun updateFullScreenVisibility() {
+        val index = indexOfImgInFullScreen
+        val makeFullScreenVisible = index != null
+        isInFullScreen = makeFullScreenVisible
+        vGroupFullScreen?.setVisible(makeFullScreenVisible)
+        vGroupOverview?.setVisible(!makeFullScreenVisible)
+    }
+
+    private fun initFullScreenBundle() {
+        val target = imgBundles[indexOfImgInFullScreen ?: return]
+        target.copyTo(stashedImgBundle)
+        with(fullScreenBundle) {
+            updateFrom(target)
+            copyTo(target)
+        }
+    }
+
+    private fun updateAdVisibility() {
+        val adView = rootView?.findViewById<AdView>(R.id.adView) ?: return
+        val adsEnabled = activity.adsEnabled()
+        adView.setVisible(adsEnabled)
+        if (adsEnabled) {
+            adView.loadAd(AdRequest.Builder().build())
+        }
+    }
+
+    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
+        val context = activity ?: return
+        imgDescs.forEach {
+            imgBundles[it.index].status = LOADING
+        }
         val frameDelayFactor = context.sharedPrefs.rateMinsPerSec
         val animationDuration = context.sharedPrefs.animationDurationMillis
         for (desc in imgDescs) {
-            start {
+            val bundle = imgBundles[desc.index]
+            launch(UI) {
                 try {
                     val (lastModified, imgBytes) = try {
                         fetchUrl(context, desc.url, fetchPolicy)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
-                    if (imgViews[desc.index] == null) {
-                        return@start
-                    }
                     if (imgBytes == null) {
-                        setImageStatus(desc.index, BROKEN)
-                        return@start
+                        bundle.status = BROKEN
+                        return@launch
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     val gifData = editGif(imgBytes, desc.framesToKeep)
-                    desc.index.let { i ->
-                        val gifAnimator = GifAnimator(desc, gifData, imgViews[i], isOffline = lastModified == 0L)
-                        animationLooper.animators[i] = gifAnimator.apply {
-                            pushAgeTextToView(textViews[i]!!)
-                        }
+                    with (animationLooper) {
+                        receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
+                        restart(animationDuration, frameDelayFactor)
                     }
-                    animationLooper.restart(animationDuration, frameDelayFactor)
-                    setImageStatus(desc.index, SHOWING)
-                    activity.actionBar.hide()
+                    bundle.status = SHOWING
+                    context.actionBar.hide()
                 } catch (t: Throwable) {
-                    error("Failed to load animated GIF ${desc.filename}", t)
-                    setImageStatus(desc.index, BROKEN)
+                    error(t) {"Failed to load animated GIF ${desc.filename}"}
+                    bundle.status = BROKEN
                 }
             }
         }
     }
 
-    private fun setImageStatus(i: Int, status: ImgStatus) {
-        progressBars[i]?.setVisible(status == LOADING)
-        imgViews[i]?.setVisible(status == SHOWING)
-        brokenImgViews[i]?.setVisible(status == BROKEN)
-        if (status != SHOWING) {
-            textViews[i]?.text = ""
-        }
-    }
-
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
-}
-
-private enum class ImgStatus {
-    LOADING, SHOWING, BROKEN
 }
 

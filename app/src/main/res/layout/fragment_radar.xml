@@ -54,8 +54,8 @@
                         style="?android:attr/progressBarStyleLarge"
                         android:layout_width="match_parent"
                         android:layout_height="300dp"
-                        android:paddingTop="50dp"
-                        android:paddingBottom="50dp"
+                        android:paddingTop="100dp"
+                        android:paddingBottom="100dp"
                 />
                 <TextView
                         android:id="@+id/text_lradar"
@@ -92,8 +92,8 @@
                         style="?android:attr/progressBarStyleLarge"
                         android:layout_width="match_parent"
                         android:layout_height="300dp"
-                        android:paddingTop="50dp"
-                        android:paddingBottom="50dp"
+                        android:paddingTop="100dp"
+                        android:paddingBottom="100dp"
                 />
             </LinearLayout>
         </ScrollView>
@@ -112,6 +112,7 @@
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:gravity="center"
     >
         <TextView
                 android:id="@+id/text_radar_zoomed"
@@ -135,6 +136,18 @@
                 android:layout_weight="1"
                 android:adjustViewBounds="true"
                 android:scaleType="fitCenter"
+        />
+        <ImageView
+                android:id="@+id/broken_img_zoomed"
+                android:src="@drawable/thunderbolt"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+        />
+        <ProgressBar
+                android:id="@+id/progress_bar_zoomed"
+                style="?android:attr/progressBarStyleLarge"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
         />
     </LinearLayout>
 </LinearLayout>

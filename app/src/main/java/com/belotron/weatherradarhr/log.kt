@@ -16,21 +16,21 @@ inline fun info(arg: () -> String) {
     }
 }
 
-fun warn(message: String) {
+inline fun warn(arg: () -> String) {
     if (logLevelEnabled(Log.WARN)) {
-        Log.w(LOGTAG, message)
+        Log.w(LOGTAG, arg())
     }
 }
 
-fun error(message: String, exception: Throwable) {
+fun error(exception: Throwable, arg: () -> String) {
     if (logLevelEnabled(Log.ERROR)) {
-        Log.e(LOGTAG, message, exception)
+        Log.e(LOGTAG, arg(), exception)
     }
 }
 
-fun error(message: String) {
+fun error(arg: () -> String) {
     if (logLevelEnabled(Log.ERROR)) {
-        Log.e(LOGTAG, message)
+        Log.e(LOGTAG, arg())
     }
 }
 

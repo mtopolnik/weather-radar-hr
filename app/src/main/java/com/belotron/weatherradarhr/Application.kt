@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.preference.PreferenceManager
@@ -31,15 +32,20 @@ import java.util.concurrent.Executors
 const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
 const val KEY_ADS_ENABLED = "ads_enabled"
 
+private const val KEY_SAVED_AT = "instance-state-saved-at"
+
 val threadPool = Executors.newCachedThreadPool().asCoroutineDispatcher()
 
-fun start(block: suspend CoroutineScope.() -> Unit) = launch(
-        Looper.myLooper()?.let { Handler(it).asCoroutineDispatcher() } ?: Unconfined,
-        start = CoroutineStart.UNDISPATCHED,
-        block = block)
-
-fun ByteArray.toBitmap(): Bitmap =
-        BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        migratePrefs()
+        initOcr(this)
+        if (adsEnabled()) {
+            MobileAds.initialize(this, ADMOB_ID)
+        }
+    }
+}
 
 fun View.setVisible(state: Boolean) {
     visibility = if (state) VISIBLE else GONE
@@ -54,11 +60,6 @@ fun Context.ageText(timestamp: Long): CharSequence =
 
 fun Context.adsEnabled() = sharedPrefs.getBoolean(KEY_ADS_ENABLED, true)
 
-fun SharedPreferences.replaceSetting(keyStr: String, valStr: String, value: Int): Int {
-    applyUpdate { putString(keyStr, valStr) }
-    return value
-}
-
 fun Activity.switchActionBarVisible():Boolean {
     val actionBar = actionBar!!
     if (actionBar.isShowing) {
@@ -68,6 +69,11 @@ fun Activity.switchActionBarVisible():Boolean {
     }
     return true
 }
+
+fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis())
+
+val Bundle.wasFastResume: Boolean
+    get() = System.currentTimeMillis() - getLong(KEY_SAVED_AT) < DateUtils.SECOND_IN_MILLIS
 
 @SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
@@ -89,14 +95,5 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-class MyApplication : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        migratePrefs()
-        initOcr(this)
-        if (adsEnabled()) {
-            MobileAds.initialize(this, ADMOB_ID)
-        }
-    }
-}
-
+fun ByteArray.toBitmap(): Bitmap =
+        BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())

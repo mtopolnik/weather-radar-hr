@@ -24,6 +24,8 @@ import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.launch
 import java.io.IOException
 import java.util.Calendar
 import java.util.TimeZone
@@ -84,7 +86,7 @@ fun Context.startFetchWidgetImages() {
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
         if (wCtx.isWidgetInUse()) {
-            start {
+            launch(UI) {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
         }
@@ -111,7 +113,7 @@ class RefreshImageService : JobService() {
             info { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse()) {
-                start {
+                launch(UI) {
                     val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                     jobFinished(params, lastModified == null)
                     if (lastModified != null) {
@@ -124,7 +126,7 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            error("Error in RefreshImageService", e)
+            error(e) {"Error in RefreshImageService"}
             throw e
         }
     }
@@ -150,7 +152,7 @@ class UpdateAgeService : JobService() {
             }
             return false
         } catch (e: Throwable) {
-            error("error in UpdateAgeService", e)
+            error(e) {"error in UpdateAgeService"}
             throw e
         }
     }
@@ -171,8 +173,8 @@ private class WidgetContext (
             AppWidgetManager.getInstance(context).getAppWidgetIds(providerName()).isNotEmpty()
 
     fun onUpdateWidget() {
-        warn("onUpdate ${wDesc.name}")
-        start {
+        warn{"onUpdate ${wDesc.name}"}
+        launch(UI) {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
                     if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)
@@ -196,14 +198,14 @@ private class WidgetContext (
             if (e.cached != null) {
                 updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached))
             } else if (!onlyIfNew) {
-                warn("Failed to fetch ${wDesc.imgFilename()}, using preview")
+                warn{"Failed to fetch ${wDesc.imgFilename()}, using preview"}
                 updateRemoteViews(TimestampedBitmap(
                         0L,
                         (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap))
             }
             return null
         } catch (t: Throwable) {
-            error("Widget refresh failure", t)
+            error(t) {"Widget refresh failure"}
             return null
         }
     }

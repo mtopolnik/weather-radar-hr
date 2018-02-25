@@ -5,6 +5,8 @@ import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.Log
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.launch
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,7 +37,7 @@ class ConcurrentHttpFetchTest {
 
     private fun startFetch(url: String) {
         counter.incrementAndGet()
-        start {
+        launch(UI) {
             try {
                 fetchUrl(appContext, url, UP_TO_DATE)
             } catch (e: Exception) {

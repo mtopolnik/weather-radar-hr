@@ -46,6 +46,8 @@ import android.widget.ImageView.ScaleType.FIT_START
 import android.widget.ImageView.ScaleType.FIT_XY
 import android.widget.ImageView.ScaleType.MATRIX
 import android.widget.OverScroller
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.launch
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.Continuation
 import kotlin.coroutines.experimental.suspendCoroutine
@@ -150,7 +152,7 @@ class TouchImageView : ImageView {
             if (onDrawCalled) {
                 // setScaleType() has been called programmatically, update TouchImageView
                 // with the new scaleType.
-                start { setZoom(this@TouchImageView) }
+                launch(UI) { setZoom(this@TouchImageView) }
             }
         }
     }

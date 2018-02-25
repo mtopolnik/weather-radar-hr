@@ -6,11 +6,9 @@ import android.preference.PreferenceManager
 import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 
-private const val KEY_INSTANCE_STATE_SAVED_AT = "instance-state-saved-at"
 private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
 
 class MainActivity : Activity()  {
-    var isFullScreenMode: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,29 +27,22 @@ class MainActivity : Activity()  {
     override fun onSaveInstanceState(outState: Bundle) {
         info { "MainActivity.onSaveInstanceState" }
         super.onSaveInstanceState(outState)
-        outState.putLong(KEY_INSTANCE_STATE_SAVED_AT, System.currentTimeMillis())
+        outState.recordSavingTime()
         outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar.isShowing)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         info { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
-        val stateSavedTimestamp = savedInstanceState.getLong(KEY_INSTANCE_STATE_SAVED_AT)
-        if (stateSavedTimestamp == 0L) {
-            return
-        }
-        val timeDiff = System.currentTimeMillis() - stateSavedTimestamp
-        val didRotate = timeDiff < SECOND_IN_MILLIS
-        info { "Time diff $timeDiff, did rotate? $didRotate" }
-        if (didRotate && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
+        if (savedInstanceState.wasFastResume && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
             actionBar.hide()
         }
     }
 
     override fun onBackPressed() {
         fragmentManager.findFragmentById(R.id.radar_img_fragment)
-                ?.takeIf { isFullScreenMode }
                 ?.let { it as RadarImageFragment? }
+                ?.takeIf { it.isInFullScreen }
                 ?.also {
                     it.exitFullScreen()
                     return

@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
+import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.withContext
 import java.io.File
 import java.io.IOException
@@ -50,7 +51,7 @@ suspend fun fetchUrl(
             }
         }
     } catch (e: Exception) {
-        error("Error fetching $url", e)
+        error(e) {"Error fetching $url"}
         throw ImageFetchException(if (fetchPolicy == ONLY_IF_NEW) null else loadCachedImage(context, url))
     } finally {
         conn.disconnect()
@@ -84,7 +85,7 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
         } catch (t: Throwable) {
-            error("Failed to handle a successful image response", t)
+            error(t) {"Failed to handle a successful image response"}
             throw t
         }
     }
@@ -97,7 +98,7 @@ private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: 
             cachedOut.write(responseBody)
         }
     } catch (e: IOException) {
-        error("Failed to write cached image to $cacheFile", e)
+        error(e) {"Failed to write cached image to $cacheFile"}
     }
 }
 
