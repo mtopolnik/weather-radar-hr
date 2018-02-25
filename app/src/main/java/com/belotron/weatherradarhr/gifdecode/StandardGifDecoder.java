@@ -218,8 +218,11 @@ public class StandardGifDecoder implements GifDecoder {
     }
 
     @Override
-    public void resetFrameIndex() {
-        framePointer = -1;
+    public void gotoFrame(int index) {
+        if (index < -1 || index >= header.frameCount) {
+            throw new IllegalArgumentException("Frame index out of range: index");
+        }
+        framePointer = index;
     }
 
     @Override

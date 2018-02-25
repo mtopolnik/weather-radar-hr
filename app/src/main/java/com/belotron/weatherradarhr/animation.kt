@@ -34,7 +34,10 @@ class AnimationLooper(
             return
         }
         stop()
+        var oldLoopingJob = loopingJob
         loopingJob = launch(UI) {
+            oldLoopingJob?.join()
+            oldLoopingJob = null
             while (true) {
                 animatorJobs.forEach { it?.join() }
                 animators.forEachIndexed { i, it ->
@@ -88,7 +91,7 @@ class GifAnimator(
                     showFrame(nextFrame)
                 }
             } catch (e: StopAnimationException) {
-                debug { "Animator stop: ${e.message} inside the loop" }
+                info { "Animator stop: ${e.message} inside the loop" }
             }
         }
     }
@@ -112,11 +115,13 @@ class GifAnimator(
     private suspend fun ensureTimestampInitialized() {
         if (timestamp != 0L) return
         with(gifDecoder) {
+            val currIndex = currentFrameIndex
             gotoLastFrame()
             decodeCurrentFrame().also {
                 timestamp = imgDesc.ocrTimestamp(it)
                 it.dispose()
             }
+            gotoFrame(currIndex)
         }
     }
 

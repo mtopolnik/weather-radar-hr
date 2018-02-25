@@ -86,7 +86,7 @@ object KradarOcr {
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
             (0..13).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
-                    ?: throw AssertionError("Couldn't kradar time digit at $x")
+                    ?: throw AssertionError("Couldn't read kradar time digit at $x")
 
     private fun readDateNumber(bitmap: Bitmap, vararg indices : Int): Int =
             indices.fold(0, { acc, i -> 10 * acc + readDateDigit(bitmap, i) })

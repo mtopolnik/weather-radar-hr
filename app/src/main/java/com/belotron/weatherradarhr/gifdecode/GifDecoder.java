@@ -151,11 +151,7 @@ public interface GifDecoder {
 
     void gotoLastFrame();
 
-    /**
-     * Resets the frame pointer to before the 0th frame, as if we'd never used this decoder to
-     * decode any frames.
-     */
-    void resetFrameIndex();
+    void gotoFrame(int index);
 
     /**
      * Gets the "Netscape" loop count, if any.
