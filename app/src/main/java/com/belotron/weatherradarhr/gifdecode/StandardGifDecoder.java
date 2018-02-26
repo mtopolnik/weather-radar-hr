@@ -692,7 +692,7 @@ public class StandardGifDecoder implements GifDecoder {
         final int endOfInformation = clear + 1;
         for (pi = 0; pi < npix;) {
             if (top == 0) {
-                if (bits < codeSize) {
+                while (bits < codeSize) {
                     // Read a new data block.
                     if (count == 0) {
                         count = readBlock();
@@ -706,11 +706,9 @@ public class StandardGifDecoder implements GifDecoder {
                     bits += 8;
                     ++bi;
                     --count;
-                    continue;
                 }
 
                 // Get the next code.
-
                 int code = datum & codeMask;
                 datum >>= codeSize;
                 bits -= codeSize;
