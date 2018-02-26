@@ -17,7 +17,7 @@ object LradarOcr {
 
     fun initDigitBitmaps(context: Context) {
         if (digitBitmaps.isEmpty()) {
-            digitBitmaps = loadDigits(context, "lradar")
+            digitBitmaps = context.loadDigits("lradar")
         }
     }
 
@@ -48,10 +48,10 @@ object KradarOcr {
 
     fun initDigitBitmaps(context: Context) {
         if (dateDigitBitmaps.isEmpty()) {
-            dateDigitBitmaps = loadDigits(context, "kradar/date")
+            dateDigitBitmaps = context.loadDigits("kradar/date")
         }
         if (timeDigitBitmaps.isEmpty()) {
-            timeDigitBitmaps = loadDigits(context, "kradar/time")
+            timeDigitBitmaps = context.loadDigits("kradar/time")
         }
     }
 
@@ -117,8 +117,10 @@ private fun stripeData(img: Bitmap, imgX: Int, imgY: Int, rectHeight: Int, rectX
 private fun stripeEqual(img: Bitmap, imgX: Int, imgY: Int, rect: Bitmap, rectX: Int) =
     (0 until rect.height).all { rectY -> img.getPixel(imgX + rectX, imgY + rectY) == rect.getPixel(rectX, rectY) }
 
-private fun loadDigits(context: Context, path : String) =
-        (0..9).map { context.assets.open("$path/$it.gif").use { it.readBytes() }.toBitmap() }
+private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
+
+private fun Context.loadDigit(path: String, digit: Int) =
+        assets.open("$path/$digit.gif").use { it.readBytes() }.toBitmap()
 
 class DateTime(
         copyFrom: DateTime? = null,
