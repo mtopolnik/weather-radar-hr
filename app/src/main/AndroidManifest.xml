@@ -5,23 +5,31 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:name="com.belotron.weatherradarhr.MyApplication"
+        android:name=".MyApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
         android:allowBackup="true"
         android:supportsRtl="true"
-        <activity android:name=".MainActivity"
+    >
+        <!--<activity android:name=".MainActivity"-->
+                  <!--android:label="@string/main_activity_title">-->
+            <!--<intent-filter>-->
+                <!--<category android:name="android.intent.category.LAUNCHER"/>-->
+                <!--<action android:name="android.intent.action.MAIN"/>-->
+            <!--</intent-filter>-->
+        <!--</activity>-->
+        <activity android:name=".TestActivity"
                   android:label="@string/main_activity_title">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <action android:name="android.intent.action.MAIN"/>
             </intent-filter>
         </activity>
-        <activity android:name=".SettingsActivity"
-                  android:label="@string/settings"
-                  android:parentActivityName=".MainActivity">
-        </activity>
+        <!--<activity android:name=".SettingsActivity"-->
+                  <!--android:label="@string/settings"-->
+                  <!--android:parentActivityName=".MainActivity">-->
+        <!--</activity>-->
 
         <receiver android:name=".LradarWidgetProvider"
                   android:label="@string/widget_slo">
