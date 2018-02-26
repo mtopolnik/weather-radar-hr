@@ -23,9 +23,6 @@ package com.belotron.weatherradarhr.gifdecode;
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
-
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.support.annotation.ColorInt;
@@ -40,6 +37,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
+
 /**
  * Reads frame data from a GIF image source and decodes it into individual frames for animation
  * purposes.  Image data can be read from either and InputStream source or a byte[].
@@ -53,9 +53,11 @@ import java.util.Arrays;
  * next frame.  This method must also be called before you request the first frame or an error
  * will occur.
  * <p>
- * <p>Implementation adapted from sample code published in Lyons. (2004). <em>Java for
- * Programmers</em>, republished under the MIT Open Source License
- *
+ * Implementation adapted from sample code published in Lyons. (2004). <em>Java for
+ * Programmers</em>, republished under the MIT Open Source License.
+ * <p>
+ * @see <a href="http://show.docjava.com/book/cgij/exportToHTML/ip/gif/stills/GifDecoder.java.html">
+ *     Original source</a>
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
 public class StandardGifDecoder implements GifDecoder {
@@ -684,33 +686,39 @@ public class StandardGifDecoder implements GifDecoder {
         }
         final byte[] block = this.block;
         // Decode GIF pixel stream.
-        int pi = 0, bi = 0, top = 0, first = 0, datum = 0, count = 0, bits = 0, i = 0;
+        int pi = 0, bi = 0, top = 0, first = 0, datum = 0, count = 0, bits = 0;
         int oldCode = NULL_CODE;
         int available = clear + 2;
         final int endOfInformation = clear + 1;
-        while (i < npix) {
-            // Read a new data block.
-            if (count == 0) {
-                count = readBlock();
-                if (count <= 0) {
-                    status = STATUS_PARTIAL_DECODE;
-                    break;
+        for (pi = 0; pi < npix;) {
+            if (top == 0) {
+                if (bits < codeSize) {
+                    // Read a new data block.
+                    if (count == 0) {
+                        count = readBlock();
+                        if (count <= 0) {
+                            status = STATUS_PARTIAL_DECODE;
+                            break;
+                        }
+                        bi = 0;
+                    }
+                    datum += toUnsignedInt(block[bi]) << bits;
+                    bits += 8;
+                    ++bi;
+                    --count;
+                    continue;
                 }
-                bi = 0;
-            }
 
-            datum += toUnsignedInt(block[bi]) << bits;
-            bits += 8;
-            ++bi;
-            --count;
-
-            while (bits >= codeSize) {
                 // Get the next code.
+
                 int code = datum & codeMask;
                 datum >>= codeSize;
                 bits -= codeSize;
 
                 // Interpret the code.
+                if (code > available || code == endOfInformation) {
+                    break;
+                }
                 if (code == clear) {
                     // Reset decoder.
                     codeSize = dataSize + 1;
@@ -718,53 +726,41 @@ public class StandardGifDecoder implements GifDecoder {
                     available = clear + 2;
                     oldCode = NULL_CODE;
                     continue;
-                } else if (code == endOfInformation) {
-                    break;
-                } else if (oldCode == NULL_CODE) {
-                    pixelStack[top] = suffix[code];
-                    ++top;
+                }
+                if (oldCode == NULL_CODE) {
+                    pixelStack[top++] = suffix[code];
                     oldCode = code;
                     first = code;
                     continue;
                 }
-
-                int inCode = code;
-                if (code >= available) {
-                    pixelStack[top] = (byte) first;
-                    ++top;
+                final int inCode = code;
+                if (code == available) {
+                    pixelStack[top++] = (byte) first;
                     code = oldCode;
                 }
-
-                while (code >= clear) {
-                    pixelStack[top] = suffix[code];
-                    ++top;
+                while (code > clear) {
+                    pixelStack[top++] = suffix[code];
                     code = prefix[code];
                 }
                 first = toUnsignedInt(suffix[code]);
 
-                mainPixels[pi] = (byte) first;
-                ++pi;
-                ++i;
+                // Add a new string to the string table
 
-                while (top > 0) {
-                    // Pop a pixel off the pixel stack.
-                    mainPixels[pi] = pixelStack[--top];
-                    ++pi;
-                    ++i;
+                if (available >= MAX_STACK_SIZE) {
+                    break;
                 }
-
-                // Add a new string to the string table.
-                if (available < MAX_STACK_SIZE) {
-                    prefix[available] = (short) oldCode;
-                    suffix[available] = (byte) first;
-                    ++available;
-                    if (((available & codeMask) == 0) && (available < MAX_STACK_SIZE)) {
-                        ++codeSize;
-                        codeMask += available;
-                    }
+                pixelStack[top++] = (byte) first;
+                prefix[available] = (short) oldCode;
+                suffix[available] = (byte) first;
+                ++available;
+                if (((available & codeMask) == 0) && (available < MAX_STACK_SIZE)) {
+                    ++codeSize;
+                    codeMask += available;
                 }
                 oldCode = inCode;
             }
+            // Pop a pixel off the pixel stack.
+            mainPixels[pi++] = pixelStack[--top];
         }
 
         // Clear missing pixels.
