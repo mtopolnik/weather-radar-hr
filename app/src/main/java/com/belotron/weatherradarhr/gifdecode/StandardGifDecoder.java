@@ -547,7 +547,6 @@ public class StandardGifDecoder implements GifDecoder {
                 iline += inc;
             }
             line += downsampledIY;
-            boolean isNotDownsampling = sampleSize == 1;
             if (line < downsampledHeight) {
                 int k = line * downsampledWidth;
                 // Start of line in dest.
@@ -560,11 +559,11 @@ public class StandardGifDecoder implements GifDecoder {
                 }
                 // Start of line in source.
                 int sx = i * sampleSize * currentFrame.iw;
+                boolean isNotDownsampling = sampleSize == 1;
                 if (isNotDownsampling) {
-                    int averageColor;
                     while (dx < dlim) {
                         int currentColorIndex = ((int) mainPixels[sx]) & MASK_INT_LOWEST_BYTE;
-                        averageColor = act[currentColorIndex];
+                        int averageColor = act[currentColorIndex];
                         if (averageColor != COLOR_TRANSPARENT_BLACK) {
                             dest[dx] = averageColor;
                         } else if (isFirstFrame && isFirstFrameTransparent == null) {
@@ -574,13 +573,12 @@ public class StandardGifDecoder implements GifDecoder {
                         dx++;
                     }
                 } else {
-                    int averageColor;
                     int maxPositionInSource = sx + ((dlim - dx) * sampleSize);
                     while (dx < dlim) {
                         // Map color and insert in destination.
                         // TODO: This is substantially slower (up to 50ms per frame) than just grabbing the
                         // current color index above, even with a sample size of 1.
-                        averageColor = averageColorsNear(sx, maxPositionInSource, currentFrame.iw);
+                        int averageColor = averageColorsNear(sx, maxPositionInSource, currentFrame.iw);
                         if (averageColor != COLOR_TRANSPARENT_BLACK) {
                             dest[dx] = averageColor;
                         } else if (isFirstFrame && isFirstFrameTransparent == null) {
@@ -655,45 +653,41 @@ public class StandardGifDecoder implements GifDecoder {
             rawData.position(frame.bufferFrameStart);
         }
 
-        int npix = (frame == null) ? header.width * header.height : frame.iw * frame.ih;
-        int available, clear, codeMask, codeSize, endOfInformation, inCode, oldCode, bits, code, count,
-                i, datum, dataSize, first, top, bi, pi;
+        final int npix = (frame == null) ? header.width * header.height : frame.iw * frame.ih;
 
         if (mainPixels == null || mainPixels.length < npix) {
             // Allocate new pixel array.
             mainPixels = bitmapProvider.obtainByteArray(npix);
         }
-        byte[] mainPixels = this.mainPixels;
+        final byte[] mainPixels = this.mainPixels;
         if (prefix == null) {
             prefix = new short[MAX_STACK_SIZE];
         }
-        short[] prefix = this.prefix;
+        final short[] prefix = this.prefix;
         if (suffix == null) {
             suffix = new byte[MAX_STACK_SIZE];
         }
-        byte[] suffix = this.suffix;
+        final byte[] suffix = this.suffix;
         if (pixelStack == null) {
             pixelStack = new byte[MAX_STACK_SIZE + 1];
         }
-        byte[] pixelStack = this.pixelStack;
+        final byte[] pixelStack = this.pixelStack;
 
         // Initialize GIF data stream decoder.
-        dataSize = readByte();
-        clear = 1 << dataSize;
-        endOfInformation = clear + 1;
-        available = clear + 2;
-        oldCode = NULL_CODE;
-        codeSize = dataSize + 1;
-        codeMask = (1 << codeSize) - 1;
-
-        for (code = 0; code < clear; code++) {
-            // XXX ArrayIndexOutOfBoundsException.
+        final int dataSize = readByte();
+        final int clear = 1 << dataSize;
+        int codeSize = dataSize + 1;
+        int codeMask = (1 << codeSize) - 1;
+        for (int code = 0; code < clear; code++) {
             prefix[code] = 0;
             suffix[code] = (byte) code;
         }
-        byte[] block = this.block;
+        final byte[] block = this.block;
         // Decode GIF pixel stream.
-        i = datum = bits = count = first = top = pi = bi = 0;
+        int pi = 0, bi = 0, top = 0, first = 0, datum = 0, count = 0, bits = 0, i = 0;
+        int oldCode = NULL_CODE;
+        int available = clear + 2;
+        final int endOfInformation = clear + 1;
         while (i < npix) {
             // Read a new data block.
             if (count == 0) {
@@ -705,14 +699,14 @@ public class StandardGifDecoder implements GifDecoder {
                 bi = 0;
             }
 
-            datum += (((int) block[bi]) & MASK_INT_LOWEST_BYTE) << bits;
+            datum += toUnsignedInt(block[bi]) << bits;
             bits += 8;
             ++bi;
             --count;
 
             while (bits >= codeSize) {
                 // Get the next code.
-                code = datum & codeMask;
+                int code = datum & codeMask;
                 datum >>= codeSize;
                 bits -= codeSize;
 
@@ -734,7 +728,7 @@ public class StandardGifDecoder implements GifDecoder {
                     continue;
                 }
 
-                inCode = code;
+                int inCode = code;
                 if (code >= available) {
                     pixelStack[top] = (byte) first;
                     ++top;
@@ -746,7 +740,7 @@ public class StandardGifDecoder implements GifDecoder {
                     ++top;
                     code = prefix[code];
                 }
-                first = ((int) suffix[code]) & MASK_INT_LOWEST_BYTE;
+                first = toUnsignedInt(suffix[code]);
 
                 mainPixels[pi] = (byte) first;
                 ++pi;
@@ -781,7 +775,7 @@ public class StandardGifDecoder implements GifDecoder {
      * Reads a single byte from the input stream.
      */
     private int readByte() {
-        return rawData.get() & MASK_INT_LOWEST_BYTE;
+        return toUnsignedInt(rawData.get());
     }
 
     /**
@@ -804,5 +798,9 @@ public class StandardGifDecoder implements GifDecoder {
         Bitmap result = bitmapProvider.obtain(downsampledWidth, downsampledHeight, config);
         result.setHasAlpha(true);
         return result;
+    }
+
+    private static int toUnsignedInt(byte b) {
+        return b & MASK_INT_LOWEST_BYTE;
     }
 }

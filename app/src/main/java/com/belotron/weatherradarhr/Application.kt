@@ -15,6 +15,8 @@ import android.text.format.DateUtils
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart
@@ -95,5 +97,7 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap(): Bitmap =
-        BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
+fun ByteArray.toBitmap(): Bitmap {
+    return StandardGifDecoder(BitmapFreelists()).also { it.read(this); it.advance() }.currentFrame
+//    return BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
+}
