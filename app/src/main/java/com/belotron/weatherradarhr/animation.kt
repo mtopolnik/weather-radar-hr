@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
@@ -100,12 +99,10 @@ class GifAnimator(
         currFrame = newFrame
     }
 
-    @SuppressLint("SetTextI18n")
     private suspend fun updateAgeText() {
-        if (imgBundle.status != SHOWING) return
-        imgBundle.textView?.apply {
-            text = (if (isOffline) "Offline - " else "") + context.ageText(suspendGetTimestamp())
-        }
+        imgBundle.takeIf { it.status == SHOWING }
+                ?.textView
+                ?.setAgeText(suspendGetTimestamp(), isOffline)
     }
 
     private suspend fun suspendGetTimestamp(): Long {

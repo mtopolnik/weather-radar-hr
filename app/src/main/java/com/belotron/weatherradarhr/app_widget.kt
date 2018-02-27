@@ -45,17 +45,21 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
                 LradarWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
-                { val bitmap = it.toBitmap()
+                { bytes, isOffline ->
+                    val bitmap = bytes.toBitmap()
                     TimestampedBitmap(
                             ocrLradarTimestamp(bitmap),
+                            isOffline,
                             createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
         WidgetDescriptor("KRadar", "http://vrijeme.hr/kradar.gif", 15,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
-                { val bitmap = it.toBitmap()
+                { bytes, isOffline ->
+                    val bitmap = bytes.toBitmap()
                     TimestampedBitmap(
                             ocrKradarTimestamp(bitmap),
+                            isOffline,
                             createBitmap(bitmap, 0, 0, KRADAR_CROP_X_RIGHT, bitmap.height)) })
 )
 
@@ -65,7 +69,7 @@ private data class WidgetDescriptor(
         val updatePeriodMinutes: Long,
         val providerClass: Class<out AppWidgetProvider>,
         val previewResourceId: Int,
-        val timestampedBitmapFrom: (ByteArray) -> TimestampedBitmap
+        val timestampedBitmapFrom: (ByteArray, Boolean) -> TimestampedBitmap
 ) {
     fun imgFilename() = url.substringAfterLast('/')
     fun timestampFilename() = imgFilename() + ".timestamp"
@@ -79,7 +83,7 @@ private data class WidgetDescriptor(
     }
 }
 
-private data class TimestampedBitmap(val timestamp: Long, val bitmap: Bitmap)
+private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
 
 fun Context.startFetchWidgetImages() {
     val appContext = applicationContext
@@ -144,11 +148,12 @@ class UpdateAgeService : JobService() {
             val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
             val wDesc = widgetDescriptors[wDescIndex]
             info { "UpdateAgeService: ${wDesc.name}" }
-            val wCtx = WidgetContext(applicationContext, wDesc)
-            if (wCtx.isWidgetInUse()) {
-                wCtx.updateRemoteViews(wCtx.readImgAndTimestamp())
-            } else {
-                wCtx.cancelUpdateAge()
+            with (WidgetContext(applicationContext, wDesc)) {
+                if (isWidgetInUse()) {
+                    updateRemoteViews(readImgAndTimestamp())
+                } else {
+                    cancelUpdateAge()
+                }
             }
             return false
         } catch (e: Throwable) {
@@ -190,17 +195,18 @@ private class WidgetContext (
             if (imgBytes == null) {
                 return null
             }
-            val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes)
+            val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes, false)
             writeImgAndTimestamp(tsBitmap)
             updateRemoteViews(tsBitmap)
             return lastModified
         } catch (e: ImageFetchException) {
             if (e.cached != null) {
-                updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached))
+                updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
             } else if (!onlyIfNew) {
-                warn{"Failed to fetch ${wDesc.imgFilename()}, using preview"}
+                warn { "Failed to fetch ${wDesc.imgFilename()}, using preview" }
                 updateRemoteViews(TimestampedBitmap(
                         0L,
+                        true,
                         (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap))
             }
             return null
@@ -216,7 +222,7 @@ private class WidgetContext (
         if (tsBitmap != null) {
             with(remoteViews) {
                 setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
-                setTextViewText(R.id.text_view_widget, context.ageText(tsBitmap.timestamp))
+                setAgeText(context, tsBitmap.timestamp, tsBitmap.isOffline)
             }
         } else {
             remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
@@ -246,7 +252,7 @@ private class WidgetContext (
     fun readImgAndTimestamp() : TimestampedBitmap? {
         val file = context.file(wDesc.timestampFilename())
         return try {
-            file.dataIn().use { TimestampedBitmap(it.readLong(), BitmapFactory.decodeStream(it)) }
+            file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
         } catch (e : Exception) {
             null
         }
