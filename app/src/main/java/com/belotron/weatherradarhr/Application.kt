@@ -6,10 +6,7 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.preference.PreferenceManager
 import android.text.format.DateUtils
 import android.view.View
@@ -18,12 +15,7 @@ import android.view.View.VISIBLE
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import com.google.android.gms.ads.MobileAds
-import kotlinx.coroutines.experimental.CoroutineScope
-import kotlinx.coroutines.experimental.CoroutineStart
-import kotlinx.coroutines.experimental.Unconfined
-import kotlinx.coroutines.experimental.android.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
-import kotlinx.coroutines.experimental.launch
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -98,6 +90,6 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
 fun ByteArray.toBitmap(): Bitmap {
-    return StandardGifDecoder(BitmapFreelists()).also { it.read(this); it.advance() }.currentFrame
+    return StandardGifDecoder(BitmapFreelists()).also { it.read(this) }.decodeFrame(0)
 //    return BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 }

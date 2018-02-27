@@ -44,52 +44,6 @@ public interface GifDecoder {
     @interface GifDecodeStatus {
     }
 
-    /**
-     * An interface that can be used to provide reused {@link android.graphics.Bitmap}s to avoid GCs
-     * from constantly allocating {@link android.graphics.Bitmap}s for every frame.
-     */
-    interface BitmapProvider {
-        /**
-         * Returns an {@link Bitmap} with exactly the given dimensions and config.
-         *
-         * @param width  The width in pixels of the desired {@link android.graphics.Bitmap}.
-         * @param height The height in pixels of the desired {@link android.graphics.Bitmap}.
-         * @param config The {@link android.graphics.Bitmap.Config} of the desired {@link
-         *               android.graphics.Bitmap}.
-         */
-        @NonNull
-        Bitmap obtain(int width, int height, @NonNull Bitmap.Config config);
-
-        /**
-         * Releases the given Bitmap back to the pool.
-         */
-        void release(@NonNull Bitmap bitmap);
-
-        /**
-         * Returns a byte array used for decoding and generating the frame bitmap.
-         *
-         * @param size the size of the byte array to obtain
-         */
-        @NonNull
-        byte[] obtainByteArray(int size);
-
-        /**
-         * Releases the given byte array back to the pool.
-         */
-        void release(@NonNull byte[] bytes);
-
-        /**
-         * Returns an int array used for decoding/generating the frame bitmaps.
-         */
-        @NonNull
-        int[] obtainIntArray(int size);
-
-        /**
-         * Release the given array back to the pool.
-         */
-        void release(@NonNull int[] array);
-    }
-
     int getWidth();
 
     int getHeight();
@@ -108,21 +62,6 @@ public interface GifDecoder {
     int getStatus();
 
     /**
-     * Advances the animation frame pointer. If the pointer would advance to
-     * beyond the last frame, increments the animation iteration counter.
-     * If the iteration counter has reached the loop count configured on the
-     * GIF, returns {@code false}; otherwise resets the counter to the first
-     * frame. Returns {@code true} in all cases except the mentioned one.
-     */
-    boolean advance();
-
-    /**
-     * Rewinds to the initial state: no completed iterations and pointer
-     * before the first frame.
-     */
-    void rewind();
-
-    /**
      * Gets display duration for specified frame.
      *
      * @param n int index of frame.
@@ -131,27 +70,11 @@ public interface GifDecoder {
     int getDelay(int n);
 
     /**
-     * Gets display duration for the upcoming frame in ms.
-     */
-    int getCurrentDelay();
-
-    /**
      * Gets the number of frames read from file.
      *
      * @return frame count.
      */
     int getFrameCount();
-
-    /**
-     * Gets the current index of the animation frame, or -1 if animation hasn't not yet started.
-     *
-     * @return frame index.
-     */
-    int getCurrentFrameIndex();
-
-    void gotoLastFrame();
-
-    void gotoFrame(int index);
 
     /**
      * Gets the "Netscape" loop count, if any.
@@ -204,7 +127,7 @@ public interface GifDecoder {
      * @return Bitmap representation of frame.
      */
     @NonNull
-    Bitmap getCurrentFrame();
+    Bitmap decodeFrame(int index);
 
     /**
      * Reads GIF image from stream.

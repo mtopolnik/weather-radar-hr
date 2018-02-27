@@ -38,24 +38,21 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_PREVIOUS;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 /**
- * Reads frame data from a GIF image source and decodes it into individual frames for animation
- * purposes.  Image data can be read from either and InputStream source or a byte[].
+ * Reads frame data from a GIF image source and decodes it into individual
+ * frames for animation purposes.  Image data can be read from either and
+ * InputStream source or a byte[].
  * <p>
- * <p>This class is optimized for running animations with the frames, there are no methods to get
- * individual frame images, only to decode the next frame in the animation sequence.  Instead, it
- * lowers its memory footprint by only housing the minimum data necessary to decode the next frame
- * in the animation sequence.
+ * This class is optimized for running animations with the frames. It lowers
+ * its memory footprint by only housing the minimum data necessary to decode
+ * the next frame in the animation sequence.
  * <p>
- * <p>The animation must be manually moved forward using {@link #advance()} before requesting the
- * next frame.  This method must also be called before you request the first frame or an error
- * will occur.
- * <p>
- * Implementation adapted from sample code published in Lyons. (2004). <em>Java for
+ * Implementation adapted from sample code published in Lyon. (2004). <em>Java for
  * Programmers</em>, republished under the MIT Open Source License.
- * <p>
+ *
  * @see <a href="http://show.docjava.com/book/cgij/exportToHTML/ip/gif/stills/GifDecoder.java.html">
  *     Original source</a>
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
@@ -90,7 +87,7 @@ public class StandardGifDecoder implements GifDecoder {
     @ColorInt
     private final int[] pct = new int[256];
 
-    private final GifDecoder.BitmapProvider bitmapProvider;
+    private final Allocator allocator;
 
     /**
      * Raw GIF data from input source.
@@ -112,8 +109,6 @@ public class StandardGifDecoder implements GifDecoder {
     @ColorInt
     private int[] mainScratch;
 
-    private int framePointer;
-    private int iterationsCompleted;
     private GifHeader header;
     @GifDecodeStatus
     private int status;
@@ -125,24 +120,17 @@ public class StandardGifDecoder implements GifDecoder {
     @NonNull
     private Bitmap.Config bitmapConfig = Config.ARGB_8888;
 
-    // Public API.
-    public StandardGifDecoder(
-            @NonNull GifDecoder.BitmapProvider provider, GifHeader gifHeader, ByteBuffer rawData
-    ) {
+    public StandardGifDecoder(@NonNull Allocator provider, GifHeader gifHeader, ByteBuffer rawData) {
         this(provider, gifHeader, rawData, 1 /*sampleSize*/);
     }
 
-    public StandardGifDecoder(
-            @NonNull GifDecoder.BitmapProvider provider, GifHeader gifHeader, ByteBuffer rawData, int sampleSize
-    ) {
+    public StandardGifDecoder(@NonNull Allocator provider, GifHeader gifHeader, ByteBuffer rawData, int sampleSize) {
         this(provider);
         setData(gifHeader, rawData, sampleSize);
     }
 
-    public StandardGifDecoder(
-            @NonNull GifDecoder.BitmapProvider provider
-    ) {
-        this.bitmapProvider = provider;
+    public StandardGifDecoder(@NonNull Allocator allocator) {
+        this.allocator = allocator;
         header = new GifHeader();
     }
 
@@ -168,63 +156,14 @@ public class StandardGifDecoder implements GifDecoder {
     }
 
     @Override
-    public boolean advance() {
-        if (framePointer == header.frameCount) {
-            return false;
-        }
-        framePointer++;
-        if (framePointer == header.frameCount) {
-            int totalIterCount = getTotalIterationCount();
-            if (totalIterCount != TOTAL_ITERATION_COUNT_FOREVER) {
-                iterationsCompleted++;
-                if (iterationsCompleted == totalIterCount) {
-                    return false;
-                }
-            }
-            framePointer = 0;
-        }
-        return true;
-    }
-
-    @Override
-    public void rewind() {
-        iterationsCompleted = 0;
-        framePointer = -1;
-    }
-
-    @Override
     public int getDelay(int n) {
         return n >= 0 && n < header.frameCount
                 ? header.frames.get(n).delay : -1;
     }
 
     @Override
-    public int getCurrentDelay() {
-        return header.frameCount > 0 && framePointer >= 0
-                ? getDelay(framePointer) : 0;
-    }
-
-    @Override
     public int getFrameCount() {
         return header.frameCount;
-    }
-
-    @Override
-    public int getCurrentFrameIndex() {
-        return framePointer;
-    }
-
-    @Override
-    public void gotoLastFrame() {
-        framePointer = header.frameCount - 1;
-    }
-
-    @Override
-    public void gotoFrame(int index) {
-        if (index < -1 || index >= header.frameCount) {
-            throw new IllegalArgumentException("Frame index out of range: index");
-        }
-        framePointer = index;
     }
 
     @Override
@@ -245,14 +184,13 @@ public class StandardGifDecoder implements GifDecoder {
         return rawData.limit() + mainPixels.length + (mainScratch.length * BYTES_PER_INTEGER);
     }
 
-    @NonNull
-    @Override
-    public synchronized Bitmap getCurrentFrame() {
-        if (header.frameCount <= 0 || framePointer < 0) {
+    @NonNull @Override
+    public synchronized Bitmap decodeFrame(int index) {
+        if (header.frameCount <= 0 || index < 0) {
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(TAG, "Unable to decode frame"
                         + ", frameCount=" + header.frameCount
-                        + ", framePointer=" + framePointer
+                        + ", index=" + index
                 );
             }
             status = STATUS_FORMAT_ERROR;
@@ -263,11 +201,11 @@ public class StandardGifDecoder implements GifDecoder {
         status = STATUS_OK;
 
         if (block == null) {
-            block = bitmapProvider.obtainByteArray(255);
+            block = allocator.obtainByteArray(255);
         }
 
-        GifFrame currentFrame = header.frames.get(framePointer);
-        int previousIndex = framePointer - 1;
+        GifFrame currentFrame = header.frames.get(index);
+        int previousIndex = index - 1;
         GifFrame previousFrame = previousIndex >= 0 ? header.frames.get(previousIndex) : null;
 
         // Set the appropriate color table.
@@ -275,7 +213,7 @@ public class StandardGifDecoder implements GifDecoder {
         if (act == null) {
             // No color table defined.
             status = STATUS_FORMAT_ERROR;
-            throw new RuntimeException("No valid color table found for frame #" + framePointer);
+            throw new RuntimeException("No valid color table found for frame #" + index);
         }
 
         // Reset the transparent pixel in the color table
@@ -312,7 +250,6 @@ public class StandardGifDecoder implements GifDecoder {
         } else {
             status = STATUS_OPEN_ERROR;
         }
-
         try {
             if (is != null) {
                 is.close();
@@ -328,15 +265,15 @@ public class StandardGifDecoder implements GifDecoder {
     public void clear() {
         header = null;
         if (mainPixels != null) {
-            bitmapProvider.release(mainPixels);
+            allocator.release(mainPixels);
         }
         if (mainScratch != null) {
-            bitmapProvider.release(mainScratch);
+            allocator.release(mainScratch);
         }
         rawData = null;
         isFirstFrameTransparent = null;
         if (block != null) {
-            bitmapProvider.release(block);
+            allocator.release(block);
         }
     }
 
@@ -359,7 +296,6 @@ public class StandardGifDecoder implements GifDecoder {
         sampleSize = Integer.highestOneBit(sampleSize);
         this.status = STATUS_OK;
         this.header = header;
-        framePointer = -1;
         // Initialize the raw data buffer.
         rawData = buffer.asReadOnlyBuffer();
         rawData.position(0);
@@ -369,9 +305,8 @@ public class StandardGifDecoder implements GifDecoder {
         downsampledWidth = header.width / sampleSize;
         downsampledHeight = header.height / sampleSize;
         // Now that we know the size, init scratch arrays.
-        // TODO Find a way to avoid this entirely or at least downsample it (either should be possible).
-        mainPixels = bitmapProvider.obtainByteArray(header.width * header.height);
-        mainScratch = bitmapProvider.obtainIntArray(downsampledWidth * downsampledHeight);
+        mainPixels = allocator.obtainByteArray(header.width * header.height);
+        mainScratch = allocator.obtainIntArray(downsampledWidth * downsampledHeight);
     }
 
     @NonNull
@@ -411,6 +346,12 @@ public class StandardGifDecoder implements GifDecoder {
         // Final location of blended pixels.
         final int[] dest = mainScratch;
 
+        if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
+            throw new RuntimeException(
+                    "The animated GIF contains a frame with the Restore To Previous frame disposal method" +
+                            " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
+        }
+
         // fill in starting image contents based on last image's dispose code
         if (previousFrame != null && previousFrame.dispose > DISPOSAL_UNSPECIFIED) {
             // We don't need to do anything for DISPOSAL_NONE, if it has the correct pixels so will our
@@ -423,10 +364,7 @@ public class StandardGifDecoder implements GifDecoder {
                     if (currentFrame.lct != null && header.bgIndex == currentFrame.transIndex) {
                         c = COLOR_TRANSPARENT_BLACK;
                     }
-                } else if (framePointer == 0) {
-                    // TODO: We should check and see if all individual pixels are replaced. If they are, the
-                    // first frame isn't actually transparent. For now, it's simpler and safer to assume
-                    // drawing a transparent background means the GIF contains transparency.
+                } else if (currentFrame.index == 0) {
                     isFirstFrameTransparent = true;
                 }
                 // The area used by the graphic must be restored to the background color.
@@ -460,14 +398,14 @@ public class StandardGifDecoder implements GifDecoder {
         return result;
     }
 
-    private void copyIntoScratchFast(GifFrame currentFrame) {
+    private void copyIntoScratchFast(GifFrame frame) {
         int[] dest = mainScratch;
-        int downsampledIH = currentFrame.ih;
-        int downsampledIY = currentFrame.iy;
-        int downsampledIW = currentFrame.iw;
-        int downsampledIX = currentFrame.ix;
+        int downsampledIH = frame.ih;
+        int downsampledIY = frame.iy;
+        int downsampledIW = frame.iw;
+        int downsampledIX = frame.ix;
         // Copy each source line to the appropriate place in the destination.
-        boolean isFirstFrame = framePointer == 0;
+        boolean isFirstFrame = frame.index == 0;
         int width = this.downsampledWidth;
         byte[] mainPixels = this.mainPixels;
         int[] act = this.act;
@@ -484,7 +422,7 @@ public class StandardGifDecoder implements GifDecoder {
                 dlim = k + width;
             }
             // Start of line in source.
-            int sx = i * currentFrame.iw;
+            int sx = i * frame.iw;
 
             while (dx < dlim) {
                 byte byteCurrentColorIndex = mainPixels[sx];
@@ -502,21 +440,20 @@ public class StandardGifDecoder implements GifDecoder {
             }
         }
 
-        isFirstFrameTransparent =
-                isFirstFrameTransparent == null && isFirstFrame && transparentColorIndex != -1;
+        isFirstFrameTransparent = isFirstFrameTransparent == null && isFirstFrame && transparentColorIndex != -1;
     }
 
-    private void copyCopyIntoScratchRobust(GifFrame currentFrame) {
+    private void copyCopyIntoScratchRobust(GifFrame frame) {
         int[] dest = mainScratch;
-        int downsampledIH = currentFrame.ih / sampleSize;
-        int downsampledIY = currentFrame.iy / sampleSize;
-        int downsampledIW = currentFrame.iw / sampleSize;
-        int downsampledIX = currentFrame.ix / sampleSize;
+        int downsampledIH = frame.ih / sampleSize;
+        int downsampledIY = frame.iy / sampleSize;
+        int downsampledIW = frame.iw / sampleSize;
+        int downsampledIX = frame.ix / sampleSize;
         // Copy each source line to the appropriate place in the destination.
         int pass = 1;
         int inc = 8;
         int iline = 0;
-        boolean isFirstFrame = framePointer == 0;
+        boolean isFirstFrame = frame.index == 0;
         int sampleSize = this.sampleSize;
         int downsampledWidth = this.downsampledWidth;
         int downsampledHeight = this.downsampledHeight;
@@ -526,7 +463,7 @@ public class StandardGifDecoder implements GifDecoder {
         Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
         for (int i = 0; i < downsampledIH; i++) {
             int line = i;
-            if (currentFrame.interlace) {
+            if (frame.interlace) {
                 if (iline >= downsampledIH) {
                     pass++;
                     switch (pass) {
@@ -560,7 +497,7 @@ public class StandardGifDecoder implements GifDecoder {
                     dlim = k + downsampledWidth;
                 }
                 // Start of line in source.
-                int sx = i * sampleSize * currentFrame.iw;
+                int sx = i * sampleSize * frame.iw;
                 boolean isNotDownsampling = sampleSize == 1;
                 if (isNotDownsampling) {
                     while (dx < dlim) {
@@ -580,7 +517,7 @@ public class StandardGifDecoder implements GifDecoder {
                         // Map color and insert in destination.
                         // TODO: This is substantially slower (up to 50ms per frame) than just grabbing the
                         // current color index above, even with a sample size of 1.
-                        int averageColor = averageColorsNear(sx, maxPositionInSource, currentFrame.iw);
+                        int averageColor = averageColorsNear(sx, maxPositionInSource, frame.iw);
                         if (averageColor != COLOR_TRANSPARENT_BLACK) {
                             dest[dx] = averageColor;
                         } else if (isFirstFrame && isFirstFrameTransparent == null) {
@@ -594,8 +531,7 @@ public class StandardGifDecoder implements GifDecoder {
         }
 
         if (this.isFirstFrameTransparent == null) {
-            this.isFirstFrameTransparent = isFirstFrameTransparent == null
-                    ? false : isFirstFrameTransparent;
+            this.isFirstFrameTransparent = isFirstFrameTransparent != null;
         }
     }
 
@@ -659,7 +595,7 @@ public class StandardGifDecoder implements GifDecoder {
 
         if (mainPixels == null || mainPixels.length < npix) {
             // Allocate new pixel array.
-            mainPixels = bitmapProvider.obtainByteArray(npix);
+            mainPixels = allocator.obtainByteArray(npix);
         }
         final byte[] mainPixels = this.mainPixels;
         if (prefix == null) {
@@ -789,7 +725,7 @@ public class StandardGifDecoder implements GifDecoder {
     private Bitmap getNextBitmap() {
         Bitmap.Config config = isFirstFrameTransparent == null || isFirstFrameTransparent
                 ? Bitmap.Config.ARGB_8888 : bitmapConfig;
-        Bitmap result = bitmapProvider.obtain(downsampledWidth, downsampledHeight, config);
+        Bitmap result = allocator.obtain(downsampledWidth, downsampledHeight, config);
         result.setHasAlpha(true);
         return result;
     }

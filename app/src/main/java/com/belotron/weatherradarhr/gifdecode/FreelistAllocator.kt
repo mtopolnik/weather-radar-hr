@@ -8,7 +8,7 @@ import java.util.Queue
 private val emptyByteArray = ByteArray(0)
 private val emptyIntArray = IntArray(0)
 
-class BitmapFreelists : GifDecoder.BitmapProvider {
+class BitmapFreelists : Allocator {
 
     private val bitmapQueues = HashMap<Pair<Int, Int>, ArrayDeque<Bitmap>>()
     private val byteArrayQueues = HashMap<Int, Queue<ByteArray>>()

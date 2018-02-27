@@ -199,7 +199,7 @@ public class GifHeaderParser {
   private void readContents(int maxFrames) {
     // Read GIF file content blocks.
     boolean done = false;
-    while (!(done || err() || header.frameCount > maxFrames)) {
+    while (!(done || err() || header.frameCount == maxFrames)) {
       int code = read();
       switch (code) {
         case IMAGE_SEPARATOR:
@@ -208,7 +208,7 @@ public class GifHeaderParser {
           // However if one did not exist, the current frame will be null
           // and we must create it here. See issue #134.
           if (header.currentFrame == null) {
-            header.currentFrame = new GifFrame();
+            header.currentFrame = new GifFrame(header.frameCount);
           }
           readBitmap();
           break;
@@ -217,7 +217,7 @@ public class GifHeaderParser {
           switch (extensionLabel) {
             case LABEL_GRAPHIC_CONTROL_EXTENSION:
               // Start a new frame.
-              header.currentFrame = new GifFrame();
+              header.currentFrame = new GifFrame(header.frameCount);
               readGraphicControlExt();
               break;
             case LABEL_APPLICATION_EXTENSION:

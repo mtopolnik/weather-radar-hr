@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
@@ -72,15 +71,14 @@ class GifAnimator(
     fun animate(): Job? {
         return launch(UI) {
             try {
-                gifDecoder.rewind()
-                showFrame(gifDecoder.advanceAndDecode())
+                showFrame(suspendDecodeFrame(0))
                 updateAgeText()
             } catch (e: StopAnimationException) {
                 info { "Animator stop: ${e.message} before loop" }
             }
             try {
-                while (true) {
-                    val nextFrame = gifDecoder.advanceAndDecode()
+                (1 until gifDecoder.frameCount).forEach { i ->
+                    val nextFrame = suspendDecodeFrame(i)
                     val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
                     val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
                     debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
@@ -105,33 +103,24 @@ class GifAnimator(
     @SuppressLint("SetTextI18n")
     private suspend fun updateAgeText() {
         if (imgBundle.status != SHOWING) return
-        ensureTimestampInitialized()
         imgBundle.textView?.apply {
-            text = (if (isOffline) "Offline - " else "") + context.ageText(timestamp)
+            text = (if (isOffline) "Offline - " else "") + context.ageText(suspendGetTimestamp())
         }
     }
 
-    private suspend fun ensureTimestampInitialized() {
-        if (timestamp != 0L) return
-        with(gifDecoder) {
-            val currIndex = currentFrameIndex
-            gotoLastFrame()
-            decodeCurrentFrame().also {
+    private suspend fun suspendGetTimestamp(): Long {
+        if (timestamp == 0L) {
+            suspendDecodeFrame(gifDecoder.frameCount - 1).also {
                 timestamp = imgDesc.ocrTimestamp(it)
                 it.dispose()
             }
-            gotoFrame(currIndex)
         }
+        return timestamp
     }
 
-    private suspend fun GifDecoder.advanceAndDecode(): Bitmap {
-        if (!advance()) {
-            throw StopAnimationException("gifDecoder.advance() returned false")
-        }
-        return decodeCurrentFrame()
-    }
+    private suspend fun suspendDecodeFrame(frameIndex: Int) =
+            withContext(threadPool) { gifDecoder.decodeFrame(frameIndex) }
 
-    private suspend fun GifDecoder.decodeCurrentFrame() = withContext(threadPool) { currentFrame }
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 }
