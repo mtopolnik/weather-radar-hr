@@ -12,23 +12,23 @@
         android:allowBackup="true"
         android:supportsRtl="true"
     >
-        <!--<activity android:name=".MainActivity"-->
-                  <!--android:label="@string/main_activity_title">-->
-            <!--<intent-filter>-->
-                <!--<category android:name="android.intent.category.LAUNCHER"/>-->
-                <!--<action android:name="android.intent.action.MAIN"/>-->
-            <!--</intent-filter>-->
-        <!--</activity>-->
-        <activity android:name=".TestActivity"
+        <activity android:name=".MainActivity"
                   android:label="@string/main_activity_title">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <action android:name="android.intent.action.MAIN"/>
             </intent-filter>
         </activity>
-        <!--<activity android:name=".SettingsActivity"-->
-                  <!--android:label="@string/settings"-->
-                  <!--android:parentActivityName=".MainActivity">-->
+        <activity android:name=".SettingsActivity"
+                  android:label="@string/settings"
+                  android:parentActivityName=".MainActivity">
+        </activity>
+        <!--<activity android:name=".TestActivity"-->
+                  <!--android:label="@string/main_activity_title">-->
+            <!--<intent-filter>-->
+                <!--<category android:name="android.intent.category.LAUNCHER"/>-->
+                <!--<action android:name="android.intent.action.MAIN"/>-->
+            <!--</intent-filter>-->
         <!--</activity>-->
 
         <receiver android:name=".LradarWidgetProvider"
