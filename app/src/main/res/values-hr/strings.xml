@@ -2,29 +2,50 @@
 <resources>
     <string name="app_name">Vrijeme na radaru</string>
     <string name="main_activity_title">Vrijeme na radaru</string>
-    <string name="img_unavailable">Slika nedostupna. Dotakni da probam ponovo.</string>
+    <string name="img_unavailable">Slika je trenutno nedostupna.</string>
     <string name="widget_slo">Vrijeme na SLO radaru</string>
     <string name="widget_hr">Vrijeme na HR radaru</string>
     <string name="about">O aplikaciji</string>
     <string name="settings">Postavke</string>
     <string name="refresh">Osvježi</string>
     <string name="animation_rate">Brzina animacije</string>
-    <string-array name="animation_rates">
-        <item>85 minuta po sekundi</item>
-        <item>40 minuta po sekundi</item>
-        <item>20 minuta po sekundi</item>
-    </string-array>
     <string name="freeze_time">Pauza prije ponavljanja</string>
-    <string-array name="freeze_times">
-        <item>1.5 sekundi</item>
-        <item>2.5 sekundi</item>
-        <item>3.5 sekundi</item>
-    </string-array>
     <string name="about_text">
 © 2018 Belotron d.o.o.\n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com
     </string>
     <string name="help_text">
-
+        Kiša skoro nikad ne nastaje nama iznad glave, kišni oblaci putuju
+        nošeni vjetrom i nailaze prema nama. Zahvaljujući tome, pogledom na
+        animaciju radarskih slika možeš predvidjeti hoće li biti kiše u sljedećih
+        sat-dva te točno kad će početi.
+        \n
+        \nOva aplikacija prikazuje animacije koje
+        objavljuju hrvatski Državni hidrometeorološki zavod te Agencija Republike
+        Slovenije za okolje. To su najkvalitetniji izvori, “iz prve ruke”, za ove
+        prostore.
+        \n
+        \nSavjeti za korištenje:
+        \n
+        \n- Dotakni animiranu sliku da se pojavi meni. U postavkama možeš namještati
+        brzinu animacije.
+        \n- Double tapom fokusiraš se na jednu animaciju. Gestom “štipanja” možeš
+        zumirati.
+        \n- Iz fokusiranog načina vraćaš se natrag double tapom ili Android-tipkom za
+        natrag.
+        \n- Postavi si aplikacijin widget na home screen tako da ti je uvijek dostupno
+        trenutno stanje radara.
+        \n- Ako dotakneš sliku widgeta, otvara se aplikacija.
+        \n
+        \nAplikacija sa slike OCR-om očitava vrijeme snimanja i prikazuje ga iznad
+        slike. Ponekad web-sjedišta ne ažuriraju slike, tada ćeš vidjeti da
+        starost slike raste. Ako je starija od 1h, tekst će pocrveniti da te
+        upozori da slika nije više aktualna.
+        \n
+        \nAplikacija maksimalno štedi mrežni promet, ali uvijek daje najsvježije
+        slike zahvaljujući If-Modified-Since HTTP headeru. Neka te ne iznenadi
+        trenutni odziv nakon osvježavanja, server je javio da nema noviju sliku.
+        Ako je server nedostupan, u naslovu iznad slike pisat će “Offline”.
     </string>
     <string name="ads_disabled">Reklame isključene</string>
+    <string name="help">Pomoć i savjeti</string>
 </resources>

@@ -10,6 +10,9 @@
           android:icon="@drawable/ic_settings_white_24dp"
           android:showAsAction="ifRoom"
     />
+    <item android:id="@+id/help"
+          android:title="@string/help"
+    />
     <item android:id="@+id/about"
           android:title="@string/about"
     />

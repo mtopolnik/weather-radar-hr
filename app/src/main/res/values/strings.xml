@@ -1,41 +1,50 @@
 <resources>
     <string name="app_name">Weather Radar HR and SLO</string>
     <string name="main_activity_title">Weather Radar</string>
-    <string name="img_unavailable">Radar image unavailable. Tap to retry.</string>
+    <string name="img_unavailable">Radar image currently unavailable.</string>
     <string name="widget_slo">Weather Radar SLO</string>
     <string name="widget_hr">Weather Radar HR=</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
-    <string-array name="animation_rates">
-        <item>85 minutes/second</item>
-        <item>40 minutes/second</item>
-        <item>20 minutes/second</item>
-    </string-array>
-    <string name="frame_delay_default" translatable="false">frameDelay0</string>
-    <string-array name="frame_delay_values" translatable="false">
-        <item>frameDelay0</item>
-        <item>frameDelay1</item>
-        <item>frameDelay2</item>
-    </string-array>
     <string name="freeze_time">Pause before repeating</string>
-    <string-array name="freeze_times">
-        <item>1.5 seconds</item>
-        <item>2.5 seconds</item>
-        <item>3.5 seconds</item>
-    </string-array>
-    <string name="freeze_time_default" translatable="false">freeze0</string>
-    <string-array name="freeze_time_values" translatable="false">
-        <item>freeze0</item>
-        <item>freeze1</item>
-        <item>freeze2</item>
-    </string-array>
     <string name="about_text">
 © 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com
     </string>
     <string name="ads_disabled">Ads disabled</string>
+    <string name="help">Help and Tips</string>
     <string name="help_text">
-
+        Rains almost never appear right above you, rain clouds reach you from
+        some direction, carried by winds. Owing to this you can take a look at
+        the weather radar animation and predict whether and when the rains will
+        hit you, up to several hours in advance.
+        \n
+        \nThis app displays the animations published by the Croatian
+        Meteorological and Hydrological Service and the Slovenian Environment
+        Agency. These are the best sources, “from the horse’s mouth”, for this
+        region.
+        \n
+        \nSome usage tips:
+        \n
+        \n- Double-tap an image to focus on it. You can pinch-zoom the image. To
+        get back, double-tap again or press the Android Back-button.
+        \n
+        \n- Place the app\'s widget on your home screen to have quick access to
+        the current radar image.
+        \n
+        \n- Tap the widget image to start the app.
+        \n
+        \nThe app uses OCR to read the image\'s timestamp and shows it above the
+        image. Sometimes the websites stop updating their images, in that case
+        you\'ll see the image\'s age growing. Once the age reaches one hour, the
+        text turns red to alert you that the image is no longer up-to-date.
+        \n
+        \nThe app is very conservative with internet traffic usage and never has
+        to fetch the same image twice, but you always get the latest images thanks
+        to the If-Modified-Since HTTP headers. Owing to this, sometimes an image
+        refresh takes just fraction of a second, but you can rest assured that we
+        contacted the server and it replied that we already have the latest image.
+        If we can\'t contact a server, the title above its image will say “Offline”.
     </string>
 </resources>

@@ -100,9 +100,7 @@ class GifAnimator(
     }
 
     private suspend fun updateAgeText() {
-        imgBundle.takeIf { it.status == SHOWING }
-                ?.textView
-                ?.setAgeText(suspendGetTimestamp(), isOffline)
+        imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(suspendGetTimestamp(), isOffline)
     }
 
     private suspend fun suspendGetTimestamp(): Long {

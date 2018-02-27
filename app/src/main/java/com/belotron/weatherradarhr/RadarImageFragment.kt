@@ -243,6 +243,7 @@ class RadarImageFragment : Fragment() {
                 activity.startFetchWidgetImages()
             }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
+            R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
             R.id.about -> launch(UI) {
                 showAboutDialogFragment(activity)
                 updateAdVisibility()

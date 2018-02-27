@@ -23,6 +23,10 @@
                   android:label="@string/settings"
                   android:parentActivityName=".MainActivity">
         </activity>
+        <activity android:name=".HelpActivity"
+                  android:label="@string/help"
+                  android:parentActivityName=".MainActivity">
+        </activity>
         <!--<activity android:name=".TestActivity"-->
                   <!--android:label="@string/main_activity_title">-->
             <!--<intent-filter>-->
