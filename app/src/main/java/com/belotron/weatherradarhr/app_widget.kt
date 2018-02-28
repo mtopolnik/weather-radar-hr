@@ -272,6 +272,7 @@ private class WidgetContext (
         val growingFile = context.file(fname + ".growing")
         growingFile.dataOut().use {
             it.writeLong(tsBitmap.timestamp)
+            it.writeBoolean(tsBitmap.isOffline)
             tsBitmap.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         if (!growingFile.renameTo(context.file(fname))) {
