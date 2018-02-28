@@ -6,6 +6,7 @@
  * Updated By: @ipsilondev
  * Updated By: hank-cp
  * Updated By: singpolyma
+ * Converted to Kotlin and updated by: mtopolnik
  * -------------------
  * Extends Android ImageView to include pinch zooming, panning, fling and double tap zoom.
  */
@@ -21,6 +22,7 @@ import android.graphics.Matrix.MSCALE_X
 import android.graphics.Matrix.MSCALE_Y
 import android.graphics.Matrix.MTRANS_X
 import android.graphics.Matrix.MTRANS_Y
+import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -409,8 +411,7 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * Performs boundary checking and fixes the image matrix if it
-     * is out of bounds.
+     * Performs boundary checking and fixes the image matrix if it is out of bounds.
      */
     private fun fixTrans() {
         currMatrix.getValues(m)
@@ -794,18 +795,28 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * ScaleListener detects user two finger scaling and scales image.
+     * Detects two-finger scaling and scales the image.
      *
      * @author Ortiz
      */
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        var prevTouchPoint: PointF? = null
+
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             state = State.ZOOM
+            prevTouchPoint = null
             return true
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            scaleImage(detector.scaleFactor.toDouble(), detector.focusX, detector.focusY, true)
+            val touchPoint = PointF(detector.focusX, detector.focusY)
+            scaleImage(detector.scaleFactor.toDouble(), touchPoint.x, touchPoint.y, true)
+            prevTouchPoint?.also {
+                val deltaX = touchPoint.x - it.x
+                val deltaY = touchPoint.y - it.y
+                currMatrix.postTranslate(deltaX, deltaY)
+            }
+            prevTouchPoint = touchPoint
             touchImageViewListener?.invoke()
             return true
         }
