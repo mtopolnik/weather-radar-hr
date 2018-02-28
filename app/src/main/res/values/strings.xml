@@ -15,8 +15,8 @@
     <string name="ads_disabled">Ads disabled</string>
     <string name="help">Help and Tips</string>
     <string name="help_text">
-        Rains almost never appear right above you, rain clouds reach you from
-        some direction, carried by winds. Owing to this you can take a look at
+        Rains almost never appear right above you, the clouds reach you from
+        some direction carried by winds. Owing to this you can take a look at
         the weather radar animation and predict whether and when the rains will
         hit you, up to several hours in advance.
         \n
@@ -35,16 +35,17 @@
         \n
         \n- Tap the widget image to start the app.
         \n
-        \nThe app uses OCR to read the image\'s timestamp and shows it above the
-        image. Sometimes the websites stop updating their images, in that case
-        you\'ll see the image\'s age growing. Once the age reaches one hour, the
-        text turns red to alert you that the image is no longer up-to-date.
+        \nThe app uses OCR to read the image\'s timestamp, translates it to your
+        timezone, and shows it above the image. Sometimes the websites stop
+        updating their images, in that case you\'ll see the image\'s age growing.
+        Once the age reaches one hour, the text turns red to alert you that the
+        image is no longer up-to-date.
         \n
         \nThe app is very conservative with internet traffic usage and never has
         to fetch the same image twice, but you always get the latest images thanks
         to the If-Modified-Since HTTP headers. Owing to this, sometimes an image
         refresh takes just fraction of a second, but you can rest assured that we
-        contacted the server and it replied that we already have the latest image.
+        contacted the server and it replied that you already have the latest image.
         If we can\'t contact a server, the title above its image will say “Offline”.
     </string>
 </resources>

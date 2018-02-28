@@ -54,7 +54,7 @@ fun View.setVisible(state: Boolean) {
 
 fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
     text = context.ageText(timestamp, isOffline)
-    val isFresh = System.currentTimeMillis() < timestamp + HOURS.toMillis(1)
+    val isFresh = isFreshTimestamp(timestamp)
     setTextColor(getColor(context,
             if (isFresh) R.color.textPrimary
             else R.color.textRed))
@@ -65,11 +65,12 @@ fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
 
 fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {
     setTextViewText(R.id.text_view_widget, context.ageText(timestamp, isOffline))
-    val isFresh = System.currentTimeMillis() < timestamp + HOURS.toMillis(1)
     setTextColor(R.id.text_view_widget, getColor(context,
-            if (isFresh) R.color.textPrimary
+            if (isFreshTimestamp(timestamp)) R.color.textPrimary
             else R.color.textRed))
 }
+
+private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
 
 val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 

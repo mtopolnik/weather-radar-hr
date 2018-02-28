@@ -17,7 +17,7 @@
         Kiša skoro nikad ne nastaje nama iznad glave, kišni oblaci putuju
         nošeni vjetrom i nailaze prema nama. Zahvaljujući tome, pogledom na
         animaciju radarskih slika možeš predvidjeti hoće li biti kiše u sljedećih
-        sat-dva te točno kad će početi.
+        nekoliko sati te točno kad će početi.
         \n
         \nOva aplikacija prikazuje animacije koje
         objavljuju hrvatski Državni hidrometeorološki zavod te Agencija Republike
@@ -26,20 +26,19 @@
         \n
         \nSavjeti za korištenje:
         \n
-        \n- Dotakni animiranu sliku da se pojavi meni. U postavkama možeš namještati
-        brzinu animacije.
         \n- Double tapom fokusiraš se na jednu animaciju. Gestom “štipanja” možeš
         zumirati.
         \n- Iz fokusiranog načina vraćaš se natrag double tapom ili Android-tipkom za
         natrag.
-        \n- Postavi si aplikacijin widget na home screen tako da ti je uvijek dostupno
+        \n- Postavi si widget aplikacije na home screen tako da ti je uvijek dostupno
         trenutno stanje radara.
         \n- Ako dotakneš sliku widgeta, otvara se aplikacija.
         \n
-        \nAplikacija sa slike OCR-om očitava vrijeme snimanja i prikazuje ga iznad
-        slike. Ponekad web-sjedišta ne ažuriraju slike, tada ćeš vidjeti da
-        starost slike raste. Ako je starija od 1h, tekst će pocrveniti da te
-        upozori da slika nije više aktualna.
+        \nAplikacija sa slike OCR-om očitava vrijeme snimanja, korigira ga s
+        obzirom na tvoju vremensku zonu i prikazuje iznad slike. Ponekad
+        web-sjedišta ne ažuriraju slike, tada ćeš vidjeti da starost slike raste.
+        Ako je starija od 1h, tekst će pocrveniti da te upozori da slika nije više
+        aktualna.
         \n
         \nAplikacija maksimalno štedi mrežni promet, ali uvijek daje najsvježije
         slike zahvaljujući If-Modified-Since HTTP headeru. Neka te ne iznenadi

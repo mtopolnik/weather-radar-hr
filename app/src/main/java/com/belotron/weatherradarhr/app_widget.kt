@@ -225,7 +225,7 @@ private class WidgetContext (
                 setAgeText(context, tsBitmap.timestamp, tsBitmap.isOffline)
             }
         } else {
-            remoteViews.setTextViewText(R.id.text_view_widget, "Radar image unavailable. Tap to retry.")
+            remoteViews.setTextViewText(R.id.text_view_widget, context.resources.getString(R.string.img_unavailable))
         }
         AppWidgetManager.getInstance(context).updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
         info { "Updated Remote Views" }
@@ -249,15 +249,6 @@ private class WidgetContext (
         context.jobScheduler().cancel(wDesc.updateAgeJobId())
     }
 
-    fun readImgAndTimestamp() : TimestampedBitmap? {
-        val file = context.file(wDesc.timestampFilename())
-        return try {
-            file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
-        } catch (e : Exception) {
-            null
-        }
-    }
-
     private fun scheduleUpdateAge() {
         val resultCode = context.jobScheduler().schedule(
                 JobInfo.Builder(wDesc.updateAgeJobId(), ComponentName(context, UpdateAgeService::class.java))
@@ -265,6 +256,15 @@ private class WidgetContext (
                         .setPeriodic(MINUTE_IN_MILLIS)
                         .build())
         reportScheduleResult("update age every minute", resultCode)
+    }
+
+    fun readImgAndTimestamp() : TimestampedBitmap? {
+        val file = context.file(wDesc.timestampFilename())
+        return try {
+            file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
+        } catch (e : Exception) {
+            null
+        }
     }
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {
