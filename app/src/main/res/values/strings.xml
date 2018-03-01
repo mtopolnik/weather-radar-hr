@@ -5,15 +5,15 @@
     <string name="widget_slo">Weather Radar SLO</string>
     <string name="widget_hr">Weather Radar HR=</string>
     <string name="settings">Settings</string>
+    <string name="help">Help and Tips</string>
     <string name="about">About</string>
+    <string name="ads_disabled">Ads disabled</string>
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
     <string name="about_text">
 © 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com
     </string>
-    <string name="ads_disabled">Ads disabled</string>
-    <string name="help">Help and Tips</string>
     <string name="help_text">
         Rains almost never appear right above you, the clouds reach you from
         some direction carried by winds. Owing to this you can take a look at

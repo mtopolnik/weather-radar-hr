@@ -12,9 +12,9 @@
             android:layout_gravity="bottom"
             android:textColor="@color/textPrimary"
             android:shadowColor="@color/textShadow"
-            android:shadowDx="0"
-            android:shadowDy="0"
-            android:shadowRadius="10"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="2"
     />
     <ImageView
         android:id="@+id/img_view_widget"

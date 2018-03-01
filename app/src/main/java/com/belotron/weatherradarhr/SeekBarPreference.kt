@@ -12,7 +12,7 @@ import android.widget.TextView
 private const val NS_BELOTRON = "http://belotron.com"
 
 class SeekBarPreference @JvmOverloads constructor(
-        context: Context, attrs: AttributeSet? = null, defStyle: Int = 0
+        context: Context, attrs: AttributeSet? = null, defStyle: Int = android.R.attr.dialogPreferenceStyle
 ) : Preference(context, attrs, defStyle), OnSeekBarChangeListener {
 
     private var summary: String
