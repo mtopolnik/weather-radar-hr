@@ -42,7 +42,7 @@ class MyApplication : Application() {
         super.onCreate()
         migratePrefs()
         initOcr(this)
-        if (adsEnabled()) {
+        if (sharedPrefs.adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
         }
     }
@@ -52,9 +52,8 @@ fun View.setVisible(state: Boolean) {
     visibility = if (state) VISIBLE else GONE
 }
 
-fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
+fun TextView.setAgeText(timestamp: Long, isOffline: Boolean, isFresh: Boolean) {
     text = context.ageText(timestamp, isOffline)
-    val isFresh = isFreshTimestamp(timestamp)
     setTextColor(getColor(context,
             if (isFresh) R.color.textPrimary
             else R.color.textRed))
@@ -70,16 +69,12 @@ fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean
             else R.color.textRed))
 }
 
-private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
-
-val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
+fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
 
 fun Context.file(name: String) = File(noBackupFilesDir, name)
 
 fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (isOffline) "Offline - " else "") +
         getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
-
-fun Context.adsEnabled() = sharedPrefs.getBoolean(KEY_ADS_ENABLED, true)
 
 fun Activity.switchActionBarVisible():Boolean {
     val actionBar = actionBar!!
@@ -95,22 +90,6 @@ fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis()
 
 val Bundle.wasFastResume: Boolean
     get() = System.currentTimeMillis() - getLong(KEY_SAVED_AT) < DateUtils.SECOND_IN_MILLIS
-
-@SuppressLint("CommitPrefEdits")
-inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        commit()
-    }
-}
-
-@SuppressLint("CommitPrefEdits")
-inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        apply()
-    }
-}
 
 fun File.dataIn() = DataInputStream(FileInputStream(this))
 

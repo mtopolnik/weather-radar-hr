@@ -5,28 +5,22 @@ import android.content.res.TypedArray
 import android.preference.Preference
 import android.util.AttributeSet
 import android.view.View
+import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
+import android.view.LayoutInflater
 
 private const val NS_BELOTRON = "http://belotron.com"
 
-class SeekBarPreference @JvmOverloads constructor(
-        context: Context, attrs: AttributeSet? = null, defStyle: Int = android.R.attr.dialogPreferenceStyle
-) : Preference(context, attrs, defStyle), OnSeekBarChangeListener {
+class SeekBarPreference constructor(context: Context, attrs: AttributeSet)
+    : Preference(context, attrs), OnSeekBarChangeListener {
 
-    private var summary: String
     private lateinit var summaryView: TextView
 
-    private val min: Int
-    private val max: Int
-
-    init {
-        layoutResource = R.layout.preference_seekbar
-        summary = super.getSummary()?.toString() ?: ""
-        min = attrs?.getAttributeIntValue(NS_BELOTRON, "min", 0) ?: 0
-        max = attrs?.getAttributeIntValue(NS_BELOTRON, "max", 0) ?: 0
-    }
+    private var summary: String = super.getSummary()?.toString() ?: ""
+    private val min: Int = attrs.getAttributeIntValue(NS_BELOTRON, "min", 0)
+    private val max: Int = attrs.getAttributeIntValue(NS_BELOTRON, "max", 0)
 
     private var isTrackingTouch: Boolean = false
     private var valueWhileTrackingTouch = 0
@@ -49,9 +43,18 @@ class SeekBarPreference @JvmOverloads constructor(
             defaultValue as Int? ?: 0
     }
 
+    override fun onCreateView(parent: ViewGroup?): View {
+        val ret = super.onCreateView(parent)
+        val summary = ret.findViewById<View?>(android.R.id.summary) ?: return ret
+        val summaryParent = summary.parent as? ViewGroup ?: return ret
+        val layoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        layoutInflater.inflate(R.layout.preference_seekbar, summaryParent)
+        return ret
+    }
+
     override fun onBindView(view: View) {
         super.onBindView(view)
-        view.findViewById<SeekBar>(R.id.prefSeekbar).also {
+        view.findViewById<SeekBar>(R.id.seekbar).also {
             it.max = max - min
             it.progress = value - min
             it.setOnSeekBarChangeListener(this)

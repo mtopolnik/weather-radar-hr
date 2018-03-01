@@ -18,4 +18,10 @@
             belotron:min="100"
             belotron:max="6000"
     />
+    <CheckBoxPreference
+            android:key="show_age_of_every_frame"
+            android:title="@string/title_show_age_of_every_frame"
+            android:summary="@string/summary_show_age_of_every_frame"
+            android:defaultValue="false"
+    />
 </PreferenceScreen>

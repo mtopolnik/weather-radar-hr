@@ -12,6 +12,14 @@
     <string name="refresh">Osvježi</string>
     <string name="animation_rate">Brzina animacije</string>
     <string name="freeze_time">Pauza prije ponavljanja</string>
+    <string name="title_show_age_of_every_frame">Prikazuj starost svake slike</string>
+    <string name="summary_show_age_of_every_frame">
+        Da: prikaz se mijenja tijekom animacije\nNe: prikaz se odnosi na animaciju kao cjelinu
+    </string>
+    <string-array name="update_age_choice_labels">
+        <item>zadnju sliku</item>
+        <item>trenutnu sliku</item>
+    </string-array>
     <string name="about_text">
 Verzija %1$s
 \n© 2018 Belotron d.o.o.\n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com

@@ -23,9 +23,12 @@ class AnimationLooper(
         animators[desc.index] = GifAnimator(imgBundles, desc, gifData, isOffline)
     }
 
-    fun restart(newDuration: Int, newRateMinsPerSec: Int) {
+    fun restart(newDuration: Int, newRateMinsPerSec: Int, showAgeOfEveryFrame: Boolean) {
         animationDuration = newDuration
-        animators.forEach { it?.rateMinsPerSec = newRateMinsPerSec }
+        animators.forEach {
+            it?.rateMinsPerSec = newRateMinsPerSec
+            it?.showAgeOfEveryFrame = showAgeOfEveryFrame
+        }
         info { "AnimationLooper.restart" }
         if (animators.none()) {
             return
@@ -58,36 +61,37 @@ class GifAnimator(
         private val isOffline: Boolean
 ) {
     var rateMinsPerSec: Int = DEFAULT_ANIMATION_RATE
+    var showAgeOfEveryFrame: Boolean = false
+    private var animationTimestamp: Long = 0
+    private val isAnimationFresh get() = isFreshTimestamp(animationTimestamp)
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
+    private val lastFrameIndex = gifDecoder.frameCount - 1
     private val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
-    private var timestamp = 0L
+    private val timestamps = LongArray(gifDecoder.frameCount)
     private var currFrame: Bitmap? = null
     private var currFrameShownAt = 0L
 
+
     fun animate(): Job? {
         return launch(UI) {
-            try {
-                showFrame(suspendDecodeFrame(0))
-                updateAgeText()
-            } catch (e: StopAnimationException) {
-                info { "Animator stop: ${e.message} before loop" }
-            }
-            try {
-                (1 until gifDecoder.frameCount).forEach { i ->
-                    val nextFrame = suspendDecodeFrame(i)
-                    val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
-                    val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
-                    debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
-                    remainingTillNextFrame.takeIf { it > 0 }?.also {
-                        delay(it)
-                    }
-                    showFrame(nextFrame)
+            showFrame(suspendDecodeFrame(0))
+            animationTimestamp = suspendGetTimestamp(lastFrameIndex)
+            updateAgeText(if (showAgeOfEveryFrame) 0 else lastFrameIndex)
+            (1 until gifDecoder.frameCount).forEach { i ->
+                val nextFrame = suspendDecodeFrame(i)
+                val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
+                val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
+                debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
+                remainingTillNextFrame.takeIf { it > 0 }?.also {
+                    delay(it)
                 }
-            } catch (e: StopAnimationException) {
-                info { "Animator stop: ${e.message} inside the loop" }
+                showFrame(nextFrame)
+                if (showAgeOfEveryFrame) {
+                    updateAgeText(i)
+                }
             }
         }
     }
@@ -99,25 +103,26 @@ class GifAnimator(
         currFrame = newFrame
     }
 
-    private suspend fun updateAgeText() {
-        imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(suspendGetTimestamp(), isOffline)
+    @Suppress("NOTHING_TO_INLINE")
+    private suspend inline fun updateAgeText(frameIndex: Int) {
+        imgBundle.takeIf { it.status == SHOWING }
+                ?.textView?.setAgeText(suspendGetTimestamp(frameIndex), isOffline, isAnimationFresh)
     }
 
-    private suspend fun suspendGetTimestamp(): Long {
-        if (timestamp == 0L) {
-            suspendDecodeFrame(gifDecoder.frameCount - 1).also {
-                timestamp = imgDesc.ocrTimestamp(it)
+    @Suppress("NOTHING_TO_INLINE")
+    private suspend inline fun suspendGetTimestamp(frameIndex: Int): Long {
+        if (timestamps[frameIndex] == 0L) {
+            suspendDecodeFrame(frameIndex).also {
+                timestamps[frameIndex] = imgDesc.ocrTimestamp(it)
                 it.dispose()
             }
         }
-        return timestamp
+        return timestamps[frameIndex]
     }
 
-    private suspend fun suspendDecodeFrame(frameIndex: Int) =
+    @Suppress("NOTHING_TO_INLINE")
+    private suspend inline fun suspendDecodeFrame(frameIndex: Int) =
             withContext(threadPool) { gifDecoder.decodeFrame(frameIndex) }
-
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 }
-
-private class StopAnimationException(message: String) : Exception(message)

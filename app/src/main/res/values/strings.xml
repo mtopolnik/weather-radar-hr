@@ -11,6 +11,10 @@
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
+    <string name="title_show_age_of_every_frame">Show age of every animation frame</string>
+    <string name="summary_show_age_of_every_frame">
+        On: age text changes with each frame\nOff: shows age of the animation as a whole
+    </string>
     <string name="about_text">
 Version %1$s
 \n© 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com

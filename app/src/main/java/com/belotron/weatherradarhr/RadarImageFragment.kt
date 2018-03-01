@@ -200,7 +200,7 @@ class RadarImageFragment : Fragment() {
         val statusIsKnown = imgBundles.none { it.status == UNKNOWN }
         if (statusIsKnown && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.restart(animationDurationMillis, rateMinsPerSec)
+                animationLooper.restart(animationDurationMillis, rateMinsPerSec, showAgeOfEveryFrame)
             }
         } else {
             info { "Reloading animations" }
@@ -305,7 +305,7 @@ class RadarImageFragment : Fragment() {
 
     private fun updateAdVisibility() {
         val adView = rootView?.findViewById<AdView>(R.id.adView) ?: return
-        val adsEnabled = activity.adsEnabled()
+        val adsEnabled = activity.sharedPrefs.adsEnabled
         adView.setVisible(adsEnabled)
         if (adsEnabled) {
             adView.loadAd(AdRequest.Builder().build())
@@ -319,6 +319,7 @@ class RadarImageFragment : Fragment() {
         }
         val frameDelayFactor = context.sharedPrefs.rateMinsPerSec
         val animationDuration = context.sharedPrefs.animationDurationMillis
+        val showAgeOfEveryFrame = context.sharedPrefs.showAgeOfEveryFrame
         for (desc in imgDescs) {
             val bundle = imgBundles[desc.index]
             launch(UI) {
@@ -336,7 +337,7 @@ class RadarImageFragment : Fragment() {
                     val gifData = editGif(imgBytes, desc.framesToKeep)
                     with (animationLooper) {
                         receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
-                        restart(animationDuration, frameDelayFactor)
+                        restart(animationDuration, frameDelayFactor, showAgeOfEveryFrame)
                     }
                     bundle.status = SHOWING
                     context.actionBar.hide()
