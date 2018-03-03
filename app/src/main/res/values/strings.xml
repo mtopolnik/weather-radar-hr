@@ -12,7 +12,10 @@
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
     <string name="about_text">
-© 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com
+Version %1$s
+\n© 2018 Belotron d.o.o.\n\nApp icon made by DinosoftLabs from www.flaticon.com
+\n\nRadar image SLO © Slovenian Environment Agency
+\n\nRadar image HR © Meteorological and Hydrological Service
     </string>
     <string name="help_text">
         Rains almost never appear right above you, the clouds reach you from
