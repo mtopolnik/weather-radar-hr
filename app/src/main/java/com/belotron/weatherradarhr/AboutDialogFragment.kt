@@ -34,17 +34,22 @@ class AboutDialogFragment(
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val inflater = activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val view = inflater.inflate(R.layout.about, null)
-        view.findViewById<TextView>(R.id.about_text_view).setText(R.string.about_text)
-        if (!activity.adsEnabled()) {
-            view.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
+        val rootView = inflater.inflate(R.layout.about, null)
+        val version =
+                try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }
+                catch (e: Exception) { null } ?: "??"
+        val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
+            text = getString(R.string.about_text, version)
         }
-        val gd = GestureDetector(activity, EasterEggDetector(view))
-        view.setOnTouchListener { v, event ->  gd.onTouchEvent(event); true }
+        if (!activity.adsEnabled()) {
+            rootView.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
+        }
+        val gd = GestureDetector(activity, EasterEggDetector(rootView))
+        textView.setOnTouchListener { v, event -> gd.onTouchEvent(event); true }
         return AlertDialog.Builder(activity)
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
-                .setView(view)
+                .setView(rootView)
                 .setPositiveButton(android.R.string.ok) { _, _ -> continuation?.resume(Unit) }
                 .create()
     }
@@ -56,7 +61,7 @@ private class EasterEggDetector(
     private val sequence = listOf(L, R, R, L, L, L, R, R, R, R)
     private var indexInSequence = 0
 
-    override fun onSingleTapUp(e: MotionEvent): Boolean {
+    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
         val middle = view.width / 2
         val tapSide = if (e.x < middle) L else R
         info { "Tap side: $tapSide" }
