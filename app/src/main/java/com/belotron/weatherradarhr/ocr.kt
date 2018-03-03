@@ -38,8 +38,7 @@ object LradarOcr {
             indices.fold(0, { acc, ind -> 10 * acc + readDigit(lradar, ind) })
 
     private fun readDigit(lradar: Bitmap, pos : Int) =
-        (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) }
-                ?: throw AssertionError("Couldn't read lradar digit at $pos")
+        (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) } ?: 1
 }
 
 object KradarOcr {
@@ -85,8 +84,7 @@ object KradarOcr {
         xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(bitmap, x) })
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
-            (0..13).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) }
-                    ?: throw AssertionError("Couldn't read kradar time digit at $x")
+            (0..13).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) } ?: 1
 
     private fun readDateNumber(bitmap: Bitmap, vararg indices : Int): Int =
             indices.fold(0, { acc, i -> 10 * acc + readDateDigit(bitmap, i) })
@@ -96,13 +94,7 @@ object KradarOcr {
         val imgY = 168
         return when {
             (0 until 13).all { rectY -> bitmap.getPixel(imgX + 1, imgY + rectY) != -1 } -> 0 // blank space
-            else -> {
-                val inputStripe = stripeData(bitmap, imgX, imgY, 13, 1)
-                val digit2Stripe = stripeData(dateDigitBitmaps[2], 0, 0, 13, 1)
-                (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) }
-                        ?: throw AssertionError("Couldn't read kradar date digit at $pos," +
-                                "input stripe was $inputStripe and digit 2 stripe is $digit2Stripe")
-            }
+            else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) } ?: 1
         }
     }
 }
