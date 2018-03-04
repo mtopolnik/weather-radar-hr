@@ -16,10 +16,6 @@
     <string name="summary_show_age_of_every_frame">
         Da: prikaz se mijenja tijekom animacije\nNe: prikaz se odnosi na animaciju kao cjelinu
     </string>
-    <string-array name="update_age_choice_labels">
-        <item>zadnju sliku</item>
-        <item>trenutnu sliku</item>
-    </string-array>
     <string name="about_text">
 Verzija %1$s
 \n© 2018 Belotron d.o.o.
