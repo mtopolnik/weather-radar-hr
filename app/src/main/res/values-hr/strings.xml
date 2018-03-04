@@ -22,9 +22,10 @@
     </string-array>
     <string name="about_text">
 Verzija %1$s
-\n© 2018 Belotron d.o.o.\n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com
+\n© 2018 Belotron d.o.o.
 \n\nRadarska slika SLO © Agencija Republike Slovenije za okolje
 \n\nRadarska slika HR © Državni hidrometeorološki zavod
+\n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com
     </string>
     <string name="help_text">
         Kiša skoro nikad ne nastaje nama iznad glave, kišni oblaci putuju
