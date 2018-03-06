@@ -45,7 +45,7 @@ class AboutDialogFragment(
             rootView.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
         }
         val gd = GestureDetector(activity, EasterEggDetector(rootView))
-        textView.setOnTouchListener { v, event -> gd.onTouchEvent(event); true }
+        textView.setOnTouchListener { _, event -> gd.onTouchEvent(event); true }
         return AlertDialog.Builder(activity)
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
