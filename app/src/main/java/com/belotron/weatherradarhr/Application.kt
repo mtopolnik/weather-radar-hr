@@ -60,14 +60,26 @@ fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
 }
 
 fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {
-    setTextViewText(R.id.text_view_widget, context.ageText(timestamp, isOffline))
-    setTextColor(R.id.text_view_widget, getColor(context,
-            if (isFreshTimestamp(timestamp)) R.color.textPrimary
-            else R.color.textRed))
+    val ageText = context.ageText(timestamp, isOffline)
+    if (isFreshTimestamp(timestamp)) {
+        setBlackText(ageText)
+    } else {
+        setRedText(ageText)
+    }
+}
+
+fun RemoteViews.setBlackText(text: CharSequence) = setWidgetText(text, R.id.text_black, R.id.text_red)
+
+fun RemoteViews.setRedText(text: CharSequence) = setWidgetText(text, R.id.text_red, R.id.text_black)
+
+fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleViewId: Int) {
+    setViewVisibility(visibleViewId, VISIBLE)
+    setViewVisibility(invisibleViewId, GONE)
+    setTextViewText(visibleViewId, text)
+    setTextViewText(invisibleViewId, "")
 }
 
 private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
-
 
 fun Context.file(name: String) = File(noBackupFilesDir, name)
 

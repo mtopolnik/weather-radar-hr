@@ -3,7 +3,7 @@
               android:layout_height="match_parent"
               android:orientation="vertical">
     <TextView
-            android:id="@+id/text_view_widget"
+            android:id="@+id/text_black"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="4dp"
@@ -15,6 +15,23 @@
             android:shadowDx="2"
             android:shadowDy="2"
             android:shadowRadius="2"
+            android:textIsSelectable="true"
+    />
+    <TextView
+            android:id="@+id/text_red"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:minLines="1"
+            android:maxLines="1"
+            android:layout_gravity="bottom"
+            android:textColor="@color/textRed"
+            android:shadowColor="@color/textRedShadow"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="2"
+            android:textIsSelectable="true"
+            android:visibility="gone"
     />
     <ImageView
         android:id="@+id/img_view_widget"

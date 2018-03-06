@@ -225,7 +225,7 @@ private class WidgetContext (
                 setAgeText(context, tsBitmap.timestamp, tsBitmap.isOffline)
             }
         } else {
-            remoteViews.setTextViewText(R.id.text_view_widget, context.resources.getString(R.string.img_unavailable))
+            remoteViews.setRedText(context.resources.getString(R.string.img_unavailable))
         }
         AppWidgetManager.getInstance(context).updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
         info { "Updated Remote Views" }
