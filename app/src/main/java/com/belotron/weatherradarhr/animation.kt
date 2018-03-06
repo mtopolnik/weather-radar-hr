@@ -116,8 +116,5 @@ class GifAnimator(
     private suspend fun suspendDecodeFrame(frameIndex: Int) =
             withContext(threadPool) { gifDecoder.decodeFrame(frameIndex) }
 
-
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 }
-
-private class StopAnimationException(message: String) : Exception(message)

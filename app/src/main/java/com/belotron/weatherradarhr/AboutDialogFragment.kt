@@ -41,7 +41,7 @@ class AboutDialogFragment(
         val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
             text = getString(R.string.about_text, version)
         }
-        if (!activity.adsEnabled()) {
+        if (!activity.sharedPrefs.adsEnabled) {
             rootView.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
         }
         val gd = GestureDetector(activity, EasterEggDetector(rootView))
@@ -80,7 +80,7 @@ private class EasterEggDetector(
 
     @SuppressLint("CommitPrefEdits")
     private fun invertAdsEnabled() {
-        val enableAds = !view.context.adsEnabled()
+        val enableAds = !view.context.sharedPrefs.adsEnabled
         view.context.sharedPrefs.commitUpdate {
             putBoolean(KEY_ADS_ENABLED, enableAds)
         }

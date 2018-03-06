@@ -1,7 +1,9 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.preference.PreferenceManager
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
@@ -9,6 +11,10 @@ private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 
 const val DEFAULT_ANIMATION_RATE = 85
 private const val DEFAULT_FREEZE_TIME = 1500
+
+val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
+
+val SharedPreferences.adsEnabled: Boolean get() = getBoolean(KEY_ADS_ENABLED, true)
 
 val SharedPreferences.rateMinsPerSec: Int get() = getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE)
 
@@ -36,6 +42,22 @@ fun Context.migratePrefs() {
                 remove(KEY_FREEZE_TIME_OLD)
             }
         }
+    }
+}
+
+@SuppressLint("CommitPrefEdits")
+inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        commit()
+    }
+}
+
+@SuppressLint("CommitPrefEdits")
+inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
+    with (edit()) {
+        block()
+        apply()
     }
 }
 

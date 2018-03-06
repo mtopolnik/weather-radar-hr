@@ -1,13 +1,10 @@
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.support.v4.content.ContextCompat.getColor
 import android.text.format.DateUtils
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -32,7 +29,6 @@ import java.util.concurrent.TimeUnit.HOURS
 
 const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
 const val KEY_ADS_ENABLED = "ads_enabled"
-
 private const val KEY_SAVED_AT = "instance-state-saved-at"
 
 val threadPool = Executors.newCachedThreadPool().asCoroutineDispatcher()
@@ -42,7 +38,7 @@ class MyApplication : Application() {
         super.onCreate()
         migratePrefs()
         initOcr(this)
-        if (adsEnabled()) {
+        if (sharedPrefs.adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
         }
     }
@@ -72,14 +68,12 @@ fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean
 
 private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
 
-val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
 fun Context.file(name: String) = File(noBackupFilesDir, name)
 
 fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (isOffline) "Offline - " else "") +
         getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
 
-fun Context.adsEnabled() = sharedPrefs.getBoolean(KEY_ADS_ENABLED, true)
 
 fun Activity.switchActionBarVisible():Boolean {
     val actionBar = actionBar!!
@@ -95,22 +89,6 @@ fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis()
 
 val Bundle.wasFastResume: Boolean
     get() = System.currentTimeMillis() - getLong(KEY_SAVED_AT) < DateUtils.SECOND_IN_MILLIS
-
-@SuppressLint("CommitPrefEdits")
-inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        commit()
-    }
-}
-
-@SuppressLint("CommitPrefEdits")
-inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        apply()
-    }
-}
 
 fun File.dataIn() = DataInputStream(FileInputStream(this))
 
