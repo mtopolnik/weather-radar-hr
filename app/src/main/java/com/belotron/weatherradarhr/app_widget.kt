@@ -269,7 +269,7 @@ private class WidgetContext (
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {
         val fname = wDesc.timestampFilename()
-        val growingFile = context.file(fname + ".growing")
+        val growingFile = context.file("$fname.growing")
         growingFile.dataOut().use {
             it.writeLong(tsBitmap.timestamp)
             it.writeBoolean(tsBitmap.isOffline)

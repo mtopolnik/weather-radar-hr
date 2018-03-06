@@ -622,7 +622,7 @@ public class StandardGifDecoder implements GifDecoder {
         }
         final byte[] block = this.block;
         // Decode GIF pixel stream.
-        int pi = 0, bi = 0, top = 0, first = 0, datum = 0, count = 0, bits = 0;
+        int pi, bi = 0, top = 0, first = 0, datum = 0, count = 0, bits = 0;
         int oldCode = NULL_CODE;
         int available = clear + 2;
         final int endOfInformation = clear + 1;

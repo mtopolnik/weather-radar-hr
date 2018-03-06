@@ -32,6 +32,7 @@
                         android:shadowDx="2"
                         android:shadowDy="2"
                         android:shadowRadius="2"
+                        android:textIsSelectable="true"
                 />
                 <ImageView
                         android:id="@+id/img_kradar"
@@ -70,6 +71,7 @@
                         android:shadowDx="2"
                         android:shadowDy="2"
                         android:shadowRadius="2"
+                        android:textIsSelectable="true"
                 />
                 <ImageView
                         android:id="@+id/img_lradar"

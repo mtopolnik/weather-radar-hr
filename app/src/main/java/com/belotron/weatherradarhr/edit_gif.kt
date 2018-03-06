@@ -98,18 +98,18 @@ constructor(
 
     private fun parseApplicationExtension() {
         val blockSize = nextByte()
-        if (blockSize != 11) throw AssertionError("Invalid Application Extension block size: " + blockSize)
+        if (blockSize != 11) throw AssertionError("Invalid Application Extension block size: $blockSize")
         val appId = getString(11)
         when (appId) {
             "NETSCAPE2.0" -> {
                 val len = nextByte()
                 val subBlockId = nextByte()
                 if (subBlockId == 1) {
-                    if (len != 3) throw AssertionError("Invalid Netscape Looping Extension block size: " + len)
+                    if (len != 3) throw AssertionError("Invalid Netscape Looping Extension block size: $len")
                     val loopCount = buf.char.toInt()
                     debug { "Netscape Extension Loop Count $loopCount" }
                     val terminatorByte = nextByte()
-                    if (terminatorByte != 0) throw AssertionError("Invalid terminator byte " + terminatorByte)
+                    if (terminatorByte != 0) throw AssertionError("Invalid terminator byte $terminatorByte")
                 }
                 return
             }
@@ -189,7 +189,7 @@ constructor(
                 firstFrameOffset = offset
             }
             if (!frameInProgress) {
-                currFrame = FrameDescriptor(offset)
+                currFrame = FrameDescriptor()
             }
             val blockType = buf.get(offset).toUnsignedInt()
             frameInProgress = blockType != BLOCK_TYPE_IMAGE
@@ -198,7 +198,7 @@ constructor(
         fun acceptGraphicControlExt() {
             val blockSize = nextByte()
             if (blockSize != 4) {
-                throw AssertionError("Invalid Graphic Control Extension block size: " + blockSize)
+                throw AssertionError("Invalid Graphic Control Extension block size: $blockSize")
             }
             currFrame!!.gcExtPackedFields = buf.get()
 //            val frameDelay = buf.getChar().toInt()
@@ -263,7 +263,7 @@ constructor(
         fun firstFrameOffset() = firstFrameOffset
     }
 
-    private class FrameDescriptor constructor(internal val start: Int) {
+    private class FrameDescriptor {
         var gcExtPackedFields: Byte = 0
         var gcExtTransparentColorIndex: Byte = 0
         var imageDescStart: Int = 0

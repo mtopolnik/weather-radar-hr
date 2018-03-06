@@ -3,7 +3,6 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
-import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.withContext
 import java.io.File
 import java.io.IOException

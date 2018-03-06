@@ -22,7 +22,6 @@ import android.graphics.Matrix.MSCALE_X
 import android.graphics.Matrix.MSCALE_Y
 import android.graphics.Matrix.MTRANS_X
 import android.graphics.Matrix.MTRANS_Y
-import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -899,8 +898,8 @@ class TouchImageView : ImageView {
 // SuperMin and SuperMax multipliers. Determine how much the image can be
 // zoomed below or above the zoom boundaries, before animating back to the
 // min/max zoom boundary.
-private val SUPER_MIN_MULTIPLIER = .75f
-private val SUPER_MAX_MULTIPLIER = 1.25f
+private const val SUPER_MIN_MULTIPLIER = .75f
+private const val SUPER_MAX_MULTIPLIER = 1.25f
 
 private fun getFixTrans(trans: Float, viewSize: Float, contentSize: Float): Float {
     val (minTrans, maxTrans) = if (contentSize <= viewSize)
@@ -922,6 +921,6 @@ private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): I
         AT_MOST -> Math.min(drawableSize, requestedSize)
         UNSPECIFIED -> drawableSize
         EXACTLY -> requestedSize
-        else -> throw IllegalArgumentException("Undefined measure specification mode " + mode)
+        else -> throw IllegalArgumentException("Undefined measure specification mode $mode")
     }
 }
