@@ -69,25 +69,17 @@ class GifAnimator(
 
     fun animate(): Job? {
         return launch(UI) {
-            try {
-                showFrame(suspendDecodeFrame(0))
-                updateAgeText()
-            } catch (e: StopAnimationException) {
-                info { "Animator stop: ${e.message} before loop" }
-            }
-            try {
-                (1 until gifDecoder.frameCount).forEach { i ->
-                    val nextFrame = suspendDecodeFrame(i)
-                    val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
-                    val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
-                    debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
-                    remainingTillNextFrame.takeIf { it > 0 }?.also {
-                        delay(it)
-                    }
-                    showFrame(nextFrame)
+            showFrame(suspendDecodeFrame(0))
+            updateAgeText()
+            (1 until gifDecoder.frameCount).forEach { i ->
+                val nextFrame = suspendDecodeFrame(i)
+                val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
+                val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
+                debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
+                remainingTillNextFrame.takeIf { it > 0 }?.also {
+                    delay(it)
                 }
-            } catch (e: StopAnimationException) {
-                info { "Animator stop: ${e.message} inside the loop" }
+                showFrame(nextFrame)
             }
         }
     }
