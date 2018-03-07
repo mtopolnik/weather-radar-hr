@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vreeme na radaru</string>
+    <string name="main_activity_title">Vreeme na radaru</string>
+    <string name="img_unavailable">Slika je trenutačno nedostupna.</string>
+    <string name="widget_slo">Radar ARSO</string>
+    <string name="widget_hr">Radar DHMZ</string>
+    <string name="help">Pomoć i saveti</string>
+    <string name="about">O aplikaciji</string>
+    <string name="ads_disabled">Reklame isključene</string>
+    <string name="settings">Postavke</string>
+    <string name="refresh">Osveži</string>
+    <string name="animation_rate">Brzina animacije</string>
+    <string name="freeze_time">Pauza pre ponavljanja</string>
+    <string name="about_text">
+        Verzija %1$s
+        \n© 2018 Belotron d.o.o.
+        \n\nRadarska slika SLO © Agencija Republike Slovenije za okolje
+        \n\nRadarska slika HR © Državni hidrometeorološki zavod
+        \n\nAutor ikone aplikacije: DinosoftLabs from www.flaticon.com
+    </string>
+    <string name="help_text">
+        Kiša skoro nikad ne nastaje nama iznad glave, kišni oblaci putuju
+        nošeni vetrom i nailaze prema nama. Zahvaljujući tome, pogledom na
+        animaciju radarskih slika možeš predvideti da li će biti kiše u
+        narednih nekoliko časova te tačno kada će početi.
+        \n
+        \nOva aplikacija prikazuje animacije koje objavljuju hrvatski Državni
+        hidrometeorološki zavod te Agencija Republike Slovenije za okolje. To su
+        najkvalitetniji izvori, “iz prve ruke”, za ove oblasti.
+        \n
+        \nSavjeti za korištenje:
+        \n
+        \n- Double tapom fokusiraš se na jednu animaciju. Gestom “štipanja” možeš
+        zumirati. Vraćaš se natrag double tapom ili Android-tipkom za natrag.
+        \n
+        \n- Postavi si viđet aplikacije na glavni ekran tako da ti je uvek dostupno
+        trenutno stanje radara.
+        \n
+        \n- Ako dotakneš sliku viđeta, otvara se aplikacija.
+        \n
+        \nAplikacija sa slike OCR-om očitava vreme snimanja, koriguje ga s
+        obzirom na tvoju vremensku zonu i prikazuje iznad slike. Ponekad
+        veb-sedišta ne ažuriraju slike, tada ćeš videti da starost slike raste.
+        Ako je starija od 1h, tekst će da pocrveni da te upozori da slika nije
+        više aktualna.
+        \n
+        \nAplikacija maksimalno štedi mrežni promet, ali uvijek daje najsvežije
+        slike zahvaljujući If-Modified-Since HTTP headeru. Neka te ne iznenadi
+        trenutni odziv nakon osvežavanja, server je javio da nema noviju sliku.
+        Ako je server nedostupan, u naslovu iznad slike pisaće “Offline”.
+    </string>
+</resources>

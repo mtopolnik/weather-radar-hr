@@ -2,8 +2,8 @@
     <string name="app_name">Weather Radar HR and SLO</string>
     <string name="main_activity_title">Weather Radar</string>
     <string name="img_unavailable">Radar image currently unavailable.</string>
-    <string name="widget_slo">Weather Radar SLO</string>
-    <string name="widget_hr">Weather Radar HR=</string>
+    <string name="widget_slo">Radar SLO</string>
+    <string name="widget_hr">Radar HR</string>
     <string name="settings">Settings</string>
     <string name="help">Help and Tips</string>
     <string name="about">About</string>
