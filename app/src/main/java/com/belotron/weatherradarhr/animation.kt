@@ -17,18 +17,19 @@ class AnimationLooper(
     private val animators = arrayOfNulls<GifAnimator>(imgBundles.size)
     private val animatorJobs = arrayOfNulls<Job>(imgBundles.size)
     private var loopingJob: Job? = null
-    private var animationDuration: Int? = null
 
     fun receiveNewGif(desc: ImgDescriptor, gifData: ByteArray, isOffline: Boolean) {
         animators[desc.index] = GifAnimator(imgBundles, desc, gifData, isOffline)
     }
 
-    fun restart(newDuration: Int, newRateMinsPerSec: Int) {
-        animationDuration = newDuration
-        animators.forEach { it?.rateMinsPerSec = newRateMinsPerSec }
+    fun restart(newRateMinsPerSec: Int, newFreezeTimeMillis: Int) {
         info { "AnimationLooper.restart" }
         if (animators.none()) {
             return
+        }
+        animators.forEach {
+            it?.rateMinsPerSec = newRateMinsPerSec
+            it?.freezeTimeMillis = newFreezeTimeMillis
         }
         stop()
         var oldLoopingJob = loopingJob
@@ -40,7 +41,6 @@ class AnimationLooper(
                 animators.forEachIndexed { i, it ->
                     animatorJobs[i] = it?.animate()
                 }
-                delay(animationDuration!!)
             }
         }
     }
@@ -57,7 +57,8 @@ class GifAnimator(
         gifData: ByteArray,
         private val isOffline: Boolean
 ) {
-    var rateMinsPerSec: Int = DEFAULT_ANIMATION_RATE
+    var rateMinsPerSec: Int = 20
+    var freezeTimeMillis: Int = 0
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
@@ -65,28 +66,34 @@ class GifAnimator(
     private val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
     private var timestamp = 0L
     private var currFrame: Bitmap? = null
-    private var currFrameShownAt = 0L
 
-    fun animate(): Job? {
+    fun animate(startIndex: Int = 0): Job? {
+        require(startIndex in 0 until gifDecoder.frameCount) { "startIndex out of range: $startIndex" }
         return launch(UI) {
-            showFrame(suspendDecodeFrame(0))
             updateAgeText()
-            (1 until gifDecoder.frameCount).forEach { i ->
-                val nextFrame = suspendDecodeFrame(i)
-                val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - currFrameShownAt)
-                val remainingTillNextFrame = frameDelayMillis - elapsedSinceFrameShown
-                debug { "$elapsedSinceFrameShown ms since last frame, $remainingTillNextFrame ms till next frame" }
-                remainingTillNextFrame.takeIf { it > 0 }?.also {
+            var frame = suspendDecodeFrame(startIndex)
+            (startIndex + 1 .. gifDecoder.frameCount).forEach { i ->
+                showFrame(frame)
+                val frameShownAt = System.nanoTime()
+                val lastFrameShown = i == gifDecoder.frameCount
+                if (!lastFrameShown) {
+                    frame = suspendDecodeFrame(i)
+                }
+                val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - frameShownAt)
+                val targetDelay =
+                        if (lastFrameShown) Math.max(freezeTimeMillis, frameDelayMillis)
+                        else frameDelayMillis
+                val remainingDelay = targetDelay - elapsedSinceFrameShown
+                debug { "$elapsedSinceFrameShown ms since last frame, $remainingDelay ms till next frame" }
+                remainingDelay.takeIf { it > 0 }?.also {
                     delay(it)
                 }
-                showFrame(nextFrame)
             }
         }
     }
 
     private fun showFrame(newFrame: Bitmap) {
         imgBundle.imgView?.setImageBitmap(newFrame)
-        currFrameShownAt = System.nanoTime()
         currFrame?.dispose()
         currFrame = newFrame
     }

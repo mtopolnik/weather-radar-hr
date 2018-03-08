@@ -35,11 +35,11 @@ private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
 
 val imgDescs = arrayOf(
         ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
-                R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
-                R.id.text_kradar, KradarOcr::ocrKradarTimestamp),
+                R.id.vg_kradar, R.id.text_kradar, R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
+                KradarOcr::ocrKradarTimestamp),
         ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 10,
-                R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
-                R.id.text_lradar, LradarOcr::ocrLradarTimestamp)
+                R.id.vg_lradar, R.id.text_lradar, R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
+                LradarOcr::ocrLradarTimestamp)
 )
 
 class ImgDescriptor(
@@ -47,10 +47,11 @@ class ImgDescriptor(
         val title: String,
         val url: String,
         val minutesPerFrame: Int,
+        val viewGroupId: Int,
+        val textViewId: Int,
         val imgViewId: Int,
         val progressBarId: Int,
         val brokenImgViewId: Int,
-        val textViewId: Int,
         val ocrTimestamp: (Bitmap) -> Long
 ) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
@@ -58,6 +59,7 @@ class ImgDescriptor(
 }
 
 class ImageBundle {
+    var viewGroup: ViewGroup? = null
     var textView: TextView? = null
     var imgView: ImageView? = null
     private var brokenImgView: ImageView? = null
@@ -67,7 +69,7 @@ class ImageBundle {
         set(value) {
             field = value
             progressBar?.setVisible(value == LOADING)
-            imgView?.setVisible(value == SHOWING)
+            viewGroup?.setVisible(value == SHOWING)
             brokenImgView?.setVisible(value == BROKEN)
             if (value != SHOWING) {
                 textView?.text = ""
@@ -89,6 +91,7 @@ class ImageBundle {
     }
 
     fun copyTo(that: ImageBundle) {
+        that.viewGroup = this.viewGroup!!
         that.textView = this.textView!!
         that.imgView = this.imgView!!
         that.brokenImgView = this.brokenImgView!!
@@ -102,6 +105,7 @@ class ImageBundle {
     }
 
     fun destroyViews() {
+        this.viewGroup = null
         this.textView = null
         this.imgView = null
         this.brokenImgView = null
@@ -109,11 +113,13 @@ class ImageBundle {
     }
 
     fun restoreViews(
+            viewGroup: ViewGroup,
             textView: TextView,
             imgView: ImageView,
             brokenImgView: ImageView,
             progressBar: ProgressBar
     ) {
+        this.viewGroup = viewGroup
         this.textView = textView
         this.imgView = imgView
         this.brokenImgView = brokenImgView
@@ -157,6 +163,7 @@ class RadarImageFragment : Fragment() {
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
         vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
         fullScreenBundle.restoreViews(
+                viewGroup = rootView.findViewById(R.id.vg_radar_zoomed),
                 textView = rootView.findViewById(R.id.text_radar_zoomed),
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_radar_zoomed).apply {
                     setOnDoubleTapListener(object: SimpleOnGestureListener() {
@@ -168,6 +175,7 @@ class RadarImageFragment : Fragment() {
                 progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
         imgDescs.forEachIndexed { i, desc -> imgBundles[i].restoreViews(
+                viewGroup = rootView.findViewById(desc.viewGroupId),
                 textView = rootView.findViewById(desc.textViewId),
                 imgView = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
                     val gl = object : SimpleOnGestureListener() {
@@ -200,7 +208,7 @@ class RadarImageFragment : Fragment() {
         val statusIsKnown = imgBundles.none { it.status == UNKNOWN }
         if (statusIsKnown && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.restart(animationDurationMillis, rateMinsPerSec)
+                animationLooper.restart(rateMinsPerSec, freezeTimeMillis)
             }
         } else {
             info { "Reloading animations" }
@@ -317,8 +325,8 @@ class RadarImageFragment : Fragment() {
         imgDescs.forEach {
             imgBundles[it.index].status = LOADING
         }
-        val frameDelayFactor = context.sharedPrefs.rateMinsPerSec
-        val animationDuration = context.sharedPrefs.animationDurationMillis
+        val rateMinsPerSec = context.sharedPrefs.rateMinsPerSec
+        val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
         for (desc in imgDescs) {
             val bundle = imgBundles[desc.index]
             launch(UI) {
@@ -336,7 +344,7 @@ class RadarImageFragment : Fragment() {
                     val gifData = editGif(imgBytes, desc.framesToKeep)
                     with (animationLooper) {
                         receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
-                        restart(animationDuration, frameDelayFactor)
+                        restart(rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
                     context.actionBar.hide()

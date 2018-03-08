@@ -10,7 +10,7 @@ private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 
 const val DEFAULT_ANIMATION_RATE = 85
-private const val DEFAULT_FREEZE_TIME = 1500
+const val DEFAULT_FREEZE_TIME = 1500
 
 val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
