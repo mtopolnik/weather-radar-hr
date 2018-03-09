@@ -15,7 +15,6 @@
             android:shadowDx="2"
             android:shadowDy="2"
             android:shadowRadius="2"
-            android:textIsSelectable="true"
     />
     <TextView
             android:id="@+id/text_red"
@@ -30,7 +29,6 @@
             android:shadowDx="2"
             android:shadowDy="2"
             android:shadowRadius="2"
-            android:textIsSelectable="true"
             android:visibility="gone"
     />
     <ImageView

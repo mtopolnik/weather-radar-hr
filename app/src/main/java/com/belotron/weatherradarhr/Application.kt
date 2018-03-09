@@ -41,6 +41,9 @@ class MyApplication : Application() {
         if (sharedPrefs.adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
         }
+        for (f in noBackupFilesDir.listFiles()) {
+            f.delete()
+        }
     }
 }
 
@@ -81,7 +84,7 @@ fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleV
 
 private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
 
-fun Context.file(name: String) = File(noBackupFilesDir, name)
+fun Context.file(name: String) = File(cacheDir, name)
 
 fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (isOffline) "Offline - " else "") +
         getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)

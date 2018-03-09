@@ -38,7 +38,6 @@
                             android:shadowDx="2"
                             android:shadowDy="2"
                             android:shadowRadius="2"
-                            android:textIsSelectable="true"
                     />
                     <ImageView
                             android:id="@+id/img_kradar"
@@ -84,7 +83,6 @@
                             android:shadowDx="2"
                             android:shadowDy="2"
                             android:shadowRadius="2"
-                            android:textIsSelectable="true"
                     />
                     <ImageView
                             android:id="@+id/img_lradar"
@@ -118,7 +116,7 @@
                 android:id="@+id/adView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
+                android:layout_gravity="bottom|left"
                 ads:adSize="BANNER"
                 ads:adUnitId="@string/adunit_id">
         </com.google.android.gms.ads.AdView>
@@ -138,7 +136,6 @@
         >
             <TextView
                     android:id="@+id/text_radar_zoomed"
-                    android:textIsSelectable="true"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingStart="4dp"
@@ -165,7 +162,7 @@
                     android:layout_width="250dp"
                     android:layout_alignParentBottom="true"
                     android:layout_alignParentRight="true"
-                    android:layout_marginRight="20dp"
+                    android:layout_marginRight="60dp"
                     android:background="#66000000"
             />
         </RelativeLayout>
