@@ -63,7 +63,7 @@ class ImageBundle {
     var viewGroup: ViewGroup? = null; private set
     var textView: TextView? = null; private set
     var imgView: ImageView? = null; private set
-    var seekBar: SeekBar? = null; private set
+    var seekBar: ThumbSeekBar? = null; private set
     private var brokenImgView: ImageView? = null
     private var progressBar: ProgressBar? = null
 
@@ -123,7 +123,7 @@ class ImageBundle {
             viewGroup: ViewGroup,
             textView: TextView,
             imgView: ImageView,
-            seekBar: SeekBar?,
+            seekBar: ThumbSeekBar?,
             brokenImgView: ImageView,
             progressBar: ProgressBar
     ) {

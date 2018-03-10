@@ -9,7 +9,10 @@ import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.runBlocking
 import kotlinx.coroutines.experimental.withContext
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import kotlin.math.roundToInt
 
@@ -66,14 +69,15 @@ class AnimationLooper(
     }
 
     override fun onStopTrackingTouch(seekBar: SeekBar) {
-        val fullScreenAnimator = animators.find { it.hasSeekBar(seekBar) }
-        val plainAnimators = animators.filterNotNull().filter { it.hasSeekBar(null) }
-        plainAnimators.forEach {
-            fullScreenAnimator?.imgBundle?.animationProgress?.also { fullScreenProgress ->
-                it.imgBundle.animationProgress = fullScreenProgress
+        val seekBar = seekBar as ThumbSeekBar
+        (animators.find { it.hasSeekBar(seekBar) } ?: return).also { fullScreenAnimator ->
+            seekBar.thumbText = ""
+            val fullScreenProgress = fullScreenAnimator.imgBundle.animationProgress
+            animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
+                plainAnimator.imgBundle.animationProgress = fullScreenProgress
             }
+            resume()
         }
-        resume()
     }
 
     private fun GifAnimator?.hasSeekBar(seekBar: SeekBar?) = this?.imgBundle?.seekBar == seekBar
@@ -92,7 +96,8 @@ class GifAnimator(
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
-    private var timestamp = 0L
+    private val timestamps = LongArray(gifDecoder.frameCount)
+    private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
 
@@ -103,7 +108,7 @@ class GifAnimator(
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
             (currFrameIndex until frameCount).forEach { i ->
-                val animationProgress = 100 * i / (frameCount - 1)
+                val animationProgress = toProgress(frameIndex = i)
                 if (i == currFrameIndex) {
                     showFrame(frame, animationProgress)
                 }
@@ -137,28 +142,42 @@ class GifAnimator(
         val newFrame = suspendDecodeFrame(frameIndex)
         if (currFrameIndex == frameIndex) {
             showFrame(newFrame, animationProgress)
+            with (imgBundle) {
+                seekBar?.thumbProgress = toProgress(frameIndex)
+                runBlocking {
+                    seekBar?.thumbText = thumbDateFormat.format(suspendGetTimestamp(currFrameIndex, newFrame))
+                }
+            }
         }
     }
 
     private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
-        imgBundle.animationProgress = animationProgress
-        imgBundle.imgView?.setImageBitmap(newFrame)
+        with (imgBundle) {
+            imgView?.setImageBitmap(newFrame)
+            this.animationProgress = animationProgress
+        }
         currFrame?.dispose()
         currFrame = newFrame
     }
 
     private suspend fun updateAgeText() {
-        imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(suspendGetTimestamp(), isOffline)
+        imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(
+                suspendGetTimestamp(timestamps.size - 1), isOffline)
     }
 
-    private suspend fun suspendGetTimestamp(): Long {
-        if (timestamp == 0L) {
-            suspendDecodeFrame(gifDecoder.frameCount - 1).also {
-                timestamp = imgDesc.ocrTimestamp(it)
-                it.dispose()
+    @Suppress("NOTHING_TO_INLINE")
+    private suspend inline fun suspendGetTimestamp(frameIndex: Int, frame: Bitmap? = null): Long {
+        if (timestamps[frameIndex] == 0L) {
+            if (frame != null) {
+                timestamps[frameIndex] = imgDesc.ocrTimestamp(frame)
+            } else {
+                suspendDecodeFrame(frameIndex).also {
+                    timestamps[frameIndex] = imgDesc.ocrTimestamp(it)
+                    it.dispose()
+                }
             }
         }
-        return timestamp
+        return timestamps[frameIndex]
     }
 
     private suspend fun suspendDecodeFrame(frameIndex: Int) =
@@ -168,4 +187,6 @@ class GifAnimator(
 
     private fun toFrameIndex(animationProgress: Int) =
             (animationProgress / 100f * (gifDecoder.frameCount - 1)).roundToInt()
+
+    private fun toProgress(frameIndex: Int) = 100 * frameIndex / (gifDecoder.frameCount - 1)
 }
