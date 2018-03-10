@@ -14,7 +14,6 @@ import android.content.Intent.ACTION_MAIN
 import android.graphics.Bitmap
 import android.graphics.Bitmap.createBitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
 import android.os.PersistableBundle
 import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
@@ -175,7 +174,7 @@ private class WidgetContext (
     fun providerName() = ComponentName(context, wDesc.providerClass)
 
     fun isWidgetInUse() =
-            AppWidgetManager.getInstance(context).getAppWidgetIds(providerName()).isNotEmpty()
+            context.appWidgetManager.getAppWidgetIds(providerName()).isNotEmpty()
 
     fun onUpdateWidget() {
         warn{"onUpdate ${wDesc.name}"}
@@ -204,10 +203,7 @@ private class WidgetContext (
                 updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
             } else if (!onlyIfNew) {
                 warn { "Failed to fetch ${wDesc.imgFilename()}, using preview" }
-                updateRemoteViews(TimestampedBitmap(
-                        0L,
-                        true,
-                        (context.resources.getDrawable(wDesc.previewResourceId, null) as BitmapDrawable).bitmap))
+                updateRemoteViews(null)
             }
             return null
         } catch (t: Throwable) {
@@ -218,21 +214,22 @@ private class WidgetContext (
 
     fun updateRemoteViews(tsBitmap: TimestampedBitmap?) {
         val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
-        remoteViews.setOnClickPendingIntent(R.id.img_view_widget, intentLaunchMainActivity(context))
-        if (tsBitmap != null) {
-            with(remoteViews) {
-                setImageViewBitmap(R.id.img_view_widget, tsBitmap.bitmap)
-                setAgeText(context, tsBitmap.timestamp, tsBitmap.isOffline)
+        with(remoteViews) {
+            setOnClickPendingIntent(R.id.img_view_widget, intentLaunchMainActivity(context))
+            if (tsBitmap != null) tsBitmap.also {
+                setImageViewBitmap(R.id.img_view_widget, it.bitmap)
+                setAgeText(context, it.timestamp, it.isOffline)
+            } else {
+                setImageViewResource(R.id.img_view_widget, wDesc.previewResourceId)
+                setRedText(context.resources.getString(R.string.img_unavailable))
             }
-        } else {
-            remoteViews.setRedText(context.resources.getString(R.string.img_unavailable))
         }
-        AppWidgetManager.getInstance(context).updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
+        context.appWidgetManager.updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
         info { "Updated Remote Views" }
     }
 
     fun scheduleWidgetUpdate(latencyMillis: Long) {
-        val resultCode = context.jobScheduler().schedule(
+        val resultCode = context.jobScheduler.schedule(
                 JobInfo.Builder(wDesc.refreshImageJobId(),
                         ComponentName(context, RefreshImageService::class.java))
                         .setExtras(wDesc.toExtras())
@@ -246,11 +243,11 @@ private class WidgetContext (
 
     fun cancelUpdateAge() {
         info { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
-        context.jobScheduler().cancel(wDesc.updateAgeJobId())
+        context.jobScheduler.cancel(wDesc.updateAgeJobId())
     }
 
     private fun scheduleUpdateAge() {
-        val resultCode = context.jobScheduler().schedule(
+        val resultCode = context.jobScheduler.schedule(
                 JobInfo.Builder(wDesc.updateAgeJobId(), ComponentName(context, UpdateAgeService::class.java))
                         .setExtras(wDesc.toExtras())
                         .setPeriodic(MINUTE_IN_MILLIS)
@@ -281,8 +278,9 @@ private class WidgetContext (
     }
 }
 
-private fun Context.jobScheduler() =
-        getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+private val Context.jobScheduler get() = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+
+private val Context.appWidgetManager get() = AppWidgetManager.getInstance(this)
 
 private fun intentLaunchMainActivity(context: Context): PendingIntent {
     val launchIntent = with(Intent(ACTION_MAIN)) {
