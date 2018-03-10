@@ -335,8 +335,10 @@ class RadarImageFragment : Fragment() {
 
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         val context = activity ?: return
-        imgDescs.forEach {
-            imgBundles[it.index].status = LOADING
+        animationLooper.stop()
+        imgDescs.map { imgBundles[it.index] }.forEach {
+            it.status = LOADING
+            it.animationProgress = 0
         }
         val rateMinsPerSec = context.sharedPrefs.rateMinsPerSec
         val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
@@ -355,6 +357,7 @@ class RadarImageFragment : Fragment() {
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     val gifData = editGif(imgBytes, desc.framesToKeep)
+                    bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
                     with (animationLooper) {
                         receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
                         resume(rateMinsPerSec, freezeTimeMillis)
