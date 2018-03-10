@@ -158,11 +158,12 @@
                     android:scaleType="fitCenter"
             />
             <SeekBar
+                    android:id="@+id/radar_seekbar"
                     android:layout_height="wrap_content"
-                    android:layout_width="250dp"
+                    android:layout_width="170dp"
                     android:layout_alignParentBottom="true"
                     android:layout_alignParentRight="true"
-                    android:layout_marginRight="60dp"
+                    android:layout_marginRight="80dp"
                     android:background="#66000000"
             />
         </RelativeLayout>

@@ -17,6 +17,7 @@ import android.view.View.GONE
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.SeekBar
 import android.widget.TextView
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -59,11 +60,14 @@ class ImgDescriptor(
 }
 
 class ImageBundle {
-    var viewGroup: ViewGroup? = null
-    var textView: TextView? = null
-    var imgView: ImageView? = null
+    var viewGroup: ViewGroup? = null; private set
+    var textView: TextView? = null; private set
+    var imgView: ImageView? = null; private set
+    var seekBar: SeekBar? = null; private set
     private var brokenImgView: ImageView? = null
     private var progressBar: ProgressBar? = null
+
+    var animationProgress: Int = 0
 
     var status = UNKNOWN
         set(value) {
@@ -94,9 +98,11 @@ class ImageBundle {
         that.viewGroup = this.viewGroup!!
         that.textView = this.textView!!
         that.imgView = this.imgView!!
+        that.seekBar = this.seekBar
         that.brokenImgView = this.brokenImgView!!
         that.progressBar = this.progressBar!!
         that.status = this.status
+        that.animationProgress = this.animationProgress
     }
 
     fun clear() {
@@ -108,6 +114,7 @@ class ImageBundle {
         this.viewGroup = null
         this.textView = null
         this.imgView = null
+        this.seekBar = null
         this.brokenImgView = null
         this.progressBar = null
     }
@@ -116,15 +123,18 @@ class ImageBundle {
             viewGroup: ViewGroup,
             textView: TextView,
             imgView: ImageView,
+            seekBar: SeekBar?,
             brokenImgView: ImageView,
             progressBar: ProgressBar
     ) {
         this.viewGroup = viewGroup
         this.textView = textView
         this.imgView = imgView
+        this.seekBar = seekBar
+        seekBar?.progress = animationProgress
         this.brokenImgView = brokenImgView
         this.progressBar = progressBar
-        this.status = status // reapplies the status to view visibility
+        this.status = this.status // reapplies the status to view visibility
     }
 
     enum class Status {
@@ -171,9 +181,11 @@ class RadarImageFragment : Fragment() {
                         override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
                     })
                 },
+                seekBar = rootView.findViewById(R.id.radar_seekbar),
                 brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
                 progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
+        fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
         imgDescs.forEachIndexed { i, desc -> imgBundles[i].restoreViews(
                 viewGroup = rootView.findViewById(desc.viewGroupId),
                 textView = rootView.findViewById(desc.textViewId),
@@ -186,6 +198,7 @@ class RadarImageFragment : Fragment() {
                         imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
                     }
                 },
+                seekBar = null,
                 brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId).apply {
                     setOnClickListener { switchActionBarVisible() }
                     visibility = GONE
@@ -208,7 +221,7 @@ class RadarImageFragment : Fragment() {
         val statusIsKnown = imgBundles.none { it.status == UNKNOWN }
         if (statusIsKnown && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.restart(rateMinsPerSec, freezeTimeMillis)
+                animationLooper.resume(rateMinsPerSec, freezeTimeMillis)
             }
         } else {
             info { "Reloading animations" }
@@ -344,7 +357,7 @@ class RadarImageFragment : Fragment() {
                     val gifData = editGif(imgBytes, desc.framesToKeep)
                     with (animationLooper) {
                         receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
-                        restart(rateMinsPerSec, freezeTimeMillis)
+                        resume(rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
                     context.actionBar.hide()

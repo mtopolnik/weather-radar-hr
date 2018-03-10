@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.graphics.Bitmap
+import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
@@ -10,10 +11,12 @@ import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.withContext
 import java.util.concurrent.TimeUnit.NANOSECONDS
+import kotlin.math.roundToInt
 
 class AnimationLooper(
         private val imgBundles: List<ImageBundle>
-) {
+) : SeekBar.OnSeekBarChangeListener {
+
     private val animators = arrayOfNulls<GifAnimator>(imgBundles.size)
     private val animatorJobs = arrayOfNulls<Job>(imgBundles.size)
     private var loopingJob: Job? = null
@@ -22,14 +25,14 @@ class AnimationLooper(
         animators[desc.index] = GifAnimator(imgBundles, desc, gifData, isOffline)
     }
 
-    fun restart(newRateMinsPerSec: Int, newFreezeTimeMillis: Int) {
-        info { "AnimationLooper.restart" }
+    fun resume(newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
+        info { "AnimationLooper.resume" }
         if (animators.none()) {
             return
         }
         animators.forEach {
-            it?.rateMinsPerSec = newRateMinsPerSec
-            it?.freezeTimeMillis = newFreezeTimeMillis
+            newRateMinsPerSec?.also { _ -> it?.rateMinsPerSec = newRateMinsPerSec }
+            newFreezeTimeMillis?.also { _ -> it?.freezeTimeMillis = newFreezeTimeMillis }
         }
         stop()
         var oldLoopingJob = loopingJob
@@ -49,6 +52,31 @@ class AnimationLooper(
         animatorJobs.forEach { it?.cancel() }
         loopingJob?.cancel()
     }
+
+    override fun onStartTrackingTouch(seekBar: SeekBar) {
+        if (animators.any { it.hasSeekBar(seekBar) }) {
+            stop()
+        }
+    }
+
+    override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+        if (fromUser) launch(UI) {
+            animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
+        }
+    }
+
+    override fun onStopTrackingTouch(seekBar: SeekBar) {
+        val fullScreenAnimator = animators.find { it.hasSeekBar(seekBar) }
+        val plainAnimators = animators.filterNotNull().filter { it.hasSeekBar(null) }
+        plainAnimators.forEach {
+            fullScreenAnimator?.imgBundle?.animationProgress?.also { fullScreenProgress ->
+                it.imgBundle.animationProgress = fullScreenProgress
+            }
+        }
+        resume()
+    }
+
+    private fun GifAnimator?.hasSeekBar(seekBar: SeekBar?) = this?.imgBundle?.seekBar == seekBar
 }
 
 class GifAnimator(
@@ -59,25 +87,32 @@ class GifAnimator(
 ) {
     var rateMinsPerSec: Int = 20
     var freezeTimeMillis: Int = 0
+    val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
     private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
-    private val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
     private var timestamp = 0L
     private var currFrame: Bitmap? = null
+    private var currFrameIndex = 0
 
-    fun animate(startIndex: Int = 0): Job? {
-        require(startIndex in 0 until gifDecoder.frameCount) { "startIndex out of range: $startIndex" }
+    fun animate(): Job? {
+        val frameCount = gifDecoder.frameCount
+        currFrameIndex = toFrameIndex(imgBundle.animationProgress)
         return launch(UI) {
             updateAgeText()
-            var frame = suspendDecodeFrame(startIndex)
-            (startIndex + 1 .. gifDecoder.frameCount).forEach { i ->
-                showFrame(frame)
+            var frame = suspendDecodeFrame(currFrameIndex)
+            (currFrameIndex until frameCount).forEach { i ->
+                val animationProgress = 100 * i / (frameCount - 1)
+                if (i == currFrameIndex) {
+                    showFrame(frame, animationProgress)
+                }
                 val frameShownAt = System.nanoTime()
-                val lastFrameShown = i == gifDecoder.frameCount
+                imgBundle.seekBar?.progress = animationProgress
+                val lastFrameShown = i == frameCount - 1
                 if (!lastFrameShown) {
-                    frame = suspendDecodeFrame(i)
+                    currFrameIndex = i + 1
+                    frame = suspendDecodeFrame(i + 1)
                 }
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - frameShownAt)
                 val targetDelay =
@@ -89,10 +124,24 @@ class GifAnimator(
                     delay(it)
                 }
             }
+            imgBundle.animationProgress = 0
         }
     }
 
-    private fun showFrame(newFrame: Bitmap) {
+    suspend fun seekTo(animationProgress: Int) {
+        val frameIndex = toFrameIndex(animationProgress)
+        if (currFrameIndex == frameIndex) {
+            return
+        }
+        currFrameIndex = frameIndex
+        val newFrame = suspendDecodeFrame(frameIndex)
+        if (currFrameIndex == frameIndex) {
+            showFrame(newFrame, animationProgress)
+        }
+    }
+
+    private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
+        imgBundle.animationProgress = animationProgress
         imgBundle.imgView?.setImageBitmap(newFrame)
         currFrame?.dispose()
         currFrame = newFrame
@@ -116,4 +165,7 @@ class GifAnimator(
             withContext(threadPool) { gifDecoder.decodeFrame(frameIndex) }
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
+
+    private fun toFrameIndex(animationProgress: Int) =
+            (animationProgress / 100f * (gifDecoder.frameCount - 1)).roundToInt()
 }

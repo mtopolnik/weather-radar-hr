@@ -54,7 +54,7 @@ class SeekBarPreference constructor(context: Context, attrs: AttributeSet)
 
     override fun onBindView(view: View) {
         super.onBindView(view)
-        view.findViewById<SeekBar>(R.id.seekbar).also {
+        view.findViewById<SeekBar>(R.id.pref_seekbar).also {
             it.max = max - min
             it.progress = value - min
             it.setOnSeekBarChangeListener(this)
