@@ -5,11 +5,10 @@ import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
-import kotlinx.coroutines.experimental.Deferred
+import kotlinx.coroutines.experimental.CoroutineDispatcher
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
-import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.withContext
@@ -17,11 +16,13 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.math.roundToInt
 
-private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1)).asCoroutineDispatcher()
+private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1), DiscardOldestPolicy())
+        .asCoroutineDispatcher()
 
 class AnimationLooper(
         private val imgBundles: List<ImageBundle>
@@ -107,7 +108,6 @@ class GifAnimator(
     private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
-    private var deferredFrame: Deferred<Bitmap>? = null
 
     fun animate(): Job? {
         val frameCount = gifDecoder.frameCount
@@ -147,18 +147,13 @@ class GifAnimator(
             return
         }
         currFrameIndex = frameIndex
-        deferredFrame?.cancel()
-        val deferredFrame = async(singleThread) { gifDecoder.decodeFrame(frameIndex) }
-        this.deferredFrame = deferredFrame
         val thumbUpdated = timestamps[frameIndex].takeIf { it != 0L}
                 ?.let { updateSeekBarThumb(frameIndex, it); true }
                 ?: false
-        val newFrame = runOrNull { deferredFrame.await() }
-        if (newFrame != null) {
-            showFrame(newFrame, animationProgress)
-            if (!thumbUpdated) {
-                updateSeekBarThumb(frameIndex, suspendGetTimestamp(frameIndex, newFrame))
-            }
+        val newFrame = suspendDecodeFrame(frameIndex, singleThread)
+        showFrame(newFrame, animationProgress)
+        if (!thumbUpdated) {
+            updateSeekBarThumb(frameIndex, getTimestamp(frameIndex, newFrame))
         }
     }
 
@@ -175,6 +170,7 @@ class GifAnimator(
         imgBundle.seekBar?.apply {
             thumbProgress = toProgress(frameIndex)
             thumbText = thumbDateFormat.format(timestamp)
+            invalidate()
         }
 
     }
@@ -185,22 +181,25 @@ class GifAnimator(
     }
 
     @Suppress("NOTHING_TO_INLINE")
-    private suspend inline fun suspendGetTimestamp(frameIndex: Int, frame: Bitmap? = null): Long {
+    private suspend inline fun suspendGetTimestamp(frameIndex: Int): Long {
         if (timestamps[frameIndex] == 0L) {
-            if (frame != null) {
-                timestamps[frameIndex] = imgDesc.ocrTimestamp(frame)
-            } else {
-                suspendDecodeFrame(frameIndex).also {
-                    timestamps[frameIndex] = imgDesc.ocrTimestamp(it)
-                    it.dispose()
-                }
+            suspendDecodeFrame(frameIndex).also {
+                timestamps[frameIndex] = imgDesc.ocrTimestamp(it)
+                it.dispose()
             }
         }
         return timestamps[frameIndex]
     }
 
-    private suspend fun suspendDecodeFrame(frameIndex: Int) =
-            withContext(threadPool) { gifDecoder.decodeFrame(frameIndex) }
+    private fun getTimestamp(frameIndex: Int, frame: Bitmap): Long {
+        if (timestamps[frameIndex] == 0L) {
+            timestamps[frameIndex] = imgDesc.ocrTimestamp(frame)
+        }
+        return timestamps[frameIndex]
+    }
+
+    private suspend fun suspendDecodeFrame(frameIndex: Int, coroCtx: CoroutineDispatcher = threadPool) =
+            withContext(coroCtx) { gifDecoder.decodeFrame(frameIndex) }
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 
