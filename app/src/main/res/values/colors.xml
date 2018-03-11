@@ -6,5 +6,6 @@
     <color name="textRed">#ff4444</color>
     <color name="textRedShadow">#aa4444</color>
     <color name="textWidgetRedShadow">#440000</color>
-    <color name="seekbarThumbBackground">#88000000</color>
+    <color name="seekbarBackground">#66000000</color>
+    <color name="seekbarThumbText">#66eeff</color>
 </resources>

@@ -169,7 +169,7 @@
                     android:layout_alignParentRight="true"
                     android:layout_marginRight="80dp"
                     android:layout_marginBottom="20dp"
-                    android:background="#66000000"
+                    android:background="@color/seekbarBackground"
             />
         </RelativeLayout>
         <ImageView

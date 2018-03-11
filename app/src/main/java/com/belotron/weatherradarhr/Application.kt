@@ -113,3 +113,9 @@ fun ByteArray.toBitmap(): Bitmap {
     return StandardGifDecoder(BitmapFreelists()).also { it.read(this) }.decodeFrame(0)
 //    return BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
 }
+
+inline fun <T> runOrNull(block: () -> T) = try {
+    block()
+} catch (t: Throwable) {
+    null
+}

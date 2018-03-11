@@ -2,7 +2,6 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.widget.SeekBar
@@ -21,14 +20,14 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     private val textBounds = Rect()
     private val textRect = RectF()
     private val textPaint = TextPaint().apply {
-        color = Color.WHITE
+        color = resources.getColor(R.color.seekbarThumbText)
         textSize = resources.getDimensionPixelSize(R.dimen.thumb_text_size).toFloat()
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.LEFT
     }
 
     private val textBackgroundPaint = Paint().apply {
-        color = R.color.seekbarThumbBackground
+        color = resources.getColor(R.color.seekbarBackground)
     }
 
 
@@ -42,13 +41,12 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         val progressRatio = thumbProgress.toFloat() / max
         val netWidth = width - (paddingLeft + paddingRight)
         val thumbX = paddingLeft + progressRatio * netWidth - textBounds.width() / 2f
-        with (textRect) {
-            set(thumbX - textBorder,
-                    -thumbHeight - textBounds.height() - textBorder,
-                    thumbX + textBounds.width() + textBorder,
-                    -thumbHeight + textBorder)
-            canvas.drawRect(this, textBackgroundPaint)
-        }
+        textRect.set(
+                thumbX - textBorder,
+                -thumbHeight - textBounds.height() - textBorder,
+                thumbX + textBounds.width() + textBorder,
+                -thumbHeight + textBorder)
+        canvas.drawRect(textRect, textBackgroundPaint)
         canvas.drawText(thumbText, thumbX, -thumbHeight, textPaint)
     }
 }

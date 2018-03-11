@@ -139,10 +139,4 @@ private fun cacheFile(context: Context, url: String): File {
     return file
 }
 
-private inline fun <T> runOrNull(block: () -> T) = try {
-    block()
-} catch (t: Throwable) {
-    null
-}
-
 class ImageFetchException(val cached : ByteArray?) : Exception()
