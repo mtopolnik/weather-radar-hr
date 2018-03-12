@@ -6,6 +6,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Region
+import android.graphics.Region.Op.*
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.util.AttributeSet
@@ -60,6 +62,7 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
                 -thumbHeight - textBounds.height() - 2 * boxBorder,
                 textX + textBounds.width() + boxBorder,
                 -thumbHeight)
+        canvas.clipRect(textRect, UNION)
         canvas.drawRoundRect(textRect, rectCornerRadius, rectCornerRadius, textBackgroundPaint)
         canvas.drawPath(trianglePath, textBackgroundPaint)
         canvas.drawText(thumbText, textX - textOffset, -thumbHeight - boxBorder, textPaint)

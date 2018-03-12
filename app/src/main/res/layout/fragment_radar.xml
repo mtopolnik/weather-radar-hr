@@ -135,7 +135,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:clipChildren="false"
         >
             <TextView
                     android:id="@+id/text_radar_zoomed"
@@ -161,15 +160,22 @@
                     android:adjustViewBounds="true"
                     android:scaleType="fitCenter"
             />
-            <com.belotron.weatherradarhr.ThumbSeekBar
-                    android:id="@+id/radar_seekbar"
-                    android:layout_height="wrap_content"
-                    android:layout_width="170dp"
+            <FrameLayout
+                    android:layout_height="95dp"
+                    android:layout_width="match_parent"
+                    android:clipChildren="false"
                     android:layout_alignParentBottom="true"
                     android:layout_centerHorizontal="true"
                     android:layout_marginBottom="20dp"
-                    android:background="@color/seekbarBackground"
-            />
+            >
+                <com.belotron.weatherradarhr.ThumbSeekBar
+                        android:id="@+id/radar_seekbar"
+                        android:layout_height="wrap_content"
+                        android:layout_width="170dp"
+                        android:layout_gravity="center_horizontal|bottom"
+                        android:background="@color/seekbarBackground"
+                />
+            </FrameLayout>
         </RelativeLayout>
         <ImageView
                 android:id="@+id/broken_img_zoomed"
