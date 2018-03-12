@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
+import java.lang.Math.max
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
@@ -16,7 +17,7 @@ val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultS
 
 val SharedPreferences.adsEnabled: Boolean get() = getBoolean(KEY_ADS_ENABLED, true)
 
-val SharedPreferences.rateMinsPerSec: Int get() = getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE)
+val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
 val SharedPreferences.freezeTimeMillis: Int get() = getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME)
 
