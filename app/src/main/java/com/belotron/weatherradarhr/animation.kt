@@ -32,7 +32,7 @@ class AnimationLooper(
         }
         stop()
         var oldLoopingJob = loopingJob
-        loopingJob = launch(UI) {
+        loopingJob = start {
             oldLoopingJob?.join()
             oldLoopingJob = null
             while (true) {

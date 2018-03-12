@@ -154,7 +154,7 @@ class TouchImageView : ImageView {
             if (onDrawCalled) {
                 // setScaleType() has been called programmatically, update TouchImageView
                 // with the new scaleType.
-                launch(UI) { setZoom(this@TouchImageView) }
+                start { setZoom(this@TouchImageView) }
             }
         }
     }
