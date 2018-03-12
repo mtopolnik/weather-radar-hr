@@ -18,6 +18,7 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
 
     private val thumbHeight = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_height).toFloat()
     private val boxBorder = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_box_border).toFloat()
+    private val triangleHalfWidth = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_triangle_half_width).toFloat()
     private val textOffset = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_text_offset).toFloat()
     private val rectCornerRadius = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_box_corner_radius).toFloat()
     private val textBounds = Rect()
@@ -47,13 +48,20 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         val netWidth = width - (paddingLeft + paddingRight)
         val thumbCenter = paddingLeft + progressRatio * netWidth
         val textX = thumbCenter - textBounds.width() / 2f
-        val boxX = textX + textOffset
+        trianglePath.apply {
+            reset()
+            moveTo(thumbCenter - triangleHalfWidth, -thumbHeight)
+            lineTo(thumbCenter, 0f)
+            lineTo(thumbCenter + triangleHalfWidth, -thumbHeight)
+            close()
+        }
         textRect.set(
-                boxX - boxBorder,
-                -thumbHeight - textBounds.height() - boxBorder,
-                boxX + textBounds.width() + boxBorder,
-                -thumbHeight + boxBorder)
+                textX - boxBorder,
+                -thumbHeight - textBounds.height() - 2 * boxBorder,
+                textX + textBounds.width() + boxBorder,
+                -thumbHeight)
         canvas.drawRoundRect(textRect, rectCornerRadius, rectCornerRadius, textBackgroundPaint)
-        canvas.drawText(thumbText, textX, -thumbHeight, textPaint)
+        canvas.drawPath(trianglePath, textBackgroundPaint)
+        canvas.drawText(thumbText, textX - textOffset, -thumbHeight - boxBorder, textPaint)
     }
 }

@@ -5,5 +5,6 @@
     <dimen name="seekbar_thumb_height">30dp</dimen>
     <dimen name="seekbar_thumb_box_border">8dp</dimen>
     <dimen name="seekbar_thumb_box_corner_radius">8dp</dimen>
+    <dimen name="seekbar_thumb_triangle_half_width">6dp</dimen>
     <dimen name="seekbar_thumb_text_offset">2dp</dimen>
 </resources>
