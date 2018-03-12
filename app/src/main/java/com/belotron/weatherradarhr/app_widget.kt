@@ -89,7 +89,7 @@ fun Context.startFetchWidgetImages() {
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
         if (wCtx.isWidgetInUse()) {
-            launch(UI) {
+            start {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
         }
@@ -116,7 +116,7 @@ class RefreshImageService : JobService() {
             info { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse()) {
-                launch(UI) {
+                start {
                     val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                     jobFinished(params, lastModified == null)
                     if (lastModified != null) {
@@ -178,7 +178,7 @@ private class WidgetContext (
 
     fun onUpdateWidget() {
         warn{"onUpdate ${wDesc.name}"}
-        launch(UI) {
+        start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
                     if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)

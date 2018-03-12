@@ -17,7 +17,6 @@ import android.view.View.GONE
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.SeekBar
 import android.widget.TextView
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -28,8 +27,6 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
-import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.launch
 import java.util.concurrent.TimeUnit
 
 private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
@@ -265,7 +262,7 @@ class RadarImageFragment : Fragment() {
             }
             R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
-            R.id.about -> launch(UI) {
+            R.id.about -> start {
                 showAboutDialogFragment(activity)
                 updateAdVisibility()
                 switchActionBarVisible()
@@ -278,7 +275,7 @@ class RadarImageFragment : Fragment() {
         indexOfImgInFullScreen = index
         initFullScreenBundle()
         updateFullScreenVisibility()
-        launch(UI) {
+        start {
             fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
                 resetToNeverDrawn()
                 setImageBitmap(imgBundles[index].bitmap)
@@ -292,10 +289,10 @@ class RadarImageFragment : Fragment() {
     fun exitFullScreen() {
         val index = indexOfImgInFullScreen ?: return
         indexOfImgInFullScreen = null
-        launch(UI) {
+        start {
             val target = imgBundles[index]
             if (target.status == SHOWING) {
-                target.imgView?.let { it as TouchImageView }?.animateZoomExit()
+                target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
                 updateFrom(target)
@@ -344,7 +341,7 @@ class RadarImageFragment : Fragment() {
         val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
         for (desc in imgDescs) {
             val bundle = imgBundles[desc.index]
-            launch(UI) {
+            start {
                 try {
                     val (lastModified, imgBytes) = try {
                         fetchUrl(context, desc.url, fetchPolicy)
@@ -353,7 +350,7 @@ class RadarImageFragment : Fragment() {
                     }
                     if (imgBytes == null) {
                         bundle.status = BROKEN
-                        return@launch
+                        return@start
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     val gifData = editGif(imgBytes, desc.framesToKeep)

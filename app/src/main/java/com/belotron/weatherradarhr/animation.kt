@@ -6,6 +6,8 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import kotlinx.coroutines.experimental.CoroutineDispatcher
+import kotlinx.coroutines.experimental.CoroutineStart
+import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
@@ -47,7 +49,7 @@ class AnimationLooper(
         }
         stop()
         var oldLoopingJob = loopingJob
-        loopingJob = launch(UI) {
+        loopingJob = start {
             oldLoopingJob?.join()
             oldLoopingJob = null
             while (true) {
@@ -71,7 +73,7 @@ class AnimationLooper(
     }
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-        if (fromUser) launch(UI) {
+        if (fromUser) launch(UI, start = UNDISPATCHED) {
             animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
         }
     }
@@ -112,7 +114,7 @@ class GifAnimator(
     fun animate(): Job? {
         val frameCount = gifDecoder.frameCount
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
-        return launch(UI) {
+        return start {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
             (currFrameIndex until frameCount).forEach { i ->
