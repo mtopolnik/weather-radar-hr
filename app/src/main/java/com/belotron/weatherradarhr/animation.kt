@@ -1,18 +1,16 @@
 package com.belotron.weatherradarhr
 
+import android.animation.ObjectAnimator
 import android.graphics.Bitmap
+import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import kotlinx.coroutines.experimental.CoroutineDispatcher
-import kotlinx.coroutines.experimental.CoroutineStart
-import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -22,6 +20,7 @@ import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1), DiscardOldestPolicy())
         .asCoroutineDispatcher()
@@ -63,6 +62,9 @@ class AnimationLooper(
 
     fun stop() {
         animatorJobs.forEach { it?.cancel() }
+        animators.filterNotNull().forEach {
+            it.stopSeekBarAnimation()
+        }
         loopingJob?.cancel()
     }
 
@@ -73,7 +75,7 @@ class AnimationLooper(
     }
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-        if (fromUser) launch(UI, start = UNDISPATCHED) {
+        if (fromUser) start {
             animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
         }
     }
@@ -82,6 +84,7 @@ class AnimationLooper(
         val seekBar = seekBar as ThumbSeekBar
         (animators.find { it.hasSeekBar(seekBar) } ?: return).also { fullScreenAnimator ->
             seekBar.thumbText = ""
+            seekBar.invalidate()
             val fullScreenProgress = fullScreenAnimator.imgBundle.animationProgress
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
@@ -110,10 +113,12 @@ class GifAnimator(
     private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
+    private var seekBarAnimator: ObjectAnimator? = null
 
     fun animate(): Job? {
         val frameCount = gifDecoder.frameCount
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
+        animateSeekBarIfPresent()
         return start {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
@@ -123,7 +128,7 @@ class GifAnimator(
                     showFrame(frame, animationProgress)
                 }
                 val frameShownAt = System.nanoTime()
-                imgBundle.seekBar?.progress = animationProgress
+                animateSeekBarIfPresent()
                 val lastFrameShown = i == frameCount - 1
                 if (!lastFrameShown) {
                     currFrameIndex = i + 1
@@ -140,6 +145,14 @@ class GifAnimator(
                 }
             }
             imgBundle.animationProgress = 0
+            stopSeekBarAnimation()
+        }
+    }
+
+    fun stopSeekBarAnimation() {
+        seekBarAnimator?.also {
+            it.pause()
+            seekBarAnimator = null
         }
     }
 
@@ -175,6 +188,21 @@ class GifAnimator(
             invalidate()
         }
 
+    }
+
+    private fun animateSeekBarIfPresent() {
+        if (seekBarAnimator != null) {
+            return
+        }
+        val seekBar = imgBundle.seekBar ?: return
+        seekBar.also {
+            val progressF = imgBundle.animationProgress / 100f
+            seekBarAnimator = ObjectAnimator.ofInt(it, "progress", imgBundle.animationProgress, 100).apply {
+                duration = (gifDecoder.frameCount * frameDelayMillis * (1 - progressF)).roundToLong()
+                interpolator = LinearInterpolator()
+                start()
+            }
+        }
     }
 
     private suspend fun updateAgeText() {
