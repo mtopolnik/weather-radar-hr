@@ -147,6 +147,7 @@ class RadarImageFragment : Fragment() {
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(imgBundles)
     private var rootView: View? = null
+    private val adView get() = rootView?.findViewById<AdView>(R.id.adView)
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
     private var indexOfImgInFullScreen: Int? = null
@@ -225,6 +226,7 @@ class RadarImageFragment : Fragment() {
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
             activity.startFetchWidgetImages()
         }
+        adView?.resume()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -237,6 +239,7 @@ class RadarImageFragment : Fragment() {
         imgBundles.forEach { it.destroyViews() }
         fullScreenBundle.destroyViews()
         stashedImgBundle.destroyViews()
+        adView?.destroy()
     }
 
     override fun onPause() {
@@ -245,6 +248,7 @@ class RadarImageFragment : Fragment() {
         wasFastResume = false
         animationLooper.stop()
         activity.sharedPrefs.lastReloadedTimestamp = lastReloadedTimestamp
+        adView?.pause()
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -322,7 +326,7 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun updateAdVisibility() {
-        val adView = rootView?.findViewById<AdView>(R.id.adView) ?: return
+        val adView = adView ?: return
         val adsEnabled = activity.sharedPrefs.adsEnabled
         adView.setVisible(adsEnabled)
         if (adsEnabled) {
