@@ -7,4 +7,5 @@
     <dimen name="seekbar_thumb_box_corner_radius">8dp</dimen>
     <dimen name="seekbar_thumb_triangle_half_width">6dp</dimen>
     <dimen name="seekbar_thumb_text_offset">2dp</dimen>
+    <dimen name="seekbar_landscape_right_margin">50dp</dimen>
 </resources>

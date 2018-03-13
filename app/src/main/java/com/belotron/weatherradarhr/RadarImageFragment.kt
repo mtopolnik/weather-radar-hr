@@ -2,11 +2,13 @@ package com.belotron.weatherradarhr
 
 import android.app.Fragment
 import android.content.Intent
+import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -15,6 +17,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.View.GONE
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -28,6 +31,7 @@ import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import java.util.concurrent.TimeUnit
+
 
 private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
 
@@ -183,7 +187,15 @@ class RadarImageFragment : Fragment() {
                 brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
                 progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
-        fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
+        with (fullScreenBundle.seekBar!!) {
+            setOnSeekBarChangeListener(animationLooper)
+            if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
+                with (layoutParams as FrameLayout.LayoutParams) {
+                    gravity = Gravity.BOTTOM or Gravity.RIGHT
+                    rightMargin = resources.getDimensionPixelOffset(R.dimen.seekbar_landscape_right_margin)
+                }
+            }
+        }
         imgDescs.forEachIndexed { i, desc -> imgBundles[i].restoreViews(
                 viewGroup = rootView.findViewById(desc.viewGroupId),
                 textView = rootView.findViewById(desc.textViewId),
@@ -375,4 +387,3 @@ class RadarImageFragment : Fragment() {
 
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
 }
-
