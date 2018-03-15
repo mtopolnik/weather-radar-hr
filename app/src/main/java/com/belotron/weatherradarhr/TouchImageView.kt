@@ -47,13 +47,21 @@ import android.widget.ImageView.ScaleType.FIT_START
 import android.widget.ImageView.ScaleType.FIT_XY
 import android.widget.ImageView.ScaleType.MATRIX
 import android.widget.OverScroller
-import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.launch
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.Continuation
 import kotlin.coroutines.experimental.suspendCoroutine
+import kotlin.math.max
+import kotlin.math.min
+
 
 private val ZOOM_TIME = TimeUnit.MILLISECONDS.toNanos(500).toFloat()
+
+// SuperMin and SuperMax multipliers. Determine how much the image can be
+// zoomed below or above the zoom boundaries, before animating back to the
+// min/max zoom boundary.
+private const val SUPER_MIN_MULTIPLIER = .75f
+private const val SUPER_MAX_MULTIPLIER = 1.25f
+private const val OVERFLING = 70
 
 private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
@@ -84,13 +92,13 @@ class TouchImageView : ImageView {
 
     private lateinit var scaleType: ImageView.ScaleType
 
-    // Size of view and previous view size (ie before rotation)
+    // Size of view. Before and After rotation.
     private var viewWidth = 0
     private var viewHeight = 0
     private var prevViewWidth = 0
     private var prevViewHeight = 0
 
-    // Size of image when it is stretched to fit view. Before and After rotation.
+    // Size of image when stretched to fit view. Before and After rotation.
     private var matchViewWidth = 0f
     private var matchViewHeight = 0f
     private var prevMatchViewWidth = 0f
@@ -104,7 +112,6 @@ class TouchImageView : ImageView {
     private val gestureDetector: GestureDetector
     private var fling: Fling? = null
     private var userTouchListener: View.OnTouchListener? = null
-    private var touchImageViewListener: (() -> Unit)? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
     constructor(context: Context) : this(context, null, 0)
@@ -159,17 +166,6 @@ class TouchImageView : ImageView {
     }
 
     override fun getScaleType(): ImageView.ScaleType = scaleType
-
-    override fun canScrollHorizontally(direction: Int): Boolean {
-        currMatrix.getValues(m)
-        val x = m[MTRANS_X]
-        return when {
-            imageWidth < viewWidth -> false
-            x >= -1 && direction < 0 -> false
-            Math.abs(x) + viewWidth.toFloat() + 1f >= imageWidth && direction > 0 -> false
-            else -> true
-        }
-    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val drawable = drawable
@@ -301,10 +297,6 @@ class TouchImageView : ImageView {
         userTouchListener = l
     }
 
-    fun setOnTouchImageViewListener(l: () -> Unit) {
-        touchImageViewListener = l
-    }
-
     fun setOnDoubleTapListener(l: GestureDetector.OnDoubleTapListener) {
         doubleTapListener = l
     }
@@ -365,7 +357,6 @@ class TouchImageView : ImageView {
         m[MTRANS_X] = -(focusX * imageWidth - viewWidth * 0.5f)
         m[MTRANS_Y] = -(focusY * imageHeight - viewHeight * 0.5f)
         currMatrix.setValues(m)
-        fixTrans()
         imageMatrix = currMatrix
     }
 
@@ -409,41 +400,6 @@ class TouchImageView : ImageView {
         prevViewWidth = viewWidth
     }
 
-    /**
-     * Performs boundary checking and fixes the image matrix if it is out of bounds.
-     */
-    private fun fixTrans() {
-        currMatrix.getValues(m)
-        val transX = m[MTRANS_X]
-        val transY = m[MTRANS_Y]
-
-        val fixTransX = getFixTrans(transX, viewWidth.toFloat(), imageWidth)
-        val fixTransY = getFixTrans(transY, viewHeight.toFloat(), imageHeight)
-
-        if (fixTransX != 0f || fixTransY != 0f) {
-            currMatrix.postTranslate(fixTransX, fixTransY)
-        }
-    }
-
-    /**
-     * When transitioning from zooming from focus to zoom from center (or vice versa)
-     * the image can become unaligned within the view. This is apparent when zooming
-     * quickly. When the content size is less than the view size, the content will often
-     * be centered incorrectly within the view. fixScaleTrans first calls fixTrans() and
-     * then makes sure the image is centered correctly within the view.
-     */
-    private fun fixScaleTrans() {
-        fixTrans()
-        currMatrix.getValues(m)
-        if (imageWidth < viewWidth) {
-            m[MTRANS_X] = (viewWidth - imageWidth) / 2
-        }
-        if (imageHeight < viewHeight) {
-            m[MTRANS_Y] = (viewHeight - imageHeight) / 2
-        }
-        currMatrix.setValues(m)
-    }
-
     private fun fitImageToView() {
         val drawable: Drawable? = drawable
         if (drawable == null || drawable.intrinsicWidth == 0 || drawable.intrinsicHeight == 0) {
@@ -465,7 +421,6 @@ class TouchImageView : ImageView {
             // The view has been freshly created. Stretch and center image to fit.
             currMatrix.setScale(scale, scale)
             currMatrix.postTranslate(redundantXSpace / 2, redundantYSpace / 2)
-            fixTrans()
             // Set the initial zoom so that the image covers the width of the view.
             // This matches the scale in radar image overview.
             val initialZoom = (viewWidth.toDouble() / drawableWidth) / scale
@@ -507,7 +462,6 @@ class TouchImageView : ImageView {
 
         // Set the matrix to the adjusted scale and translate values.
         currMatrix.setValues(m)
-        fixTrans()
         setImageMatrix(currMatrix)
     }
 
@@ -624,7 +578,6 @@ class TouchImageView : ImageView {
             else -> deltaScale
         }
         currMatrix.postScale(deltaScale1.toFloat(), deltaScale1.toFloat(), focusX, focusY)
-        fixScaleTrans()
     }
 
     private fun printMatrixInfo(msg: String) {
@@ -680,11 +633,6 @@ class TouchImageView : ImageView {
                 translateImageToCenterTouchPosition(zoomProgress)
                 imageMatrix = currMatrix
 
-                // OnTouchImageViewListener is set: double tap runnable updates listener
-                // with every frame.
-                if (touchImageViewListener != null) {
-                    touchImageViewListener!!.invoke()
-                }
                 if (zoomProgress < 1f) {
                     postOnAnimation(this)
                 } else {
@@ -708,7 +656,6 @@ class TouchImageView : ImageView {
             val targetY = startTouch.y + t * (endTouch.y - startTouch.y)
             val curr = transformCoordBitmapToTouch(bitmapX, bitmapY)
             currMatrix.postTranslate(targetX - curr.x, targetY - curr.y)
-            fixScaleTrans()
         }
     }
 
@@ -761,7 +708,7 @@ class TouchImageView : ImageView {
             if (state == State.NONE || state == State.DRAG || state == State.FLING) {
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        last.set(curr)
+                        last.set(curr.x, curr.y)
                         fling?.cancelFling()
                         state = State.DRAG
                     }
@@ -769,11 +716,14 @@ class TouchImageView : ImageView {
                     MotionEvent.ACTION_MOVE -> if (state == State.DRAG) {
                         val deltaX = curr.x - last.x
                         val deltaY = curr.y - last.y
-                        val fixTransX = getFixDragTrans(deltaX, viewWidth.toFloat(), imageWidth)
-                        val fixTransY = getFixDragTrans(deltaY, viewHeight.toFloat(), imageHeight)
-                        currMatrix.postTranslate(fixTransX, fixTransY)
-                        fixTrans()
                         last.set(curr.x, curr.y)
+                        currMatrix.postTranslate(deltaX, deltaY)
+                        currMatrix.getValues(m)
+                        m[MTRANS_X] = max(-imageWidth + viewWidth / 2, m[MTRANS_X])
+                        m[MTRANS_Y] = max(-imageHeight + viewHeight / 2, m[MTRANS_Y])
+                        m[MTRANS_X] = min(viewWidth / 2f, m[MTRANS_X])
+                        m[MTRANS_Y] = min(viewHeight / 2f, m[MTRANS_Y])
+                        currMatrix.setValues(m)
                     }
 
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
@@ -784,10 +734,6 @@ class TouchImageView : ImageView {
             imageMatrix = currMatrix
             if (userTouchListener != null) {
                 userTouchListener!!.onTouch(v, event)
-            }
-            // OnTouchImageViewListener is set: TouchImageView dragged by user.
-            if (touchImageViewListener != null) {
-                touchImageViewListener!!.invoke()
             }
             return true
         }
@@ -816,7 +762,6 @@ class TouchImageView : ImageView {
                 currMatrix.postTranslate(deltaX, deltaY)
             }
             prevTouchPoint = touchPoint
-            touchImageViewListener?.invoke()
             return true
         }
 
@@ -839,11 +784,6 @@ class TouchImageView : ImageView {
         }
     }
 
-    /**
-     * Fling launches sequential runnables which apply
-     * the fling graphic to the image. The values for the translation
-     * are interpolated by the Scroller.
-     */
     private inner class Fling internal constructor(velocityX: Int, velocityY: Int) : Runnable {
 
         internal var scroller: OverScroller? = OverScroller(context)
@@ -855,13 +795,16 @@ class TouchImageView : ImageView {
             currMatrix.getValues(m)
             val startX = m[MTRANS_X].toInt()
             val startY = m[MTRANS_Y].toInt()
-            val (minX, maxX) = if (imageWidth > viewWidth)
-                Pair(viewWidth - imageWidth.toInt(), 0) else
-                Pair(startX, startX)
-            val (minY, maxY) = if (imageHeight > viewHeight)
-                Pair(viewHeight - imageHeight.toInt(), 0) else
-                Pair(startY, startY)
-            scroller!!.fling(startX, startY, velocityX, velocityY, minX, maxX, minY, maxY)
+            val minX = -imageWidth.toInt() + viewWidth / 2
+            val maxX = viewWidth / 2
+            val minY = -imageHeight.toInt() + viewHeight / 2
+            val maxY = viewHeight / 2
+            scroller!!.fling(
+                    startX, startY,
+                    velocityX, velocityY,
+                    minX, maxX,
+                    minY, maxY,
+                    OVERFLING, OVERFLING)
             currX = startX
             currY = startY
         }
@@ -873,7 +816,6 @@ class TouchImageView : ImageView {
         }
 
         override fun run() {
-            touchImageViewListener?.invoke()
             val scroller = scroller!!
             if (scroller.isFinished) {
                 this.scroller = null
@@ -887,33 +829,11 @@ class TouchImageView : ImageView {
                 currX = newX
                 currY = newY
                 currMatrix.postTranslate(transX.toFloat(), transY.toFloat())
-                fixTrans()
                 imageMatrix = currMatrix
                 postOnAnimation(this)
             }
         }
     }
-}
-
-// SuperMin and SuperMax multipliers. Determine how much the image can be
-// zoomed below or above the zoom boundaries, before animating back to the
-// min/max zoom boundary.
-private const val SUPER_MIN_MULTIPLIER = .75f
-private const val SUPER_MAX_MULTIPLIER = 1.25f
-
-private fun getFixTrans(trans: Float, viewSize: Float, contentSize: Float): Float {
-    val (minTrans, maxTrans) = if (contentSize <= viewSize)
-        Pair(0f, viewSize - contentSize) else
-        Pair(viewSize - contentSize, 0f)
-    return when {
-        trans < minTrans -> -trans + minTrans
-        trans > maxTrans -> -trans + maxTrans
-        else -> 0f
-    }
-}
-
-private fun getFixDragTrans(delta: Float, viewSize: Float, contentSize: Float): Float {
-    return if (contentSize <= viewSize) 0f else delta
 }
 
 private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): Int {
