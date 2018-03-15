@@ -118,7 +118,6 @@ class GifAnimator(
     fun animate(): Job? {
         val frameCount = gifDecoder.frameCount
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
-        animateSeekBarIfPresent()
         return start {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
@@ -127,8 +126,8 @@ class GifAnimator(
                 if (i == currFrameIndex) {
                     showFrame(frame, animationProgress)
                 }
+                animateSeekBarIfNeeded()
                 val frameShownAt = System.nanoTime()
-                animateSeekBarIfPresent()
                 val lastFrameShown = i == frameCount - 1
                 if (!lastFrameShown) {
                     currFrameIndex = i + 1
@@ -167,6 +166,7 @@ class GifAnimator(
                 ?: false
         val newFrame = suspendDecodeFrame(frameIndex, singleThread)
         showFrame(newFrame, animationProgress)
+        updateAgeText()
         if (!thumbUpdated) {
             updateSeekBarThumb(frameIndex, getTimestamp(frameIndex, newFrame))
         }
@@ -190,7 +190,7 @@ class GifAnimator(
 
     }
 
-    private fun animateSeekBarIfPresent() {
+    private fun animateSeekBarIfNeeded() {
         if (seekBarAnimator != null) {
             return
         }
