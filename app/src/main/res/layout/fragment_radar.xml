@@ -45,7 +45,6 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:adjustViewBounds="true"
-                            android:paddingBottom="8dp"
                     />
                 </LinearLayout>
                 <ImageView
@@ -76,7 +75,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:paddingLeft="4dp"
-                            android:padding="4dp"
+                            android:paddingTop="4dp"
                             android:minLines="1"
                             android:maxLines="1"
                             android:layout_gravity="bottom"
@@ -91,7 +90,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:adjustViewBounds="true"
-                            android:paddingBottom="60dp"
+                            android:paddingBottom="55dp"
                     />
                 </LinearLayout>
                 <ImageView
