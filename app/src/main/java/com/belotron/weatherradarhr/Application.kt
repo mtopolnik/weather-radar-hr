@@ -35,7 +35,7 @@ const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
 const val KEY_ADS_ENABLED = "ads_enabled"
 private const val KEY_SAVED_AT = "instance-state-saved-at"
 
-val threadPool = Executors.newCachedThreadPool().asCoroutineDispatcher()
+val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-radar-pool") }.asCoroutineDispatcher()
 
 class MyApplication : Application() {
     override fun onCreate() {

@@ -15,6 +15,7 @@ import kotlinx.coroutines.experimental.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.TimeUnit.NANOSECONDS
@@ -22,8 +23,11 @@ import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1), DiscardOldestPolicy())
+private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1),
+        ThreadFactory { task -> Thread(task, "weather-radar-animation") }, DiscardOldestPolicy())
         .asCoroutineDispatcher()
+
+private val linear = LinearInterpolator()
 
 class AnimationLooper(
         private val imgBundles: List<ImageBundle>
@@ -199,7 +203,7 @@ class GifAnimator(
             val progressF = imgBundle.animationProgress / 100f
             seekBarAnimator = ObjectAnimator.ofInt(it, "progress", imgBundle.animationProgress, 100).apply {
                 duration = (gifDecoder.frameCount * frameDelayMillis * (1 - progressF)).roundToLong()
-                interpolator = LinearInterpolator()
+                interpolator = linear
                 start()
             }
         }
