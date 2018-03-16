@@ -46,9 +46,6 @@ class MyApplication : Application() {
         if (sharedPrefs.adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
         }
-        for (f in noBackupFilesDir.listFiles()) {
-            f.delete()
-        }
     }
 }
 
