@@ -7,6 +7,7 @@ import android.preference.PreferenceManager
 import java.lang.Math.max
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
+private const val KEY_LAST_PAUSED_TIMESTAMP = "last-paused-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 
@@ -21,13 +22,11 @@ val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RA
 
 val SharedPreferences.freezeTimeMillis: Int get() = getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME)
 
-val SharedPreferences.animationDurationMillis: Int get() =
-    1000 * ANIMATION_COVERS_MINUTES / rateMinsPerSec + freezeTimeMillis
+val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
+fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long) = putLong(KEY_LAST_RELOADED_TIMESTAMP, value)
 
-var SharedPreferences.lastReloadedTimestamp: Long
-    get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
-    set(value) = applyUpdate { putLong(KEY_LAST_RELOADED_TIMESTAMP, value) }
-
+val SharedPreferences.lastPausedTimestamp: Long get() = getLong(KEY_LAST_PAUSED_TIMESTAMP, 0L)
+fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long) = putLong(KEY_LAST_PAUSED_TIMESTAMP, value)
 
 fun Context.migratePrefs() {
     with(sharedPrefs) {

@@ -6,6 +6,7 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
+import android.text.format.DateUtils.*
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.Gravity
@@ -30,10 +31,9 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
-import java.util.concurrent.TimeUnit
 
 
-private val RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS = TimeUnit.MINUTES.toMillis(5)
+private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
 val imgDescs = arrayOf(
         ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
@@ -169,7 +169,7 @@ class RadarImageFragment : Fragment() {
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         info { "RadarImageFragment.onCreateView" }
-        wasFastResume = savedInstanceState?.wasFastResume ?: false
+        wasFastResume = savedInstanceState?.savedStateRecently ?: false
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
@@ -224,10 +224,16 @@ class RadarImageFragment : Fragment() {
     }
 
     override fun onResume() {
+        val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         info { "RadarImageFragment.onResume" }
         super.onResume()
-        lastReloadedTimestamp = activity.sharedPrefs.lastReloadedTimestamp
-        val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
+        activity.sharedPrefs.also {
+            lastReloadedTimestamp = it.lastReloadedTimestamp
+            if (it.lastPausedTimestamp < aWhileAgo && isInFullScreen) {
+                exitFullScreen()
+            }
+        }
+        val isTimeToReload = lastReloadedTimestamp < aWhileAgo
         val isAnimationShowing = imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
@@ -259,7 +265,10 @@ class RadarImageFragment : Fragment() {
         super.onPause()
         wasFastResume = false
         animationLooper.stop()
-        activity.sharedPrefs.lastReloadedTimestamp = lastReloadedTimestamp
+        activity.sharedPrefs.applyUpdate {
+            setLastReloadedTimestamp(lastReloadedTimestamp)
+            setLastPausedTimestamp(System.currentTimeMillis())
+        }
         adView?.pause()
     }
 
@@ -293,8 +302,6 @@ class RadarImageFragment : Fragment() {
         updateFullScreenVisibility()
         start {
             fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
-                resetToNeverDrawn()
-                setImageBitmap(imgBundles[index].bitmap)
                 awaitOnDraw()
                 animateZoomEnter(e)
             }
@@ -332,6 +339,9 @@ class RadarImageFragment : Fragment() {
         val target = imgBundles[indexOfImgInFullScreen ?: return]
         target.copyTo(stashedImgBundle)
         with(fullScreenBundle) {
+            imgView?.let { it as TouchImageView }?.apply {
+                resetToNeverDrawn()
+            }
             updateFrom(target)
             copyTo(target)
         }

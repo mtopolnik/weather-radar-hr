@@ -6,9 +6,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.support.v4.content.ContextCompat.getColor
-import android.text.format.DateUtils
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
+import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.text.format.DateUtils.getRelativeDateTimeString
 import android.view.View
 import android.view.View.GONE
@@ -19,7 +19,6 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
-import kotlinx.coroutines.experimental.CoroutineStart
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
@@ -93,7 +92,6 @@ fun Context.file(name: String) = File(cacheDir, name)
 fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (isOffline) "Offline - " else "") +
         getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
 
-
 fun Activity.switchActionBarVisible():Boolean {
     val actionBar = actionBar!!
     if (actionBar.isShowing) {
@@ -106,8 +104,8 @@ fun Activity.switchActionBarVisible():Boolean {
 
 fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis())
 
-val Bundle.wasFastResume: Boolean
-    get() = System.currentTimeMillis() - getLong(KEY_SAVED_AT) < DateUtils.SECOND_IN_MILLIS
+val Bundle.savedStateRecently: Boolean
+    get() = System.currentTimeMillis() - getLong(KEY_SAVED_AT) < SECOND_IN_MILLIS
 
 fun File.dataIn() = DataInputStream(FileInputStream(this))
 

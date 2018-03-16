@@ -33,7 +33,7 @@ class MainActivity : Activity()  {
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         info { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
-        if (savedInstanceState.wasFastResume && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
+        if (savedInstanceState.savedStateRecently && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
             actionBar.hide()
         }
     }
