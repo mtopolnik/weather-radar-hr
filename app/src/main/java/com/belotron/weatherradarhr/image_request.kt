@@ -31,9 +31,9 @@ suspend fun fetchUrl(
         }
     }
     val conn = URL(url).openConnection() as HttpURLConnection
-    val ifModifiedSince = loadCachedLastModified(context, url)
-    ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
     try {
+        val ifModifiedSince = loadCachedLastModified(context, url)
+        ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
         conn.connect()
         when {
             conn.responseCode == 200 ->
