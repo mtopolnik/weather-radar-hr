@@ -228,8 +228,8 @@ class RadarImageFragment : Fragment() {
         super.onResume()
         lastReloadedTimestamp = activity.sharedPrefs.lastReloadedTimestamp
         val isTimeToReload = System.currentTimeMillis() > lastReloadedTimestamp + RELOAD_ON_RESUME_IF_OLDER_THAN_MILLIS
-        val statusIsKnown = imgBundles.none { it.status == UNKNOWN }
-        if (statusIsKnown && (wasFastResume || !isTimeToReload)) {
+        val isAnimationShowing = imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
+        if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
                 animationLooper.resume(rateMinsPerSec, freezeTimeMillis)
             }
