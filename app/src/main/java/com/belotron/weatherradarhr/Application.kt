@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Point
+import android.graphics.PointF
 import android.os.Bundle
 import android.support.v4.content.ContextCompat.getColor
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -13,6 +15,7 @@ import android.text.format.DateUtils.getRelativeDateTimeString
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
@@ -53,6 +56,19 @@ fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = UNDISPA
 fun View.setVisible(state: Boolean) {
     visibility = if (state) VISIBLE else GONE
 }
+
+operator fun Point.component1() = x
+operator fun Point.component2() = y
+operator fun PointF.component1() = x
+operator fun PointF.component2() = y
+
+val ImageView?.bitmapSize get() = this?.drawable
+        ?.run { Point(intrinsicWidth, intrinsicHeight) }
+        ?: Point(0, 0)
+
+val ImageView?.bitmapSizeF get() = this?.drawable
+        ?.run { PointF(intrinsicWidth.toFloat(), intrinsicHeight.toFloat()) }
+        ?: PointF(0f, 0f)
 
 fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
     text = context.ageText(timestamp, isOffline)
