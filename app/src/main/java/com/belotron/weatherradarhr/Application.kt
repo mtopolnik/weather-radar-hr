@@ -62,13 +62,17 @@ operator fun Point.component2() = y
 operator fun PointF.component1() = x
 operator fun PointF.component2() = y
 
-val ImageView?.bitmapSize get() = this?.drawable
-        ?.run { Point(intrinsicWidth, intrinsicHeight) }
-        ?: Point(0, 0)
+fun ImageView?.bitmapSize(p: Point) =
+        p.also { this?.drawable
+                ?.apply { it.set(intrinsicWidth, intrinsicHeight) }
+                ?: it.set(0, 0)
+        }.takeIf { it.x > 0 && it.y > 0 }
 
-val ImageView?.bitmapSizeF get() = this?.drawable
-        ?.run { PointF(intrinsicWidth.toFloat(), intrinsicHeight.toFloat()) }
-        ?: PointF(0f, 0f)
+fun ImageView?.bitmapSize(p: PointF) =
+        p.also { this?.drawable
+                ?.apply { it.set(intrinsicWidth.toFloat(), intrinsicHeight.toFloat()) }
+                ?: it.set(0f, 0f)
+        }.takeIf { it.x > 0 && it.y > 0 }
 
 fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
     text = context.ageText(timestamp, isOffline)

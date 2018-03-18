@@ -4,6 +4,7 @@ import android.app.Fragment
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.text.format.DateUtils.*
@@ -61,10 +62,10 @@ class ImgDescriptor(
 }
 
 class ImageBundle {
-    var viewGroup: ViewGroup? = null; private set
     var textView: TextView? = null; private set
     var imgView: ImageView? = null; private set
     var seekBar: ThumbSeekBar? = null; private set
+    private var viewGroup: ViewGroup? = null
     private var brokenImgView: ImageView? = null
     private var progressBar: ProgressBar? = null
 
@@ -202,7 +203,14 @@ class RadarImageFragment : Fragment() {
                 imgView = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
                     val gl = object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
-                        override fun onDoubleTap(e: MotionEvent) = enterFullScreen(i, e)
+                        override fun onDoubleTap(e: MotionEvent): Boolean {
+                            val (bitmapW, bitmapH) = imgView.bitmapSize(PointF()) ?: return true
+                            val focusX = (e.x / imgView.width) * bitmapW
+                            val focusY = (e.y / imgView.height) * bitmapH
+                            val (screenX, screenY) = IntArray(2).also { imgView.getLocationInWindow(it) }
+                            enterFullScreen(i, screenX, screenY, focusX, focusY)
+                            return true
+                        }
                     }
                     GestureDetector(activity, gl).let {
                         imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
@@ -296,17 +304,16 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun enterFullScreen(index: Int, e: MotionEvent): Boolean {
+    private fun enterFullScreen(index: Int, startImgX: Int, startImgY: Int, bitmapX: Float, bitmapY: Float) {
         indexOfImgInFullScreen = index
         initFullScreenBundle()
         updateFullScreenVisibility()
         start {
             fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
                 awaitOnDraw()
-                animateZoomEnter(e)
+                animateZoomEnter(startImgX, startImgY, bitmapX, bitmapY)
             }
         }
-        return true
     }
 
     fun exitFullScreen() {
