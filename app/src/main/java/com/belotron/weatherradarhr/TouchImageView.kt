@@ -16,6 +16,7 @@ package com.belotron.weatherradarhr
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.PropertyValuesHolder
+import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
@@ -48,21 +49,33 @@ import android.widget.OverScroller
 import com.belotron.weatherradarhr.State.ANIMATE_ZOOM
 import com.belotron.weatherradarhr.State.FLING
 import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.Unconfined
+import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.cancelAndJoin
+import kotlinx.coroutines.experimental.launch
 import kotlin.coroutines.experimental.Continuation
 import kotlin.coroutines.experimental.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
+private const val ZOOM_DURATION = 300L
 private const val SUPER_MIN_MULTIPLIER = .75f
 private const val SUPER_MAX_MULTIPLIER = 1.25f
 private const val OVERFLING = 70
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 128f
+private const val MAX_IMG_DIST_FROM_EDGE = 0.25f
+
+private val QUADRATIC = TimeInterpolator { t ->
+    if (t < 0.5) 2 * t * t
+    else (1 - 2 * (1 - t) * (1 - t))
+}
 
 private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
+
 
 class TouchImageView : ImageView {
 
@@ -85,16 +98,16 @@ class TouchImageView : ImageView {
 
     private var state = State.NONE
 
-    private var defaultScale = 0f
+    private var unitScale = 0f
     private var superMinScale = 0f
     private var superMaxScale = 0f
 
     private lateinit var scaleType: ImageView.ScaleType
 
-    // initial coordinates of the image on the screen, when entering
-    // the full screen view
-    private var initialImgX: Int = 0
-    private var initialImgY: Int = 0
+    // initial coordinates of the image inside the view,
+    // when entering the full screen view
+    private var fromImgX: Int = 0
+    private var fromImgY: Int = 0
 
     // Size of view. Before and After rotation.
     private var viewWidth = 0
@@ -117,6 +130,13 @@ class TouchImageView : ImageView {
     private var flingJob: Job? = null
     private var userTouchListener: View.OnTouchListener? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
+
+    private val imageWidth: Float get() = matchViewWidth * currentZoom
+    private val imageHeight: Float get() = matchViewHeight * currentZoom
+    private val minTransX: Float get() = -imageWidth + viewWidth * (1 - MAX_IMG_DIST_FROM_EDGE)
+    private val maxTransX: Float get() = viewWidth * MAX_IMG_DIST_FROM_EDGE
+    private val minTransY: Float get() = -imageHeight + viewHeight * (1 - MAX_IMG_DIST_FROM_EDGE)
+    private val maxTransY: Float get() = viewHeight * MAX_IMG_DIST_FROM_EDGE
 
     constructor(context: Context) : this(context, null, 0)
 
@@ -179,17 +199,22 @@ class TouchImageView : ImageView {
         viewWidth = computeViewSize(widthMode, widthSize, bitmapW)
         viewHeight = computeViewSize(heightMode, heightSize, bitmapH)
         setMeasuredDimension(viewWidth, viewHeight)
-        fitImageToView()
     }
 
     override fun onDraw(canvas: Canvas) {
-        onDrawCalled = true
+        info {"enter onDraw"}
+        if (!onDrawCalled) {
+            fitImageToView()
+            onDrawCalled = true
+        }
         imageRenderedAtLeastOnce = true
         onDrawContinuation?.apply {
             onDrawContinuation = null
+            info {"resume continuation"}
             resume(Unit)
         }
         super.onDraw(canvas)
+        info {"onDraw done"}
     }
 
     override fun onSaveInstanceState(): Parcelable {
@@ -235,19 +260,34 @@ class TouchImageView : ImageView {
 
     /**
      * startImgX,Y say where on the screen should the image be at the start of
-     * zoom animation
+     * zoom animation.
+     * bitmapX,Y are the coordinates of the double-tap event in bitmap's
+     * coordinate system.
      */
-    suspend fun animateZoomEnter(startImgX: Int, startImgY: Int, bitmapX: Float, bitmapY: Float) {
-        val (_, bitmapH) = bitmapSize(pointF) ?: return
+    suspend fun animateZoomEnter(startImgX: Int, startImgY: Int, bitmapFocusX: Float, bitmapFocusY: Float) {
+        info {"animateZoomEnter"}
+        val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
+
+        fun targetImgCoord(viewSize: Int, bitmapSize: Float, bitmapFocus: Float, targetScale: Float): Float {
+            val imgSize = bitmapSize * targetScale
+            val desiredImgCoord = viewSize / 2f - bitmapFocus * targetScale
+            val coordAligningOppositeEdgeWithView = viewSize - bitmapSize * targetScale
+            return if (imgSize > viewSize)
+                min(0f, max(coordAligningOppositeEdgeWithView, desiredImgCoord)) else
+                max(0f, min(coordAligningOppositeEdgeWithView, desiredImgCoord))
+        }
+
+        val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
         currMatrix.getValues(m)
-        initialImgX = startImgX
-        initialImgY = startImgY
-        m[MTRANS_X] = startImgX.toFloat()
-        m[MTRANS_Y] = startImgY.toFloat()
-        currMatrix.setValues(m)
-        imageMatrix = currMatrix
-        val zoomTo = (viewHeight.toFloat() / bitmapH) / defaultScale
-        animateZoom(zoomTo, bitmapX, bitmapY, false)
+        val fitWidthScale = viewWidth.toFloat() / bitmapW
+        val toScale = max(fitWidthScale, viewHeight.toFloat() / bitmapH)
+        fromImgX = startImgX - screenX
+        fromImgY = startImgY - screenY
+        animateZoom(
+                fitWidthScale, toScale,
+                fromImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale),
+                fromImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale))
+
     }
 
     suspend fun animateZoomExit() {
@@ -256,34 +296,15 @@ class TouchImageView : ImageView {
         val targetScale = (viewWidth.toFloat() / drawable!!.intrinsicWidth)
         val initialTransX = m[MTRANS_X]
         val initialTransY = m[MTRANS_Y]
-        val targetTransX = initialImgX.toFloat()
-        val targetTransY = initialImgY.toFloat()
-        withState(ANIMATE_ZOOM) {
-            ValueAnimator.ofPropertyValuesHolder(
-                    PropertyValuesHolder.ofFloat("scale", initialScale, targetScale),
-                    PropertyValuesHolder.ofFloat("transX", initialTransX, targetTransX),
-                    PropertyValuesHolder.ofFloat("transY", initialTransY, targetTransY)
-            ).apply {
-                addUpdateListener { anim ->
-                    currMatrix.getValues(m)
-                    val scale = anim.getAnimatedValue("scale") as Float
-                    val transX = anim.getAnimatedValue("transX") as Float
-                    val transY = anim.getAnimatedValue("transY") as Float
-                    m[MSCALE_X] = scale
-                    m[MSCALE_Y] = scale
-                    m[MTRANS_X] = transX
-                    m[MTRANS_Y] = transY
-                    currMatrix.setValues(m)
-                    imageMatrix = currMatrix
-                }
-                startAndJoin()
-            }
-        }
+        val targetTransX = fromImgX.toFloat()
+        val targetTransY = fromImgY.toFloat()
+        animateZoom(initialScale, targetScale, initialTransX, targetTransX, initialTransY, targetTransY)
     }
 
     suspend fun awaitOnDraw() {
         if (onDrawCalled) return
         require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
+        info {"Suspending until onDraw"}
         suspendCoroutine<Unit> { onDrawContinuation = it }
     }
 
@@ -294,44 +315,24 @@ class TouchImageView : ImageView {
     fun resetToNeverDrawn() {
         onDrawCalled = false
         imageRenderedAtLeastOnce = false
-    }
-
-    /**
-     * False if image is in initial, unzoomed state. True otherwise.
-     */
-    private val isZoomed get() = currentZoom != 1f
-
-    private val imageWidth: Float get() = matchViewWidth * currentZoom
-    private val imageHeight: Float get() = matchViewHeight * currentZoom
-
-    /**
-     * Saves the current matrix and view dimensions
-     * in the prevMatrix and prevView variables.
-     */
-    private fun savePreviousImageValues() {
-        if (viewHeight == 0 || viewWidth == 0) return
-        currMatrix.getValues(m)
-        prevMatrix.setValues(m)
-        prevMatchViewHeight = matchViewHeight
-        prevMatchViewWidth = matchViewWidth
-        prevViewHeight = viewHeight
-        prevViewWidth = viewWidth
+        unitScale = 0f
+        currentZoom = 1f
+        matchViewWidth = 0f
+        matchViewHeight = 0f
     }
 
     private fun fitImageToView() {
         val (bitmapW, bitmapH) = bitmapSize(point) ?: return
-        val scale = viewWidth.toFloat() / bitmapW
-        defaultScale = scale
+        val scale = min(viewWidth.toFloat() / bitmapW, viewHeight.toFloat() / bitmapH)
+        unitScale = scale
 
         // Center the image
-        val redundantYSpace = viewHeight - scale * bitmapH
-        matchViewWidth = viewWidth.toFloat()
-        matchViewHeight = viewHeight - redundantYSpace
+        matchViewWidth = bitmapW * scale
+        matchViewHeight = bitmapH * scale
 
-        if (!isZoomed && !imageRenderedAtLeastOnce) {
+        if (!imageRenderedAtLeastOnce) {
             // The view has been freshly created. Stretch and center image to fit.
             currMatrix.setScale(scale, scale)
-            adjustScale(1.0, (viewWidth / 2).toFloat(), (viewHeight / 2).toFloat(), false)
             imageMatrix = currMatrix
             return
         }
@@ -370,6 +371,51 @@ class TouchImageView : ImageView {
         // Set the matrix to the adjusted scale and translate values.
         currMatrix.setValues(m)
         imageMatrix = currMatrix
+    }
+
+    private suspend fun animateZoom(
+            fromScale: Float, toScale: Float,
+            fromTransX: Float, toTransX: Float,
+            fromTransY: Float, toTransY: Float
+    ) {
+        withState(ANIMATE_ZOOM) {
+            ValueAnimator.ofPropertyValuesHolder(
+                    PropertyValuesHolder.ofFloat("scale", fromScale, toScale),
+                    PropertyValuesHolder.ofFloat("transX", fromTransX, toTransX),
+                    PropertyValuesHolder.ofFloat("transY", fromTransY, toTransY)
+            ).apply {
+                duration = ZOOM_DURATION
+                interpolator = QUADRATIC
+                addUpdateListener { anim ->
+                    currMatrix.getValues(m)
+                    val scale = anim.getAnimatedValue("scale") as Float
+                    val transX = anim.getAnimatedValue("transX") as Float
+                    val transY = anim.getAnimatedValue("transY") as Float
+                    m[MSCALE_X] = scale
+                    m[MSCALE_Y] = scale
+                    m[MTRANS_X] = transX
+                    m[MTRANS_Y] = transY
+                    currMatrix.setValues(m)
+                    currentZoom = scale / unitScale
+                    imageMatrix = currMatrix
+                }
+                run()
+            }
+        }
+    }
+
+    /**
+     * Saves the current matrix and view dimensions to the prevMatrix and
+     * prevView variables.
+     */
+    private fun savePreviousImageValues() {
+        if (viewHeight == 0 || viewWidth == 0) return
+        currMatrix.getValues(m)
+        prevMatrix.setValues(m)
+        prevMatchViewHeight = matchViewHeight
+        prevMatchViewWidth = matchViewWidth
+        prevViewHeight = viewHeight
+        prevViewWidth = viewWidth
     }
 
     /**
@@ -426,61 +472,24 @@ class TouchImageView : ImageView {
         return pointF
     }
 
-    private fun adjustScale(deltaScale: Double, focusX: Float, focusY: Float, stretchImageToSuper: Boolean) {
+    private fun adjustScale(scaleChange: Float, focusX: Float, focusY: Float, stretchImageToSuper: Boolean) {
         val (lowerScale, upperScale) = if (stretchImageToSuper)
             Pair(superMinScale, superMaxScale) else
             Pair(MIN_ZOOM, MAX_ZOOM)
         val origScale = currentZoom
-        currentZoom *= deltaScale.toFloat()
-        val deltaScale1 = when {
+        currentZoom *= scaleChange
+        val actualChange = when {
             currentZoom > upperScale -> {
                 currentZoom = upperScale
-                (upperScale / origScale).toDouble()
+                upperScale / origScale
             }
             currentZoom < lowerScale -> {
                 currentZoom = lowerScale
-                (lowerScale / origScale).toDouble()
+                lowerScale / origScale
             }
-            else -> deltaScale
+            else -> scaleChange
         }
-        currMatrix.postScale(deltaScale1.toFloat(), deltaScale1.toFloat(), focusX, focusY)
-    }
-
-    /**
-     * focusX, focusY refer to the bitmap's intrinsic coordinate system
-     */
-    private suspend fun animateZoom(targetZoom: Float, focusX: Float, focusY: Float, stretchImageToSuper: Boolean) {
-        val startZoom = currentZoom
-        val zoomChange = targetZoom - currentZoom
-        // starting position of the focus point in the view's coordinate system
-        val (startFocusX, startFocusY) = transformCoordsBitmapToView(focusX, focusY, pointF)
-        // target position of the focus point in the view's coordinate system
-        val targetFocusX = viewWidth / 2f
-        val targetFocusY = viewHeight / 2f
-
-        /**
-         * Glide the image from initial position to where it should end up
-         * so the double-tap position comes to the center of the view.
-         */
-        fun glideTowardsCenteredTouchPosition(progress: Float) {
-            val targetX = startFocusX + progress * (targetFocusX - startFocusX)
-            val targetY = startFocusY + progress * (targetFocusY - startFocusY)
-            val (currX, currY) = transformCoordsBitmapToView(focusX, focusY, pointF)
-            currMatrix.postTranslate(targetX - currX, targetY - currY)
-        }
-
-        withState(ANIMATE_ZOOM) {
-            ValueAnimator.ofFloat(startZoom, startZoom + zoomChange).apply {
-                addUpdateListener { anim ->
-                    val zoom = anim.animatedValue as Float
-                    val deltaScale = zoom.toDouble() / currentZoom
-                    adjustScale(deltaScale, startFocusX, startFocusY, stretchImageToSuper)
-                    glideTowardsCenteredTouchPosition(anim.animatedFraction)
-                    imageMatrix = currMatrix
-                }
-                startAndJoin()
-            }
-        }
+        currMatrix.postScale(actualChange, actualChange, focusX, focusY)
     }
 
     private fun startFling(velocityX: Float, velocityY: Float) {
@@ -492,15 +501,11 @@ class TouchImageView : ImageView {
                 currMatrix.getValues(m)
                 val startX = m[MTRANS_X].toInt()
                 val startY = m[MTRANS_Y].toInt()
-                val minX = -imageWidth.toInt() + viewWidth / 2
-                val maxX = viewWidth / 2
-                val minY = -imageHeight.toInt() + viewHeight / 2
-                val maxY = viewHeight / 2
                 val scroller = OverScroller(context).apply {
                     fling(startX, startY,
-                            velocityX.toInt(), velocityY.toInt(),
-                            minX, maxX,
-                            minY, maxY,
+                            velocityX.roundToInt(), velocityY.roundToInt(),
+                            minTransX.roundToInt(), maxTransX.roundToInt(),
+                            minTransY.roundToInt(), maxTransY.roundToInt(),
                             OVERFLING, OVERFLING)
                 }
                 var currX = startX
@@ -514,10 +519,17 @@ class TouchImageView : ImageView {
                     currY = newY
                     currMatrix.postTranslate(transX.toFloat(), transY.toFloat())
                     imageMatrix = currMatrix
-                    awaitAnimationStep()
+                    UI.awaitFrame()
                 }
             }
         }
+    }
+
+    private fun constrainTranslate() {
+        currMatrix.getValues(m)
+        m[MTRANS_X] = clipToRange(m[MTRANS_X], minTransX..maxTransX)
+        m[MTRANS_Y] = clipToRange(m[MTRANS_Y], minTransY..maxTransY)
+        currMatrix.setValues(m)
     }
 
     private suspend fun withState(state: State, block: suspend () -> Unit) = try {
@@ -584,12 +596,7 @@ class TouchImageView : ImageView {
                         val deltaY = curr.y - last.y
                         last.set(curr.x, curr.y)
                         currMatrix.postTranslate(deltaX, deltaY)
-                        currMatrix.getValues(m)
-                        m[MTRANS_X] = max(-imageWidth + viewWidth / 2, m[MTRANS_X])
-                        m[MTRANS_Y] = max(-imageHeight + viewHeight / 2, m[MTRANS_Y])
-                        m[MTRANS_X] = min(viewWidth / 2f, m[MTRANS_X])
-                        m[MTRANS_Y] = min(viewHeight / 2f, m[MTRANS_Y])
-                        currMatrix.setValues(m)
+                        constrainTranslate()
                     }
 
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
@@ -621,7 +628,7 @@ class TouchImageView : ImageView {
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val touchPoint = PointF(detector.focusX, detector.focusY)
-            adjustScale(detector.scaleFactor.toDouble(), touchPoint.x, touchPoint.y, true)
+            adjustScale(detector.scaleFactor, touchPoint.x, touchPoint.y, true)
             prevTouchPoint?.also {
                 val deltaX = touchPoint.x - it.x
                 val deltaY = touchPoint.y - it.y
@@ -644,10 +651,38 @@ class TouchImageView : ImageView {
                 animateToZoomBoundary = true
             }
             if (animateToZoomBoundary) {
-                val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
-                start { animateZoom(targetZoom, (bitmapW / 2), (bitmapH / 2), true) }
+                launch(Unconfined) { animateTouchZoom(targetZoom) }
             }
         }
+
+        private suspend fun animateTouchZoom(targetZoom: Float) {
+            val startZoom = currentZoom
+            val zoomChange = targetZoom - currentZoom
+            val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
+            val (viewFocusX, viewFocusY) = transformCoordsBitmapToView(bitmapW / 2, bitmapH / 2, pointF)
+
+            withState(ANIMATE_ZOOM) {
+                ValueAnimator.ofFloat(startZoom, startZoom + zoomChange).apply {
+                    duration = ZOOM_DURATION
+                    addUpdateListener { anim ->
+                        val zoom = anim.animatedValue as Float
+                        val deltaScale = zoom / currentZoom
+                        adjustScale(deltaScale, viewFocusX, viewFocusY, true)
+                        constrainTranslate()
+                        imageMatrix = currMatrix
+                    }
+                    run()
+                }
+            }
+        }
+    }
+}
+
+private fun clipToRange(x: Float, range: ClosedFloatingPointRange<Float>): Float {
+    return when {
+        x < range.start -> range.start
+        x > range.endInclusive -> range.endInclusive
+        else -> x
     }
 }
 
@@ -660,9 +695,7 @@ private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): I
     }
 }
 
-private suspend fun View.awaitAnimationStep() = suspendCoroutine<Unit> { postOnAnimation { it.resume(Unit) } }
-
-private suspend fun ValueAnimator.startAndJoin() {
+private suspend fun ValueAnimator.run() {
     suspendCoroutine<Unit> { cont ->
         addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(a: Animator) {
