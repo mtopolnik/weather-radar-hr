@@ -618,8 +618,8 @@ class TouchImageView : ImageView {
                         val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
                         val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
                         currMatrix.getValues(m)
-                        if (!isWithinRange(m[MTRANS_X], minTransX, maxTransX)
-                                || !isWithinRange(m[MTRANS_Y], minTransY, maxTransY)
+                        if (!(m[MTRANS_X] in minTransX..maxTransX)
+                                || !(m[MTRANS_Y] in minTransY..maxTransY)
                         ) {
                             startFling(0f, 0f)
                         } else {
@@ -706,10 +706,6 @@ class TouchImageView : ImageView {
 private fun coerceToRange(x: Float, range: PointF): Float {
     val (rangeStart, rangeEnd) = range
     return x.coerceIn(rangeStart, rangeEnd)
-}
-
-private fun isWithinRange(x: Float, rangeStart: Float, rangeEnd: Float): Boolean {
-    return x >= rangeStart && x <= rangeEnd
 }
 
 private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): Int {

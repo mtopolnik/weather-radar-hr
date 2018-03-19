@@ -10,6 +10,7 @@ import android.graphics.Region.Op.*
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.util.AttributeSet
+import android.view.View
 import android.widget.SeekBar
 
 
@@ -30,7 +31,6 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         textSize = resources.getDimensionPixelSize(R.dimen.seekbar_thumb_text_size).toFloat()
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.LEFT
-
     }
 
     private val textBackgroundPaint = Paint().apply {
@@ -65,5 +65,11 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         canvas.drawRoundRect(textRect, rectCornerRadius, rectCornerRadius, textBackgroundPaint)
         canvas.drawPath(trianglePath, textBackgroundPaint)
         canvas.drawText(thumbText, textX - textOffset, -thumbHeight - boxBorder, textPaint)
+    }
+
+    fun animateEnter() {
+        val targetY = y
+        y = (parent as View).height.toFloat()
+        animate().y(targetY)
     }
 }

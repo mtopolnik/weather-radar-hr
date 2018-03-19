@@ -18,6 +18,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.GONE
+import android.view.View.INVISIBLE
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -306,13 +307,20 @@ class RadarImageFragment : Fragment() {
 
     private fun enterFullScreen(index: Int, startImgX: Int, startImgY: Int, bitmapX: Float, bitmapY: Float) {
         indexOfImgInFullScreen = index
-        fullScreenBundle.imgView?.let { it as TouchImageView }?.reset()
-        setupFullScreenBundle()
-        updateFullScreenVisibility()
-        start {
-            fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
-                awaitOnDraw()
-                animateZoomEnter(startImgX, startImgY, bitmapX, bitmapY)
+        with (fullScreenBundle) {
+            imgView?.let { it as TouchImageView }?.reset()
+            setupFullScreenBundle()
+            updateFullScreenVisibility()
+            seekBar?.visibility = INVISIBLE
+            start {
+                imgView?.let { it as TouchImageView }?.apply {
+                    awaitOnDraw()
+                    animateZoomEnter(startImgX, startImgY, bitmapX, bitmapY)
+                }
+                seekBar?.apply {
+                    setVisible(true)
+                    animateEnter()
+                }
             }
         }
     }
