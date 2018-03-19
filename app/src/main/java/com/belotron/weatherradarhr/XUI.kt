@@ -2,10 +2,15 @@ package com.belotron.weatherradarhr
 
 import android.os.Handler
 import android.os.Looper
-import android.view.Choreographer
-import kotlinx.coroutines.experimental.*
+import android.os.Looper.myLooper
+import kotlinx.coroutines.experimental.CancellableContinuation
+import kotlinx.coroutines.experimental.CoroutineDispatcher
+import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
-import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.Delay
+import kotlinx.coroutines.experimental.DisposableHandle
+import kotlinx.coroutines.experimental.Runnable
+import kotlinx.coroutines.experimental.launch
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.CoroutineContext
 
@@ -32,15 +37,13 @@ private const val MAX_DELAY = Long.MAX_VALUE / 2 // cannot delay for too long on
  * @param handler a handler.
  * @param name an optional name for debugging.
  */
-public class HandlerContext(
+class HandlerContext(
     private val handler: Handler,
     private val name: String? = null
 ) : CoroutineDispatcher(), Delay {
-    @Volatile
-    private var _choreographer: Choreographer? = null
 
     override fun dispatch(context: CoroutineContext, block: Runnable) {
-        if (Looper.myLooper() == handler.looper) {
+        if (myLooper() == handler.looper) {
             block.run()
         } else {
             handler.post(block)
@@ -48,9 +51,10 @@ public class HandlerContext(
     }
 
     override fun scheduleResumeAfterDelay(time: Long, unit: TimeUnit, continuation: CancellableContinuation<Unit>) {
-        handler.postDelayed({
-            with(continuation) { resumeUndispatched(Unit) }
-        }, unit.toMillis(time).coerceAtMost(MAX_DELAY))
+        handler.postDelayed(
+                { with(continuation) { resumeUndispatched(Unit) } },
+                unit.toMillis(time).coerceAtMost(MAX_DELAY)
+        )
     }
 
     override fun invokeOnTimeout(time: Long, unit: TimeUnit, block: Runnable): DisposableHandle {
@@ -59,37 +63,6 @@ public class HandlerContext(
             override fun dispose() {
                 handler.removeCallbacks(block)
             }
-        }
-    }
-
-    /**
-     * Awaits the next animation frame and returns frame time in nanoseconds.
-     */
-    public suspend fun awaitFrame(): Long {
-        // fast path when choreographer is already known
-        val choreographer = _choreographer
-        if (choreographer != null) {
-            return suspendCancellableCoroutine { cont ->
-                postFrameCallback(choreographer, cont)
-            }
-        }
-        // post into looper thread thread to figure it out
-        return suspendCancellableCoroutine { cont ->
-           handler.post {
-               updateChoreographerAndPostFrameCallback(cont)
-           }
-        }
-    }
-
-    private fun updateChoreographerAndPostFrameCallback(cont: CancellableContinuation<Long>) {
-        val choreographer = _choreographer ?:
-            Choreographer.getInstance()!!.also { _choreographer = it }
-        postFrameCallback(choreographer, cont)
-    }
-
-    private fun postFrameCallback(choreographer: Choreographer, cont: CancellableContinuation<Long>) {
-        choreographer.postFrameCallback { nanos ->
-            with(cont) { resumeUndispatched(nanos) }
         }
     }
 

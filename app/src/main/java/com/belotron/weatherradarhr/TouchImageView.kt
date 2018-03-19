@@ -36,6 +36,10 @@ import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.MotionEvent.ACTION_DOWN
+import android.view.MotionEvent.ACTION_MOVE
+import android.view.MotionEvent.ACTION_POINTER_UP
+import android.view.MotionEvent.ACTION_UP
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.View.MeasureSpec.AT_MOST
@@ -47,12 +51,13 @@ import android.widget.ImageView.ScaleType.FIT_START
 import android.widget.ImageView.ScaleType.MATRIX
 import android.widget.OverScroller
 import com.belotron.weatherradarhr.State.ANIMATE_ZOOM
+import com.belotron.weatherradarhr.State.DRAG
 import com.belotron.weatherradarhr.State.FLING
+import com.belotron.weatherradarhr.State.NONE
+import com.belotron.weatherradarhr.State.ZOOM
 import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.Unconfined
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.cancelAndJoin
-import kotlinx.coroutines.experimental.launch
 import kotlin.coroutines.experimental.Continuation
 import kotlin.coroutines.experimental.suspendCoroutine
 import kotlin.math.max
@@ -62,10 +67,9 @@ import kotlin.math.roundToInt
 private const val ZOOM_DURATION = 300L
 private const val SUPER_MIN_MULTIPLIER = .75f
 private const val SUPER_MAX_MULTIPLIER = 1.25f
-private const val OVERFLING = 70
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 128f
-private const val MAX_IMG_DIST_FROM_EDGE = 0.25f
+private const val BLACK_BORDER_PROPORTION = 0.25f
 
 private val QUADRATIC = TimeInterpolator { t ->
     if (t < 0.5) 2 * t * t
@@ -79,11 +83,7 @@ private enum class State {
 
 class TouchImageView : ImageView {
 
-    /**
-     * The current zoom. This is the zoom relative to the initial
-     * scale, not the original resource.
-     */
-    var currentZoom: Float = 1f; private set
+    private val overdrag = resources.getDimensionPixelOffset(R.dimen.overdrag)
 
     // Matrix applied to the image. MSCALE_X and MSCALE_Y should always be equal.
     // MTRANS_X and MTRANS_Y can be changed as needed. prevMatrix is the matrix
@@ -96,11 +96,12 @@ class TouchImageView : ImageView {
     private val pointF = PointF()
     private val point = Point()
 
-    private var state = State.NONE
+    private var state = NONE
 
     private var unitScale = 0f
     private var superMinScale = 0f
     private var superMaxScale = 0f
+    private var currentZoom: Float = 1f
 
     private lateinit var scaleType: ImageView.ScaleType
 
@@ -133,10 +134,6 @@ class TouchImageView : ImageView {
 
     private val imageWidth: Float get() = matchViewWidth * currentZoom
     private val imageHeight: Float get() = matchViewHeight * currentZoom
-    private val minTransX: Float get() = -imageWidth + viewWidth * (1 - MAX_IMG_DIST_FROM_EDGE)
-    private val maxTransX: Float get() = viewWidth * MAX_IMG_DIST_FROM_EDGE
-    private val minTransY: Float get() = -imageHeight + viewHeight * (1 - MAX_IMG_DIST_FROM_EDGE)
-    private val maxTransY: Float get() = viewHeight * MAX_IMG_DIST_FROM_EDGE
 
     constructor(context: Context) : this(context, null, 0)
 
@@ -312,30 +309,26 @@ class TouchImageView : ImageView {
         doubleTapListener = l
     }
 
-    fun resetToNeverDrawn() {
+    fun reset() {
         onDrawCalled = false
         imageRenderedAtLeastOnce = false
-        unitScale = 0f
-        currentZoom = 1f
-        matchViewWidth = 0f
-        matchViewHeight = 0f
     }
 
     private fun fitImageToView() {
         val (bitmapW, bitmapH) = bitmapSize(point) ?: return
         val scale = min(viewWidth.toFloat() / bitmapW, viewHeight.toFloat() / bitmapH)
         unitScale = scale
-
-        // Center the image
         matchViewWidth = bitmapW * scale
         matchViewHeight = bitmapH * scale
 
         if (!imageRenderedAtLeastOnce) {
             // The view has been freshly created. Stretch and center image to fit.
+            currentZoom = 1f
             currMatrix.setScale(scale, scale)
             imageMatrix = currMatrix
             return
         }
+
         // Reaching this point means the view was reconstructed after rotation.
         // Place the image on the screen according to the dimensions of the
         // previous image matrix.
@@ -501,23 +494,25 @@ class TouchImageView : ImageView {
                 currMatrix.getValues(m)
                 val startX = m[MTRANS_X].toInt()
                 val startY = m[MTRANS_Y].toInt()
+                val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
+                val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
                 val scroller = OverScroller(context).apply {
                     fling(startX, startY,
                             velocityX.roundToInt(), velocityY.roundToInt(),
                             minTransX.roundToInt(), maxTransX.roundToInt(),
                             minTransY.roundToInt(), maxTransY.roundToInt(),
-                            OVERFLING, OVERFLING)
+                            overdrag, overdrag)
                 }
                 var currX = startX
                 var currY = startY
                 while (scroller.computeScrollOffset()) {
                     val newX = scroller.currX
                     val newY = scroller.currY
-                    val transX = newX - currX
-                    val transY = newY - currY
+                    val deltaX = newX - currX
+                    val deltaY = newY - currY
                     currX = newX
                     currY = newY
-                    currMatrix.postTranslate(transX.toFloat(), transY.toFloat())
+                    currMatrix.postTranslate(deltaX.toFloat(), deltaY.toFloat())
                     imageMatrix = currMatrix
                     UI.awaitFrame()
                 }
@@ -525,18 +520,44 @@ class TouchImageView : ImageView {
         }
     }
 
+    /**
+     * Returns the bounds for the translation of the image: (minAllowed, maxAllowed)
+     */
+    private fun transBounds(viewSize: Int, imgSize: Float, outParam: PointF): PointF {
+        val bp = BLACK_BORDER_PROPORTION
+        val borderCoord1 = viewSize * bp
+        val borderCoord2 = viewSize * (1 - bp)
+        val imgWithinBorders = imgSize <= viewSize * (1 - 2 * bp)
+        if (imgWithinBorders) {
+            outParam.set(borderCoord1, borderCoord2 - imgSize)
+        }
+        else {
+            outParam.set(borderCoord2 - imgSize, borderCoord1)
+        }
+        return outParam
+    }
+
     private fun constrainTranslate() {
         currMatrix.getValues(m)
-        m[MTRANS_X] = clipToRange(m[MTRANS_X], minTransX..maxTransX)
-        m[MTRANS_Y] = clipToRange(m[MTRANS_Y], minTransY..maxTransY)
+        m[MTRANS_X] = coerceToRange(m[MTRANS_X], addOverdrag(transBounds(viewWidth, imageWidth, pointF)))
+        m[MTRANS_Y] = coerceToRange(m[MTRANS_Y], addOverdrag(transBounds(viewHeight, imageHeight, pointF)))
         currMatrix.setValues(m)
+    }
+
+    /**
+     * "x" and "y" are lower and upper bounds for allowed image translation
+     */
+    private fun addOverdrag(transBounds: PointF) : PointF {
+        transBounds.x -= overdrag
+        transBounds.y += overdrag
+        return transBounds
     }
 
     private suspend fun withState(state: State, block: suspend () -> Unit) = try {
         this.state = state
         block()
     } finally {
-        this.state = State.NONE
+        this.state = NONE
     }
 
     /**
@@ -554,10 +575,8 @@ class TouchImageView : ImageView {
         }
 
         override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-            // If a previous fling is still active, it should be cancelled so that two flings
-            // are not run simultaenously.
             startFling(velocityX, velocityY)
-            return super.onFling(e1, e2, velocityX, velocityY)
+            return true
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
@@ -581,26 +600,31 @@ class TouchImageView : ImageView {
         override fun onTouch(v: View, event: MotionEvent): Boolean {
             scaleDetector.onTouchEvent(event)
             gestureDetector.onTouchEvent(event)
-            val curr = PointF(event.x, event.y)
-
-            if (state == State.NONE || state == State.DRAG || state == FLING) {
+            if (state == NONE || state == DRAG || state == FLING) {
                 when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        last.set(curr.x, curr.y)
+                    ACTION_DOWN -> {
+                        last.set(event.x, event.y)
                         flingJob?.cancel()
-                        state = State.DRAG
+                        state = DRAG
                     }
-
-                    MotionEvent.ACTION_MOVE -> if (state == State.DRAG) {
-                        val deltaX = curr.x - last.x
-                        val deltaY = curr.y - last.y
-                        last.set(curr.x, curr.y)
+                    ACTION_MOVE -> if (state == DRAG) {
+                        val deltaX = event.x - last.x
+                        val deltaY = event.y - last.y
+                        last.set(event.x, event.y)
                         currMatrix.postTranslate(deltaX, deltaY)
                         constrainTranslate()
                     }
-
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                        state = State.NONE
+                    ACTION_UP, ACTION_POINTER_UP -> if (state == DRAG) {
+                        val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
+                        val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
+                        currMatrix.getValues(m)
+                        if (!isWithinRange(m[MTRANS_X], minTransX, maxTransX)
+                                || !isWithinRange(m[MTRANS_Y], minTransY, maxTransY)
+                        ) {
+                            startFling(0f, 0f)
+                        } else {
+                            state = NONE
+                        }
                     }
                 }
             }
@@ -621,7 +645,7 @@ class TouchImageView : ImageView {
         var prevTouchPoint: PointF? = null
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-            state = State.ZOOM
+            state = ZOOM
             prevTouchPoint = null
             return true
         }
@@ -633,6 +657,7 @@ class TouchImageView : ImageView {
                 val deltaX = touchPoint.x - it.x
                 val deltaY = touchPoint.y - it.y
                 currMatrix.postTranslate(deltaX, deltaY)
+                constrainTranslate()
             }
             prevTouchPoint = touchPoint
             return true
@@ -640,7 +665,7 @@ class TouchImageView : ImageView {
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             super.onScaleEnd(detector)
-            state = State.NONE
+            state = NONE
             var animateToZoomBoundary = false
             var targetZoom = currentZoom
             if (currentZoom > MAX_ZOOM) {
@@ -651,7 +676,7 @@ class TouchImageView : ImageView {
                 animateToZoomBoundary = true
             }
             if (animateToZoomBoundary) {
-                launch(Unconfined) { animateTouchZoom(targetZoom) }
+                start { animateTouchZoom(targetZoom) }
             }
         }
 
@@ -678,12 +703,13 @@ class TouchImageView : ImageView {
     }
 }
 
-private fun clipToRange(x: Float, range: ClosedFloatingPointRange<Float>): Float {
-    return when {
-        x < range.start -> range.start
-        x > range.endInclusive -> range.endInclusive
-        else -> x
-    }
+private fun coerceToRange(x: Float, range: PointF): Float {
+    val (rangeStart, rangeEnd) = range
+    return x.coerceIn(rangeStart, rangeEnd)
+}
+
+private fun isWithinRange(x: Float, rangeStart: Float, rangeEnd: Float): Boolean {
+    return x >= rangeStart && x <= rangeEnd
 }
 
 private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): Int {

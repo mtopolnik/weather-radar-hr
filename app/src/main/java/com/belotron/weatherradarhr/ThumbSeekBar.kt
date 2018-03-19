@@ -6,7 +6,6 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Region
 import android.graphics.Region.Op.*
 import android.graphics.Typeface
 import android.text.TextPaint
@@ -28,7 +27,7 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     private val trianglePath = Path()
     private val textPaint = TextPaint().apply {
         color = resources.getColor(R.color.seekbarThumbText)
-        textSize = resources.getDimensionPixelSize(R.dimen.thumb_text_size).toFloat()
+        textSize = resources.getDimensionPixelSize(R.dimen.seekbar_thumb_text_size).toFloat()
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.LEFT
 

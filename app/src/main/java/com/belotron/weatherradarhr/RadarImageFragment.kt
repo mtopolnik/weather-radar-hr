@@ -225,7 +225,7 @@ class RadarImageFragment : Fragment() {
                     setOnClickListener { switchActionBarVisible() }
                 }
         ) }
-        initFullScreenBundle()
+        setupFullScreenBundle()
         updateFullScreenVisibility()
         updateAdVisibility()
         return rootView
@@ -306,7 +306,8 @@ class RadarImageFragment : Fragment() {
 
     private fun enterFullScreen(index: Int, startImgX: Int, startImgY: Int, bitmapX: Float, bitmapY: Float) {
         indexOfImgInFullScreen = index
-        initFullScreenBundle()
+        fullScreenBundle.imgView?.let { it as TouchImageView }?.reset()
+        setupFullScreenBundle()
         updateFullScreenVisibility()
         start {
             fullScreenBundle.imgView?.let { it as TouchImageView }?.apply {
@@ -342,13 +343,10 @@ class RadarImageFragment : Fragment() {
         vGroupOverview?.setVisible(!makeFullScreenVisible)
     }
 
-    private fun initFullScreenBundle() {
+    private fun setupFullScreenBundle() {
         val target = imgBundles[indexOfImgInFullScreen ?: return]
         target.copyTo(stashedImgBundle)
         with(fullScreenBundle) {
-            imgView?.let { it as TouchImageView }?.apply {
-                resetToNeverDrawn()
-            }
             updateFrom(target)
             copyTo(target)
         }
