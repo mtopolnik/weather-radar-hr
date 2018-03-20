@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.belotron.weatherradarhr.ThumbSeekBar
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/radar_seekbar"
+        android:layout_marginBottom="20dp"
+        android:layout_height="30dp"
+        android:layout_width="170dp"
+        android:layout_gravity="center_horizontal|bottom"
+        android:background="@color/seekbarBackground"
+/>
