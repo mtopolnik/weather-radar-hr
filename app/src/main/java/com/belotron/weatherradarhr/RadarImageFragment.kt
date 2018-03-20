@@ -16,6 +16,8 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
+import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View
 import android.view.View.GONE
 import android.view.View.INVISIBLE
@@ -33,6 +35,8 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
+import kotlinx.coroutines.experimental.Unconfined
+import kotlinx.coroutines.experimental.launch
 
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
@@ -205,17 +209,20 @@ class RadarImageFragment : Fragment() {
                     val gl = object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent): Boolean {
-                            val (bitmapW, bitmapH) = imgView.bitmapSize(PointF()) ?: return true
-                            val focusX = (e.x / imgView.width) * bitmapW
-                            val focusY = (e.y / imgView.height) * bitmapH
-                            val (screenX, screenY) = IntArray(2).also { imgView.getLocationInWindow(it) }
-                            enterFullScreen(i, screenX, screenY, focusX, focusY)
+                            enterFullScreen(i, imgView, e.x, e.y)
                             return true
                         }
                     }
-                    GestureDetector(activity, gl).let {
-                        imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                    val sl = object : SimpleOnScaleGestureListener() {
+                        override fun onScale(detector: ScaleGestureDetector): Boolean {
+                            if (detector.currentSpan > detector.previousSpan)
+                                enterFullScreen(i, imgView, detector.focusX, detector.focusY)
+                            return true
+                        }
                     }
+                    val gd = GestureDetector(activity, gl)
+                    val sd = ScaleGestureDetector(activity, sl)
+                    imgView.setOnTouchListener { _, e -> gd.onTouchEvent(e); sd.onTouchEvent(e); true }
                 },
                 seekBar = null,
                 brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId).apply {
@@ -305,17 +312,22 @@ class RadarImageFragment : Fragment() {
         return true
     }
 
-    private fun enterFullScreen(index: Int, startImgX: Int, startImgY: Int, bitmapX: Float, bitmapY: Float) {
+    private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {
+        val (bitmapW, bitmapH) = srcImgView.bitmapSize(PointF()) ?: return
+        val focusInBitmapX = (focusX / srcImgView.width) * bitmapW
+        val focusInBitmapY = (focusY / srcImgView.height) * bitmapH
+        val (imgOnScreenX, imgOnScreenY) = IntArray(2).also { srcImgView.getLocationInWindow(it) }
+
         indexOfImgInFullScreen = index
         with (fullScreenBundle) {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
             seekBar?.visibility = INVISIBLE
-            start {
+            launch(Unconfined){
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitOnDraw()
-                    animateZoomEnter(startImgX, startImgY, bitmapX, bitmapY)
+                    animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
                 }
                 seekBar?.apply {
                     setVisible(true)
@@ -331,6 +343,7 @@ class RadarImageFragment : Fragment() {
         start {
             val target = imgBundles[index]
             if (target.status == SHOWING) {
+                fullScreenBundle.seekBar?.animateExit()
                 target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
