@@ -215,7 +215,7 @@ class RadarImageFragment : Fragment() {
                     }
                     val sl = object : SimpleOnScaleGestureListener() {
                         override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {
-                            if (!isInFullScreen && currentSpan > previousSpan)
+                            if (!isInFullScreen && scaleFactor > 1)
                                 enterFullScreen(i, imgView, focusX, focusY)
                             true
                         }

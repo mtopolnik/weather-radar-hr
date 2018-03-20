@@ -1,16 +1,3 @@
-/*
- * TouchImageView.java
- * By: Michael Ortiz
- * Updated By: Patrick Lackemacher
- * Updated By: Babay88
- * Updated By: @ipsilondev
- * Updated By: hank-cp
- * Updated By: singpolyma
- * Converted to Kotlin and updated by: mtopolnik
- * -------------------
- * Extends Android ImageView to include pinch zooming, panning, fling and double tap zoom.
- */
-
 package com.belotron.weatherradarhr
 
 import android.animation.Animator
@@ -60,7 +47,6 @@ import com.belotron.weatherradarhr.State.ZOOM
 import kotlinx.coroutines.experimental.CancellationException
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.cancelAndJoin
 import kotlin.coroutines.experimental.Continuation
 import kotlin.coroutines.experimental.suspendCoroutine
 import kotlin.math.max
@@ -372,29 +358,27 @@ class TouchImageView : ImageView {
             fromTransX: Float, toTransX: Float,
             fromTransY: Float, toTransY: Float
     ) {
-        withState(ANIMATE_ZOOM) {
-            ValueAnimator.ofPropertyValuesHolder(
-                    PropertyValuesHolder.ofFloat("scale", fromScale, toScale),
-                    PropertyValuesHolder.ofFloat("transX", fromTransX, toTransX),
-                    PropertyValuesHolder.ofFloat("transY", fromTransY, toTransY)
-            ).apply {
-                duration = ZOOM_DURATION
-                interpolator = QUADRATIC
-                addUpdateListener { anim ->
-                    currMatrix.getValues(m)
-                    val scale = anim.getAnimatedValue("scale") as Float
-                    val transX = anim.getAnimatedValue("transX") as Float
-                    val transY = anim.getAnimatedValue("transY") as Float
-                    m[MSCALE_X] = scale
-                    m[MSCALE_Y] = scale
-                    m[MTRANS_X] = transX
-                    m[MTRANS_Y] = transY
-                    currMatrix.setValues(m)
-                    currentZoom = scale / unitScale
-                    imageMatrix = currMatrix
-                }
-                run()
+        ValueAnimator.ofPropertyValuesHolder(
+                PropertyValuesHolder.ofFloat("scale", fromScale, toScale),
+                PropertyValuesHolder.ofFloat("transX", fromTransX, toTransX),
+                PropertyValuesHolder.ofFloat("transY", fromTransY, toTransY)
+        ).apply {
+            duration = ZOOM_DURATION
+            interpolator = QUADRATIC
+            addUpdateListener { anim ->
+                currMatrix.getValues(m)
+                val scale = anim.getAnimatedValue("scale") as Float
+                val transX = anim.getAnimatedValue("transX") as Float
+                val transY = anim.getAnimatedValue("transY") as Float
+                m[MSCALE_X] = scale
+                m[MSCALE_Y] = scale
+                m[MTRANS_X] = transX
+                m[MTRANS_Y] = transY
+                currMatrix.setValues(m)
+                currentZoom = scale / unitScale
+                imageMatrix = currMatrix
             }
+            run()
         }
     }
 
@@ -446,44 +430,6 @@ class TouchImageView : ImageView {
                 m[axis] = -(percentage * imageSize - viewSize * 0.5f)
             }
         }
-    }
-
-    /**
-     * Inverse of transformCoordTouchToBitmap. This function will transform
-     * the coordinates in the drawable's coordinate system to the view's
-     * coordinate system.
-     *
-     * @param bx x-coordinate in original bitmap coordinate system
-     * @param by y-coordinate in original bitmap coordinate system
-     * @return Coordinates of the point in the view's coordinate system.
-     */
-    private fun transformCoordsBitmapToView(bx: Float, by: Float, outParam: PointF): PointF {
-        currMatrix.getValues(m)
-        val (origW, origH) = bitmapSize(outParam)!!
-        val px = bx / origW
-        val py = by / origH
-        outParam.set(m[MTRANS_X] + imageWidth * px, m[MTRANS_Y] + imageHeight * py)
-        return outParam
-    }
-
-    private fun adjustScale(scaleChange: Float, focusX: Float, focusY: Float, stretchImageToSuper: Boolean) {
-        val (lowerScale, upperScale) = if (stretchImageToSuper)
-            Pair(superMinScale, superMaxScale) else
-            Pair(MIN_ZOOM, MAX_ZOOM)
-        val origScale = currentZoom
-        currentZoom *= scaleChange
-        val actualChange = when {
-            currentZoom > upperScale -> {
-                currentZoom = upperScale
-                upperScale / origScale
-            }
-            currentZoom < lowerScale -> {
-                currentZoom = lowerScale
-                lowerScale / origScale
-            }
-            else -> scaleChange
-        }
-        currMatrix.postScale(actualChange, actualChange, focusX, focusY)
     }
 
     private fun startFling(velocityX: Float, velocityY: Float) {
@@ -568,10 +514,6 @@ class TouchImageView : ImageView {
         }
     }
 
-    /**
-     * Gesture Listener detects a single click or long click and passes that on
-     * to the view's listener.
-     */
     private inner class GestureListener : SimpleOnGestureListener() {
 
         override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
@@ -596,14 +538,10 @@ class TouchImageView : ImageView {
         }
     }
 
-    /**
-     * Responsible for all touch events. Handles the heavy lifting of drag and
-     * also sends touch events to Scale Detector and Gesture Detector.
-     */
     private inner class PrivateOnTouchListener : View.OnTouchListener {
 
-        // Remember last point position for dragging
-        private val last = PointF()
+        private val initial = PointF()
+        private val initialMatrix = Matrix()
 
         override fun onTouch(v: View, event: MotionEvent): Boolean {
             scaleDetector.onTouchEvent(event)
@@ -611,14 +549,15 @@ class TouchImageView : ImageView {
             if (state == NONE || state == DRAG || state == FLING) {
                 when (event.action) {
                     ACTION_DOWN -> {
-                        last.set(event.x, event.y)
+                        initial.set(event.x, event.y)
+                        initialMatrix.set(currMatrix)
                         flingJob?.cancel()
                         state = DRAG
                     }
                     ACTION_MOVE -> if (state == DRAG) {
-                        val deltaX = event.x - last.x
-                        val deltaY = event.y - last.y
-                        last.set(event.x, event.y)
+                        val deltaX = event.x - initial.x
+                        val deltaY = event.y - initial.y
+                        currMatrix.set(initialMatrix)
                         currMatrix.postTranslate(deltaX, deltaY)
                         constrainTranslate()
                     }
@@ -642,63 +581,59 @@ class TouchImageView : ImageView {
         }
     }
 
-    /**
-     * Detects two-finger scaling and scales the image.
-     *
-     * @author Ortiz
-     */
     private inner class ScaleListener : SimpleOnScaleGestureListener() {
-        var prevTouchPoint: PointF? = null
+        val initialTranslation = PointF()
+        val initialFocus = PointF()
+        var initialSpan = 1f
+        var initialZoom = 1f
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             state = ZOOM
-            prevTouchPoint = null
+            currMatrix.getValues(m)
+            initialTranslation.set(m[MTRANS_X], m[MTRANS_Y])
+            initialFocus.set(detector.focusX, detector.focusY)
+            initialSpan = detector.currentSpan
+            initialZoom = currentZoom
             return true
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val touchPoint = PointF(detector.focusX, detector.focusY)
-            adjustScale(detector.scaleFactor, touchPoint.x, touchPoint.y, true)
-            prevTouchPoint?.also {
-                val deltaX = touchPoint.x - it.x
-                val deltaY = touchPoint.y - it.y
-                currMatrix.postTranslate(deltaX, deltaY)
-                constrainTranslate()
-            }
-            prevTouchPoint = touchPoint
+            val (initTransX, initTransY) = initialTranslation
+            val (initFocusX, initFocusY) = initialFocus
+            val scale = detector.currentSpan / initialSpan
+            currentZoom = initialZoom * scale
+            m[MTRANS_X] = detector.focusX - scale * (initFocusX - initTransX)
+            m[MTRANS_Y] = detector.focusY - scale * (initFocusY - initTransY)
+            m[MSCALE_X] = unitScale * currentZoom
+            m[MSCALE_Y] = unitScale * currentZoom
+            currMatrix.setValues(m)
+            constrainTranslate()
             return true
         }
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             super.onScaleEnd(detector)
             state = NONE
-            var animateToZoomBoundary = false
-            var targetZoom = currentZoom
-            if (currentZoom > MAX_ZOOM) {
-                targetZoom = MAX_ZOOM
-                animateToZoomBoundary = true
-            } else if (currentZoom < MIN_ZOOM) {
-                targetZoom = MIN_ZOOM
-                animateToZoomBoundary = true
-            }
-            if (animateToZoomBoundary) {
-                start { animateTouchZoom(targetZoom) }
+            val targetZoom = coerceToRange(currentZoom, pointF.apply { set(MIN_ZOOM, MAX_ZOOM) })
+            if (targetZoom != currentZoom) {
+                start { animateZoomTo(targetZoom) }
             }
         }
 
-        private suspend fun animateTouchZoom(targetZoom: Float) {
+        private suspend fun animateZoomTo(targetZoom: Float) {
             val startZoom = currentZoom
-            val zoomChange = targetZoom - currentZoom
-            val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
-            val (viewFocusX, viewFocusY) = transformCoordsBitmapToView(bitmapW / 2, bitmapH / 2, pointF)
-
+            val (initFocusX, initFocusY) = initialFocus
+            val initialMatrix = Matrix(currMatrix)
             withState(ANIMATE_ZOOM) {
-                ValueAnimator.ofFloat(startZoom, startZoom + zoomChange).apply {
+                ValueAnimator.ofFloat(startZoom, targetZoom).apply {
                     duration = ZOOM_DURATION
+                    interpolator = QUADRATIC
                     addUpdateListener { anim ->
-                        val zoom = anim.animatedValue as Float
-                        val deltaScale = zoom / currentZoom
-                        adjustScale(deltaScale, viewFocusX, viewFocusY, true)
+                        currentZoom = anim.animatedValue as Float
+                        currMatrix.set(initialMatrix)
+                        currMatrix.postScale(
+                                currentZoom / startZoom, currentZoom / startZoom,
+                                initFocusX, initFocusY)
                         constrainTranslate()
                         imageMatrix = currMatrix
                     }
