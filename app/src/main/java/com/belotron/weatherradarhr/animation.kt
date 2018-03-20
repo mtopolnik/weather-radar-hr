@@ -66,9 +66,7 @@ class AnimationLooper(
 
     fun stop() {
         animatorJobs.forEach { it?.cancel() }
-        animators.filterNotNull().forEach {
-            it.stopSeekBarAnimation()
-        }
+        animators.forEach { it?.stopSeekBarAnimation() }
         loopingJob?.cancel()
     }
 

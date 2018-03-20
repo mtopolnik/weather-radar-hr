@@ -37,7 +37,6 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         color = resources.getColor(R.color.seekbarBackground)
     }
 
-
     @Synchronized
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -61,7 +60,6 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
                 -thumbHeight - textBounds.height() - 2 * boxBorder,
                 textX + textBounds.width() + boxBorder,
                 -thumbHeight)
-        canvas.clipRect(textRect, UNION)
         canvas.drawRoundRect(textRect, rectCornerRadius, rectCornerRadius, textBackgroundPaint)
         canvas.drawPath(trianglePath, textBackgroundPaint)
         canvas.drawText(thumbText, textX - textOffset, -thumbHeight - boxBorder, textPaint)
@@ -70,6 +68,14 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     fun animateEnter() {
         val targetY = y
         y = (parent as View).height.toFloat()
-        animate().y(targetY)
+        animate().y(targetY).duration = 200
+    }
+
+    fun animateExit() {
+        val startY = y
+        animate().y((parent as View).height.toFloat()).withEndAction {
+            visibility = View.INVISIBLE
+            y = startY
+        }
     }
 }
