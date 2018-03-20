@@ -57,6 +57,7 @@ import com.belotron.weatherradarhr.State.DRAG
 import com.belotron.weatherradarhr.State.FLING
 import com.belotron.weatherradarhr.State.NONE
 import com.belotron.weatherradarhr.State.ZOOM
+import kotlinx.coroutines.experimental.CancellationException
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.cancelAndJoin
@@ -488,8 +489,8 @@ class TouchImageView : ImageView {
     private fun startFling(velocityX: Float, velocityY: Float) {
         val oldFling = flingJob
         val context = context
+        oldFling?.cancel()
         flingJob = start {
-            oldFling?.cancelAndJoin()
             withState(FLING) {
                 currMatrix.getValues(m)
                 val startX = m[MTRANS_X].toInt()
@@ -553,11 +554,18 @@ class TouchImageView : ImageView {
         return transBounds
     }
 
-    private suspend fun withState(state: State, block: suspend () -> Unit) = try {
-        this.state = state
-        block()
-    } finally {
-        this.state = NONE
+    private suspend fun withState(state: State, block: suspend () -> Unit) {
+        try {
+            this.state = state
+            block()
+            this.state = NONE
+        } catch (e: CancellationException) {
+            // The cancelling code already set another state, don't reset it
+        } catch (e: Throwable) {
+            if (this.state == state) {
+                this.state = NONE
+            }
+        }
     }
 
     /**
