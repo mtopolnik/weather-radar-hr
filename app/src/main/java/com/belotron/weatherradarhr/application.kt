@@ -40,6 +40,8 @@ private const val KEY_SAVED_AT = "instance-state-saved-at"
 
 val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-radar-pool") }.asCoroutineDispatcher()
 
+fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = CoroutineStart.UNDISPATCHED, block = block)
+
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
@@ -129,15 +131,10 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap(): Bitmap {
-    return StandardGifDecoder(BitmapFreelists()).also { it.read(this) }.decodeFrame(0)
-//    return BitmapFactory.decodeByteArray(this, 0, this.size, BitmapFactory.Options())
-}
+fun ByteArray.toBitmap() = StandardGifDecoder(BitmapFreelists()).also { it.read(this) }.decodeFrame(0)
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()
 } catch (t: Throwable) {
     null
 }
-
-fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = CoroutineStart.UNDISPATCHED, block = block)
