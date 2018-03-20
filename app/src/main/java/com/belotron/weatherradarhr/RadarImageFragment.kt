@@ -209,7 +209,7 @@ class RadarImageFragment : Fragment() {
                     val gl = object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent): Boolean {
-                            enterFullScreen(i, imgView, e.x, e.y)
+                            if (!isInFullScreen) enterFullScreen(i, imgView, e.x, e.y)
                             return true
                         }
                     }
