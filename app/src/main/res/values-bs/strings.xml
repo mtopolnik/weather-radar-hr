@@ -20,25 +20,14 @@
         \n\nAutor ikone aplikacije: Emilija Kalajžić
     </string>
     <string name="help_text">
-        Kiša skoro nikad ne nastaje nama iznad glave, kišni oblaci putuju
-        nošeni vjetrom i nailaze prema nama. Zahvaljujući tome, pogledom na
-        animaciju radarskih slika možeš predvidjeti hoće li biti kiše u sljedećih
-        nekoliko sati te točno kad će početi.
-        \n
-        \nOva aplikacija prikazuje animacije koje objavljuju hrvatski Državni
-        hidrometeorološki zavod te Agencija Republike Slovenije za okolje. To su
-        najkvalitetniji izvori, “iz prve ruke”, za ove prostore.
-        \n
-        \nSavjeti za korištenje:
-        \n
-        \n- Double tapom fokusiraš se na jednu animaciju. Dodirom na seek bar
+        Double tapom fokusiraš se na jednu animaciju. Dodirom na seek bar
         preuzimaš ručno upravljanje prikazom slika. Gestom “štipanja” možeš
         zumirati. Vraćaš se natrag double tapom ili Android-tipkom za natrag.
         \n
-        \n- Postavi si widget aplikacije na home screen tako da ti je uvijek dostupno
+        \nPostavi si widget aplikacije na home screen tako da ti je uvijek dostupno
         trenutno stanje radara.
         \n
-        \n- Ako dotakneš sliku widgeta, otvara se aplikacija.
+        \nAko dotakneš sliku widgeta, otvara se aplikacija.
         \n
         \nAplikacija sa slike OCR-om očitava vrijeme snimanja, korigira ga s
         obzirom na tvoju vremensku zonu i prikazuje iznad slike. Ponekad

@@ -19,26 +19,14 @@
         \n\nApp icon by Emilija Kalajžić
     </string>
     <string name="help_text">
-        Rains almost never appear right above you, the clouds reach you from
-        some direction carried by winds. Owing to this you can take a look at
-        the weather radar animation and predict whether and when the rains will
-        hit you, up to several hours in advance.
-        \n
-        \nThis app displays the animations published by the Croatian
-        Meteorological and Hydrological Service and the Slovenian Environment
-        Agency. These are the best sources, “from the horse’s mouth”, for this
-        region.
-        \n
-        \nSome usage tips:
-        \n
-        \n- Double-tap an image to focus on it. Use the seek bar to manually
+        Double-tap an image to focus on it. Use the seek bar to manually
         control the shown frame. You can pinch-zoom the image. To get back,
         double-tap again or press the Android Back-button.
         \n
-        \n- Place the app\'s widget on your home screen to have quick access to
+        \nPlace the app\'s widget on your home screen to have quick access to
         the current radar image.
         \n
-        \n- Tap the widget image to start the app.
+        \nTap the widget image to start the app.
         \n
         \nThe app uses OCR to read the image\'s timestamp, translates it to your
         timezone, and shows it above the image. Sometimes the websites stop
