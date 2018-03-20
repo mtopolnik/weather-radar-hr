@@ -35,12 +35,14 @@ import android.os.Bundle
 import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.GestureDetector
+import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
 import android.view.MotionEvent.ACTION_DOWN
 import android.view.MotionEvent.ACTION_MOVE
 import android.view.MotionEvent.ACTION_POINTER_UP
 import android.view.MotionEvent.ACTION_UP
 import android.view.ScaleGestureDetector
+import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View
 import android.view.View.MeasureSpec.AT_MOST
 import android.view.View.MeasureSpec.EXACTLY
@@ -80,7 +82,6 @@ private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
 
-
 class TouchImageView : ImageView {
 
     private val overdrag = resources.getDimensionPixelOffset(R.dimen.overdrag)
@@ -97,6 +98,10 @@ class TouchImageView : ImageView {
     private val point = Point()
 
     private var state = NONE
+        set(value) {
+            info { "state: $value" }
+            field = value
+        }
 
     private var unitScale = 0f
     private var superMinScale = 0f
@@ -184,7 +189,6 @@ class TouchImageView : ImageView {
     override fun getScaleType(): ImageView.ScaleType = scaleType
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        info { "onMeasure" }
         val (bitmapW, bitmapH) = bitmapSize(point) ?: run {
             setMeasuredDimension(0, 0)
             return
@@ -199,7 +203,6 @@ class TouchImageView : ImageView {
     }
 
     override fun onDraw(canvas: Canvas) {
-        info {"enter onDraw"}
         if (!onDrawCalled) {
             fitImageToView()
             onDrawCalled = true
@@ -211,7 +214,6 @@ class TouchImageView : ImageView {
             resume(Unit)
         }
         super.onDraw(canvas)
-        info {"onDraw done"}
     }
 
     override fun onSaveInstanceState(): Parcelable {
@@ -262,7 +264,6 @@ class TouchImageView : ImageView {
      * coordinate system.
      */
     suspend fun animateZoomEnter(startImgX: Int, startImgY: Int, bitmapFocusX: Float, bitmapFocusY: Float) {
-        info {"animateZoomEnter"}
         val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
 
         fun targetImgCoord(viewSize: Int, bitmapSize: Float, bitmapFocus: Float, targetScale: Float): Float {
@@ -301,7 +302,6 @@ class TouchImageView : ImageView {
     suspend fun awaitOnDraw() {
         if (onDrawCalled) return
         require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
-        info {"Suspending until onDraw"}
         suspendCoroutine<Unit> { onDrawContinuation = it }
     }
 
@@ -456,13 +456,13 @@ class TouchImageView : ImageView {
      * @param by y-coordinate in original bitmap coordinate system
      * @return Coordinates of the point in the view's coordinate system.
      */
-    private fun transformCoordsBitmapToView(bx: Float, by: Float, pointF: PointF): PointF {
+    private fun transformCoordsBitmapToView(bx: Float, by: Float, outParam: PointF): PointF {
         currMatrix.getValues(m)
-        val (origW, origH) = bitmapSize(pointF)!!
+        val (origW, origH) = bitmapSize(outParam)!!
         val px = bx / origW
         val py = by / origH
-        pointF.set(m[MTRANS_X] + imageWidth * px, m[MTRANS_Y] + imageHeight * py)
-        return pointF
+        outParam.set(m[MTRANS_X] + imageWidth * px, m[MTRANS_Y] + imageHeight * py)
+        return outParam
     }
 
     private fun adjustScale(scaleChange: Float, focusX: Float, focusY: Float, stretchImageToSuper: Boolean) {
@@ -564,7 +564,7 @@ class TouchImageView : ImageView {
      * Gesture Listener detects a single click or long click and passes that on
      * to the view's listener.
      */
-    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
+    private inner class GestureListener : SimpleOnGestureListener() {
 
         override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
             return doubleTapListener?.onSingleTapConfirmed(e) ?: performClick()
@@ -641,7 +641,7 @@ class TouchImageView : ImageView {
      *
      * @author Ortiz
      */
-    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+    private inner class ScaleListener : SimpleOnScaleGestureListener() {
         var prevTouchPoint: PointF? = null
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
