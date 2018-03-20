@@ -21,7 +21,11 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import com.google.android.gms.ads.MobileAds
+import kotlinx.coroutines.experimental.CoroutineScope
+import kotlinx.coroutines.experimental.CoroutineStart
+import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
+import kotlinx.coroutines.experimental.launch
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -135,3 +139,5 @@ inline fun <T> runOrNull(block: () -> T) = try {
 } catch (t: Throwable) {
     null
 }
+
+fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = CoroutineStart.UNDISPATCHED, block = block)

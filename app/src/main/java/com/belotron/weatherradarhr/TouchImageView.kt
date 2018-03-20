@@ -618,9 +618,7 @@ class TouchImageView : ImageView {
                         val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
                         val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
                         currMatrix.getValues(m)
-                        if (!(m[MTRANS_X] in minTransX..maxTransX)
-                                || !(m[MTRANS_Y] in minTransY..maxTransY)
-                        ) {
+                        if (m[MTRANS_X] !in minTransX..maxTransX || m[MTRANS_Y] !in minTransY..maxTransY) {
                             startFling(0f, 0f)
                         } else {
                             state = NONE
