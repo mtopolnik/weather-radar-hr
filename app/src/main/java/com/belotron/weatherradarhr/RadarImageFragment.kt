@@ -5,9 +5,10 @@ import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
-import android.text.format.DateUtils.*
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.Gravity
@@ -25,6 +26,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -213,16 +215,9 @@ class RadarImageFragment : Fragment() {
                             return true
                         }
                     }
-                    val sl = object : SimpleOnScaleGestureListener() {
-                        override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {
-                            if (!isInFullScreen && scaleFactor > 1)
-                                enterFullScreen(i, imgView, focusX, focusY)
-                            true
-                        }
+                    GestureDetector(activity, gl).also {
+                        imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
                     }
-                    val gd = GestureDetector(activity, gl)
-                    val sd = ScaleGestureDetector(activity, sl)
-                    imgView.setOnTouchListener { _, e -> gd.onTouchEvent(e); sd.onTouchEvent(e); true }
                 },
                 seekBar = null,
                 brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId).apply {
@@ -233,6 +228,26 @@ class RadarImageFragment : Fragment() {
                     setOnClickListener { switchActionBarVisible() }
                 }
         ) }
+        val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)
+        val sl = object : SimpleOnScaleGestureListener() {
+            private val rect = Rect()
+            override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {
+                if (isInFullScreen || scaleFactor <= 1) {
+                    return true
+                }
+                scrollView.offsetDescendantRectToMyCoords(imgBundles[1].textView ?: return true, rect.reset())
+                val imgIndex = if (focusY <= rect.top) 0 else 1
+                val imgView = imgBundles[imgIndex].imgView ?: return true
+                scrollView.offsetDescendantRectToMyCoords(imgView, rect.reset())
+                imgView.also {
+                    enterFullScreen(imgIndex, it, focusX - rect.left, focusY - rect.top)
+                }
+                true
+            }
+        }
+        ScaleGestureDetector(activity, sl).also {
+            scrollView.setOnTouchListener { _, e -> it.onTouchEvent(e); false }
+        }
         setupFullScreenBundle()
         updateFullScreenVisibility()
         updateAdVisibility()
@@ -324,7 +339,7 @@ class RadarImageFragment : Fragment() {
             setupFullScreenBundle()
             updateFullScreenVisibility()
             seekBar?.visibility = INVISIBLE
-            launch(Unconfined){
+            start {
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitOnDraw()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
@@ -422,4 +437,9 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
+}
+
+private fun Rect.reset(): Rect {
+    set(0, 0, 0, 0)
+    return this
 }
