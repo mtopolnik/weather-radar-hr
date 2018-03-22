@@ -44,10 +44,11 @@ import com.belotron.weatherradarhr.State.DRAG
 import com.belotron.weatherradarhr.State.FLING
 import com.belotron.weatherradarhr.State.NONE
 import com.belotron.weatherradarhr.State.ZOOM
+import kotlinx.coroutines.experimental.CancellableContinuation
 import kotlinx.coroutines.experimental.CancellationException
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
-import kotlin.coroutines.experimental.Continuation
+import kotlinx.coroutines.experimental.suspendCancellableCoroutine
 import kotlin.coroutines.experimental.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.min
@@ -60,7 +61,7 @@ private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 128f
 private const val BLACK_BORDER_PROPORTION = 0.25f
 
-private val QUADRATIC = TimeInterpolator { t ->
+private val quadratic = TimeInterpolator { t ->
     if (t < 0.5) 2 * t * t
     else (1 - 2 * (1 - t) * (1 - t))
 }
@@ -116,7 +117,7 @@ class TouchImageView : ImageView {
 
     private var onDrawCalled = false
     private var imageRenderedAtLeastOnce = false
-    private var onDrawContinuation: Continuation<Unit>? = null
+    private var onDrawContinuation: CancellableContinuation<Unit>? = null
 
     private val scaleDetector: ScaleGestureDetector
     private val gestureDetector: GestureDetector
@@ -197,8 +198,7 @@ class TouchImageView : ImageView {
         imageRenderedAtLeastOnce = true
         onDrawContinuation?.apply {
             onDrawContinuation = null
-            info {"resume continuation"}
-            resume(Unit)
+            UI.resumeUndispatched(Unit)
         }
         super.onDraw(canvas)
     }
@@ -233,6 +233,16 @@ class TouchImageView : ImageView {
             imageRenderedAtLeastOnce = getBoolean("imageRendered")
             super.onRestoreInstanceState(getParcelable("instanceState"))
         }
+    }
+
+    private fun savePreviousImageValues() {
+        if (viewHeight == 0 || viewWidth == 0) return
+        currMatrix.getValues(m)
+        prevMatrix.setValues(m)
+        prevMatchViewHeight = matchViewHeight
+        prevMatchViewWidth = matchViewWidth
+        prevViewHeight = viewHeight
+        prevViewWidth = viewWidth
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -289,7 +299,7 @@ class TouchImageView : ImageView {
     suspend fun awaitOnDraw() {
         if (onDrawCalled) return
         require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
-        suspendCoroutine<Unit> { onDrawContinuation = it }
+        suspendCancellableCoroutine<Unit> { onDrawContinuation = it }
     }
 
     fun setOnDoubleTapListener(l: GestureDetector.OnDoubleTapListener) {
@@ -332,21 +342,36 @@ class TouchImageView : ImageView {
         m[MSCALE_X] = matchViewWidth / bitmapW * currentZoom
         m[MSCALE_Y] = matchViewHeight / bitmapH * currentZoom
 
-        // TransX and TransY from previous matrix
-        val transX = m[MTRANS_X]
-        val transY = m[MTRANS_Y]
+        fun translateMatrixAfterRotate(
+                axis: Int, imgSizeBefore: Float, imgSizeNow: Float,
+                viewSizeBefore: Int, viewSizeNow: Int, bitmapSize: Int
+        ) {
+            when {
+                imgSizeNow <= viewSizeNow -> {
+                    // Image is smaller than the view. C enter it.
+                    m[axis] = 0.5f * (viewSizeNow - bitmapSize * m[MSCALE_X])
+                }
+                m[axis] > 0 -> {
+                    // Image is larger than the view, but wasn't before rotation. Center it.
+                    m[axis] = -0.5f * (imgSizeNow - viewSizeNow)
+                }
+                else -> {
+                    // Find the area of the image which was previously centered in the view. Determine its distance
+                    // from the left/top side of the view as a fraction of the entire image's width/height. Use that
+                    // percentage to calculate the trans in the new view width/height.
+                    val proportion = (Math.abs(m[axis]) + 0.5f * viewSizeBefore) / imgSizeBefore
+                    m[axis] = -(proportion * imgSizeNow - viewSizeNow * 0.5f)
+                }
+            }
+        }
 
         // Width
         val prevActualWidth = prevMatchViewWidth * currentZoom
-        val actualWidth = imageWidth
-        translateMatrixAfterRotate(MTRANS_X, transX, prevActualWidth, actualWidth,
-                prevViewWidth, viewWidth, bitmapW)
+        translateMatrixAfterRotate(MTRANS_X, prevActualWidth, imageWidth, prevViewWidth, viewWidth, bitmapW)
 
         // Height
         val prevActualHeight = prevMatchViewHeight * currentZoom
-        val actualHeight = imageHeight
-        translateMatrixAfterRotate(MTRANS_Y, transY, prevActualHeight, actualHeight,
-                prevViewHeight, viewHeight, bitmapH)
+        translateMatrixAfterRotate(MTRANS_Y, prevActualHeight, imageHeight, prevViewHeight, viewHeight, bitmapH)
 
         // Set the matrix to the adjusted scale and translate values.
         currMatrix.setValues(m)
@@ -364,7 +389,7 @@ class TouchImageView : ImageView {
                 PropertyValuesHolder.ofFloat("transY", fromTransY, toTransY)
         ).apply {
             duration = ZOOM_DURATION
-            interpolator = QUADRATIC
+            interpolator = quadratic
             addUpdateListener { anim ->
                 currMatrix.getValues(m)
                 val scale = anim.getAnimatedValue("scale") as Float
@@ -379,56 +404,6 @@ class TouchImageView : ImageView {
                 imageMatrix = currMatrix
             }
             run()
-        }
-    }
-
-    /**
-     * Saves the current matrix and view dimensions to the prevMatrix and
-     * prevView variables.
-     */
-    private fun savePreviousImageValues() {
-        if (viewHeight == 0 || viewWidth == 0) return
-        currMatrix.getValues(m)
-        prevMatrix.setValues(m)
-        prevMatchViewHeight = matchViewHeight
-        prevMatchViewWidth = matchViewWidth
-        prevViewHeight = viewHeight
-        prevViewWidth = viewWidth
-    }
-
-    /**
-     * After rotating the matrix needs to be translated. This function finds
-     * the area of the image which was previously centered and adjusts
-     * translations so that is again the center, post-rotation.
-     *
-     * @param axis          Matrix.MTRANS_X or Matrix.MTRANS_Y
-     * @param trans         the value of trans in that axis before the rotation
-     * @param prevImageSize the width/height of the image before the rotation
-     * @param imageSize     width/height of the image after rotation
-     * @param prevViewSize  width/height of view before rotation
-     * @param viewSize      width/height of view after rotation
-     * @param drawableSize  width/height of drawable
-     */
-    private fun translateMatrixAfterRotate(
-            axis: Int, trans: Float, prevImageSize: Float, imageSize: Float,
-            prevViewSize: Int, viewSize: Int, drawableSize: Int
-    ) {
-        when {
-            imageSize < viewSize -> {
-                // The width/height of image is less than the view's width/height. Center it.
-                m[axis] = (viewSize - drawableSize * m[MSCALE_X]) * 0.5f
-            }
-            trans > 0 -> {
-                // The image is larger than the view, but was not before rotation. Center it.
-                m[axis] = -((imageSize - viewSize) * 0.5f)
-            }
-            else -> {
-                // Find the area of the image which was previously centered in the view. Determine its distance
-                // from the left/top side of the view as a fraction of the entire image's width/height. Use that
-                // percentage to calculate the trans in the new view width/height.
-                val percentage = (Math.abs(trans) + 0.5f * prevViewSize) / prevImageSize
-                m[axis] = -(percentage * imageSize - viewSize * 0.5f)
-            }
         }
     }
 
@@ -582,15 +557,14 @@ class TouchImageView : ImageView {
     }
 
     private inner class ScaleListener : SimpleOnScaleGestureListener() {
-        val initialTranslation = PointF()
+        val initialMatrix = Matrix()
         val initialFocus = PointF()
         var initialSpan = 1f
         var initialZoom = 1f
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             state = ZOOM
-            currMatrix.getValues(m)
-            initialTranslation.set(m[MTRANS_X], m[MTRANS_Y])
+            initialMatrix.set(currMatrix)
             initialFocus.set(detector.focusX, detector.focusY)
             initialSpan = detector.currentSpan
             initialZoom = currentZoom
@@ -598,16 +572,14 @@ class TouchImageView : ImageView {
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val (initTransX, initTransY) = initialTranslation
             val (initFocusX, initFocusY) = initialFocus
             val scale = detector.currentSpan / initialSpan
             currentZoom = initialZoom * scale
-            m[MTRANS_X] = detector.focusX - scale * (initFocusX - initTransX)
-            m[MTRANS_Y] = detector.focusY - scale * (initFocusY - initTransY)
-            m[MSCALE_X] = unitScale * currentZoom
-            m[MSCALE_Y] = unitScale * currentZoom
-            currMatrix.setValues(m)
+            currMatrix.set(initialMatrix)
+            currMatrix.postTranslate(detector.focusX - initFocusX, detector.focusY - initFocusY)
+            currMatrix.postScale(scale, scale, detector.focusX, detector.focusY)
             constrainTranslate()
+            imageMatrix = currMatrix
             return true
         }
 
@@ -627,7 +599,7 @@ class TouchImageView : ImageView {
             withState(ANIMATE_ZOOM) {
                 ValueAnimator.ofFloat(startZoom, targetZoom).apply {
                     duration = ZOOM_DURATION
-                    interpolator = QUADRATIC
+                    interpolator = quadratic
                     addUpdateListener { anim ->
                         currentZoom = anim.animatedValue as Float
                         currMatrix.set(initialMatrix)
