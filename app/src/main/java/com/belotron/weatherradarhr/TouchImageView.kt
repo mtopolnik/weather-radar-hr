@@ -6,8 +6,6 @@ import android.animation.PropertyValuesHolder
 import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
 import android.content.Context
-import android.content.res.Configuration
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Matrix.MSCALE_X
@@ -16,8 +14,6 @@ import android.graphics.Matrix.MTRANS_X
 import android.graphics.Matrix.MTRANS_Y
 import android.graphics.Point
 import android.graphics.PointF
-import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
 import android.util.AttributeSet
@@ -61,6 +57,11 @@ private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 128f
 private const val BLACK_BORDER_PROPORTION = 0.25f
 
+private const val STATE_IMAGEVIEW = "image_view"
+private const val STATE_SCALE = "scale"
+private const val STATE_IMG_FOCUS_X = "img_focus_x"
+private const val STATE_IMG_FOCUS_Y = "img_focus_y"
+
 private val quadratic = TimeInterpolator { t ->
     if (t < 0.5) 2 * t * t
     else (1 - 2 * (1 - t) * (1 - t))
@@ -70,18 +71,14 @@ private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
 
+
 class TouchImageView : ImageView {
 
     private val overdrag = resources.getDimensionPixelOffset(R.dimen.overdrag)
 
-    // Matrix applied to the image. MSCALE_X and MSCALE_Y should always be equal.
-    // MTRANS_X and MTRANS_Y can be changed as needed. prevMatrix is the matrix
-    // saved prior to the screen rotating.
-    private val currMatrix = Matrix()
-    private val prevMatrix = Matrix()
-
     // Reusable value containers
-    private var m = FloatArray(9)
+    private val mx = Matrix()
+    private val m = FloatArray(9)
     private val pointF = PointF()
     private val point = Point()
 
@@ -98,26 +95,19 @@ class TouchImageView : ImageView {
 
     private lateinit var scaleType: ImageView.ScaleType
 
-    // initial coordinates of the image inside the view,
+    // Initial coordinates of the image inside the view,
     // when entering the full screen view
     private var fromImgX: Int = 0
     private var fromImgY: Int = 0
 
-    // Size of view. Before and After rotation.
+    // Current size of our view
     private var viewWidth = 0
     private var viewHeight = 0
-    private var prevViewWidth = 0
-    private var prevViewHeight = 0
 
-    // Size of image when stretched to fit view. Before and After rotation.
-    private var matchViewWidth = 0f
-    private var matchViewHeight = 0f
-    private var prevMatchViewWidth = 0f
-    private var prevMatchViewHeight = 0f
+    private var restoredInstanceState: Bundle? = null
 
-    private var onDrawCalled = false
-    private var imageRenderedAtLeastOnce = false
-    private var onDrawContinuation: CancellableContinuation<Unit>? = null
+    private var matrixInitialized = false
+    private var onMatrixInitializedContinuation: CancellableContinuation<Unit>? = null
 
     private val scaleDetector: ScaleGestureDetector
     private val gestureDetector: GestureDetector
@@ -125,8 +115,11 @@ class TouchImageView : ImageView {
     private var userTouchListener: View.OnTouchListener? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
-    private val imageWidth: Float get() = matchViewWidth * currentZoom
-    private val imageHeight: Float get() = matchViewHeight * currentZoom
+    private fun imageSize(outParam: PointF): PointF {
+        val (bitmapW, bitmapH) = bitmapSize(outParam) ?: return outParam.apply { set(0f, 0f) }
+        val scale = unitScale * currentZoom
+        return outParam.apply { set(bitmapW * scale, bitmapH * scale) }
+    }
 
     constructor(context: Context) : this(context, null, 0)
 
@@ -138,29 +131,8 @@ class TouchImageView : ImageView {
         gestureDetector = GestureDetector(context, GestureListener())
         superMinScale = SUPER_MIN_MULTIPLIER * MIN_ZOOM
         superMaxScale = SUPER_MAX_MULTIPLIER * MAX_ZOOM
-        imageMatrix = currMatrix
         setScaleType(MATRIX)
         super.setOnTouchListener(PrivateOnTouchListener())
-    }
-
-    override fun setImageResource(resId: Int) {
-        super.setImageResource(resId)
-        savePreviousImageValues()
-    }
-
-    override fun setImageBitmap(bm: Bitmap?) {
-        super.setImageBitmap(bm)
-        savePreviousImageValues()
-    }
-
-    override fun setImageDrawable(drawable: Drawable?) {
-        super.setImageDrawable(drawable)
-        savePreviousImageValues()
-    }
-
-    override fun setImageURI(uri: Uri) {
-        super.setImageURI(uri)
-        savePreviousImageValues()
     }
 
     override fun setScaleType(type: ImageView.ScaleType) {
@@ -191,63 +163,37 @@ class TouchImageView : ImageView {
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (!onDrawCalled) {
-            fitImageToView()
-            onDrawCalled = true
+        if (!matrixInitialized) {
+            matrixInitialized = tryInitializeMatrix()
         }
-        imageRenderedAtLeastOnce = true
-        onDrawContinuation?.apply {
-            onDrawContinuation = null
-            UI.resumeUndispatched(Unit)
+        if (matrixInitialized) {
+            onMatrixInitializedContinuation?.apply {
+                onMatrixInitializedContinuation = null
+                UI.resumeUndispatched(Unit)
+            }
         }
         super.onDraw(canvas)
     }
 
     override fun onSaveInstanceState(): Parcelable {
-        currMatrix.getValues(m)
         return Bundle().apply {
-            putParcelable("instanceState", super.onSaveInstanceState())
-            putFloat("saveScale", currentZoom)
-            putFloat("matchViewHeight", matchViewHeight)
-            putFloat("matchViewWidth", matchViewWidth)
-            putInt("viewWidth", viewWidth)
-            putInt("viewHeight", viewHeight)
-            putFloatArray("matrix", m)
-            putBoolean("imageRendered", imageRenderedAtLeastOnce)
+            putParcelable(STATE_IMAGEVIEW, super.onSaveInstanceState())
+            putFloat(STATE_SCALE, currentZoom * unitScale)
+            loadMatrix()
+            putFloat(STATE_IMG_FOCUS_X, 0.5f * viewWidth - m[MTRANS_X])
+            putFloat(STATE_IMG_FOCUS_Y, 0.5f * viewHeight - m[MTRANS_Y])
         }
     }
 
     override fun onRestoreInstanceState(state: Parcelable) {
+        info {"restore instance state"}
         if (state !is Bundle) {
             super.onRestoreInstanceState(state)
-            return
+        } else with (state) {
+            super.onRestoreInstanceState(getParcelable(STATE_IMAGEVIEW))
+            putParcelable(STATE_IMAGEVIEW, null)
+            restoredInstanceState = this
         }
-        with (state) {
-            currentZoom = getFloat("saveScale")
-            m = getFloatArray("matrix")
-            prevMatrix.setValues(m)
-            prevMatchViewHeight = getFloat("matchViewHeight")
-            prevMatchViewWidth = getFloat("matchViewWidth")
-            prevViewHeight = getInt("viewHeight")
-            prevViewWidth = getInt("viewWidth")
-            imageRenderedAtLeastOnce = getBoolean("imageRendered")
-            super.onRestoreInstanceState(getParcelable("instanceState"))
-        }
-    }
-
-    private fun savePreviousImageValues() {
-        if (viewHeight == 0 || viewWidth == 0) return
-        currMatrix.getValues(m)
-        prevMatrix.setValues(m)
-        prevMatchViewHeight = matchViewHeight
-        prevMatchViewWidth = matchViewWidth
-        prevViewHeight = viewHeight
-        prevViewWidth = viewWidth
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        savePreviousImageValues()
     }
 
     override fun setOnTouchListener(l: View.OnTouchListener) {
@@ -273,7 +219,7 @@ class TouchImageView : ImageView {
         }
 
         val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
-        currMatrix.getValues(m)
+        loadMatrix()
         val fitWidthScale = viewWidth.toFloat() / bitmapW
         val toScale = max(fitWidthScale, viewHeight.toFloat() / bitmapH)
         fromImgX = startImgX - screenX
@@ -286,7 +232,7 @@ class TouchImageView : ImageView {
     }
 
     suspend fun animateZoomExit() {
-        currMatrix.getValues(m)
+        loadMatrix()
         val initialScale = m[MSCALE_X]
         val targetScale = (viewWidth.toFloat() / drawable!!.intrinsicWidth)
         val initialTransX = m[MTRANS_X]
@@ -296,10 +242,10 @@ class TouchImageView : ImageView {
         animateZoom(initialScale, targetScale, initialTransX, targetTransX, initialTransY, targetTransY)
     }
 
-    suspend fun awaitOnDraw() {
-        if (onDrawCalled) return
-        require(onDrawContinuation == null) { "Dangling drawReadyContinuation" }
-        suspendCancellableCoroutine<Unit> { onDrawContinuation = it }
+    suspend fun awaitMatrixInitialized() {
+        if (matrixInitialized) return
+        require(onMatrixInitializedContinuation == null) { "Dangling onMatrixInitializedContinuation" }
+        suspendCancellableCoroutine<Unit> { onMatrixInitializedContinuation = it }
     }
 
     fun setOnDoubleTapListener(l: GestureDetector.OnDoubleTapListener) {
@@ -307,75 +253,32 @@ class TouchImageView : ImageView {
     }
 
     fun reset() {
-        onDrawCalled = false
-        imageRenderedAtLeastOnce = false
+        matrixInitialized = false
     }
 
-    private fun fitImageToView() {
-        val (bitmapW, bitmapH) = bitmapSize(point) ?: return
-        val scale = min(viewWidth.toFloat() / bitmapW, viewHeight.toFloat() / bitmapH)
-        unitScale = scale
-        matchViewWidth = bitmapW * scale
-        matchViewHeight = bitmapH * scale
-
-        if (!imageRenderedAtLeastOnce) {
-            // The view has been freshly created. Stretch and center image to fit.
+    private fun tryInitializeMatrix(): Boolean {
+        val (bitmapW, bitmapH) = bitmapSize(point) ?: run {
+            return false
+        }
+        unitScale = min(viewWidth.toFloat() / bitmapW, viewHeight.toFloat() / bitmapH)
+        loadMatrix()
+        val state = restoredInstanceState
+        if (state == null) {
+            mx.setScale(unitScale, unitScale)
+            imageMatrix = mx
             currentZoom = 1f
-            currMatrix.setScale(scale, scale)
-            imageMatrix = currMatrix
-            return
+            return true
         }
-
-        // Reaching this point means the view was reconstructed after rotation.
-        // Place the image on the screen according to the dimensions of the
-        // previous image matrix.
-
-        // These values should never be 0 or we will set viewWidth and viewHeight
-        // to NaN in translateMatrixAfterRotate. To avoid this, call
-        // savePreviousImageValues to set them equal to the current values.
-        if (prevMatchViewWidth == 0f || prevMatchViewHeight == 0f) {
-            savePreviousImageValues()
-        }
-        prevMatrix.getValues(m)
-
-        // Rescale Matrix after rotation
-        m[MSCALE_X] = matchViewWidth / bitmapW * currentZoom
-        m[MSCALE_Y] = matchViewHeight / bitmapH * currentZoom
-
-        fun translateMatrixAfterRotate(
-                axis: Int, imgSizeBefore: Float, imgSizeNow: Float,
-                viewSizeBefore: Int, viewSizeNow: Int, bitmapSize: Int
-        ) {
-            when {
-                imgSizeNow <= viewSizeNow -> {
-                    // Image is smaller than the view. C enter it.
-                    m[axis] = 0.5f * (viewSizeNow - bitmapSize * m[MSCALE_X])
-                }
-                m[axis] > 0 -> {
-                    // Image is larger than the view, but wasn't before rotation. Center it.
-                    m[axis] = -0.5f * (imgSizeNow - viewSizeNow)
-                }
-                else -> {
-                    // Find the area of the image which was previously centered in the view. Determine its distance
-                    // from the left/top side of the view as a fraction of the entire image's width/height. Use that
-                    // percentage to calculate the trans in the new view width/height.
-                    val proportion = (Math.abs(m[axis]) + 0.5f * viewSizeBefore) / imgSizeBefore
-                    m[axis] = -(proportion * imgSizeNow - viewSizeNow * 0.5f)
-                }
-            }
-        }
-
-        // Width
-        val prevActualWidth = prevMatchViewWidth * currentZoom
-        translateMatrixAfterRotate(MTRANS_X, prevActualWidth, imageWidth, prevViewWidth, viewWidth, bitmapW)
-
-        // Height
-        val prevActualHeight = prevMatchViewHeight * currentZoom
-        translateMatrixAfterRotate(MTRANS_Y, prevActualHeight, imageHeight, prevViewHeight, viewHeight, bitmapH)
-
-        // Set the matrix to the adjusted scale and translate values.
-        currMatrix.setValues(m)
-        imageMatrix = currMatrix
+        restoredInstanceState = null
+        val restoredScale = state.getFloat(STATE_SCALE)
+        m[MSCALE_X] = restoredScale
+        m[MSCALE_Y] = restoredScale
+        currentZoom = restoredScale / unitScale
+        m[MTRANS_X] = 0.5f * viewWidth - state.getFloat(STATE_IMG_FOCUS_X)
+        m[MTRANS_Y] = 0.5f * viewHeight - state.getFloat(STATE_IMG_FOCUS_Y)
+        mx.setValues(m)
+        applyConstraintsAndPushMatrix()
+        return true
     }
 
     private suspend fun animateZoom(
@@ -391,7 +294,7 @@ class TouchImageView : ImageView {
             duration = ZOOM_DURATION
             interpolator = quadratic
             addUpdateListener { anim ->
-                currMatrix.getValues(m)
+                loadMatrix()
                 val scale = anim.getAnimatedValue("scale") as Float
                 val transX = anim.getAnimatedValue("transX") as Float
                 val transY = anim.getAnimatedValue("transY") as Float
@@ -399,9 +302,9 @@ class TouchImageView : ImageView {
                 m[MSCALE_Y] = scale
                 m[MTRANS_X] = transX
                 m[MTRANS_Y] = transY
-                currMatrix.setValues(m)
+                mx.setValues(m)
+                imageMatrix = mx
                 currentZoom = scale / unitScale
-                imageMatrix = currMatrix
             }
             run()
         }
@@ -413,9 +316,10 @@ class TouchImageView : ImageView {
         oldFling?.cancel()
         flingJob = start {
             withState(FLING) {
-                currMatrix.getValues(m)
+                loadMatrix()
                 val startX = m[MTRANS_X].toInt()
                 val startY = m[MTRANS_Y].toInt()
+                val (imageWidth, imageHeight) = imageSize(pointF)
                 val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
                 val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
                 val scroller = OverScroller(context).apply {
@@ -434,8 +338,8 @@ class TouchImageView : ImageView {
                     val deltaY = newY - currY
                     currX = newX
                     currY = newY
-                    currMatrix.postTranslate(deltaX.toFloat(), deltaY.toFloat())
-                    imageMatrix = currMatrix
+                    mx.postTranslate(deltaX.toFloat(), deltaY.toFloat())
+                    imageMatrix = mx
                     UI.awaitFrame()
                 }
             }
@@ -459,11 +363,13 @@ class TouchImageView : ImageView {
         return outParam
     }
 
-    private fun constrainTranslate() {
-        currMatrix.getValues(m)
+    private fun applyConstraintsAndPushMatrix() {
+        mx.getValues(m)
+        val (imageWidth, imageHeight) = imageSize(pointF)
         m[MTRANS_X] = coerceToRange(m[MTRANS_X], addOverdrag(transBounds(viewWidth, imageWidth, pointF)))
         m[MTRANS_Y] = coerceToRange(m[MTRANS_Y], addOverdrag(transBounds(viewHeight, imageHeight, pointF)))
-        currMatrix.setValues(m)
+        mx.setValues(m)
+        imageMatrix = mx
     }
 
     /**
@@ -487,6 +393,11 @@ class TouchImageView : ImageView {
                 this.state = NONE
             }
         }
+    }
+
+    private fun loadMatrix() {
+        mx.set(imageMatrix)
+        mx.getValues(m)
     }
 
     private inner class GestureListener : SimpleOnGestureListener() {
@@ -525,21 +436,22 @@ class TouchImageView : ImageView {
                 when (event.action) {
                     ACTION_DOWN -> {
                         initial.set(event.x, event.y)
-                        initialMatrix.set(currMatrix)
+                        initialMatrix.set(imageMatrix)
                         flingJob?.cancel()
                         state = DRAG
                     }
                     ACTION_MOVE -> if (state == DRAG) {
                         val deltaX = event.x - initial.x
                         val deltaY = event.y - initial.y
-                        currMatrix.set(initialMatrix)
-                        currMatrix.postTranslate(deltaX, deltaY)
-                        constrainTranslate()
+                        mx.set(initialMatrix)
+                        mx.postTranslate(deltaX, deltaY)
+                        applyConstraintsAndPushMatrix()
                     }
                     ACTION_UP, ACTION_POINTER_UP -> if (state == DRAG) {
+                        val (imageWidth, imageHeight) = imageSize(pointF)
                         val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, pointF)
                         val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, pointF)
-                        currMatrix.getValues(m)
+                        loadMatrix()
                         if (m[MTRANS_X] !in minTransX..maxTransX || m[MTRANS_Y] !in minTransY..maxTransY) {
                             startFling(0f, 0f)
                         } else {
@@ -548,7 +460,6 @@ class TouchImageView : ImageView {
                     }
                 }
             }
-            imageMatrix = currMatrix
             if (userTouchListener != null) {
                 userTouchListener!!.onTouch(v, event)
             }
@@ -564,7 +475,7 @@ class TouchImageView : ImageView {
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             state = ZOOM
-            initialMatrix.set(currMatrix)
+            initialMatrix.set(imageMatrix)
             initialFocus.set(detector.focusX, detector.focusY)
             initialSpan = detector.currentSpan
             initialZoom = currentZoom
@@ -575,11 +486,10 @@ class TouchImageView : ImageView {
             val (initFocusX, initFocusY) = initialFocus
             val scale = detector.currentSpan / initialSpan
             currentZoom = initialZoom * scale
-            currMatrix.set(initialMatrix)
-            currMatrix.postTranslate(detector.focusX - initFocusX, detector.focusY - initFocusY)
-            currMatrix.postScale(scale, scale, detector.focusX, detector.focusY)
-            constrainTranslate()
-            imageMatrix = currMatrix
+            mx.set(initialMatrix)
+            mx.postTranslate(detector.focusX - initFocusX, detector.focusY - initFocusY)
+            mx.postScale(scale, scale, detector.focusX, detector.focusY)
+            applyConstraintsAndPushMatrix()
             return true
         }
 
@@ -595,19 +505,18 @@ class TouchImageView : ImageView {
         private suspend fun animateZoomTo(targetZoom: Float) {
             val startZoom = currentZoom
             val (initFocusX, initFocusY) = initialFocus
-            val initialMatrix = Matrix(currMatrix)
+            val initialMatrix = Matrix(imageMatrix)
             withState(ANIMATE_ZOOM) {
                 ValueAnimator.ofFloat(startZoom, targetZoom).apply {
                     duration = ZOOM_DURATION
                     interpolator = quadratic
                     addUpdateListener { anim ->
                         currentZoom = anim.animatedValue as Float
-                        currMatrix.set(initialMatrix)
-                        currMatrix.postScale(
+                        mx.set(initialMatrix)
+                        mx.postScale(
                                 currentZoom / startZoom, currentZoom / startZoom,
                                 initFocusX, initFocusY)
-                        constrainTranslate()
-                        imageMatrix = currMatrix
+                        applyConstraintsAndPushMatrix()
                     }
                     run()
                 }
