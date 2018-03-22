@@ -6,7 +6,6 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Region.Op.*
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.util.AttributeSet
@@ -17,6 +16,10 @@ import android.widget.SeekBar
 class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, attrs) {
     var thumbText: String = ""
     var thumbProgress: Int = 0
+
+    // anchor position of the seekbar within its parent, needed to restore the
+    // position after enter/exit animation
+    private var anchorY = 0f
 
     private val thumbHeight = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_height).toFloat()
     private val boxBorder = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_box_border).toFloat()
@@ -65,17 +68,21 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
         canvas.drawText(thumbText, textX - textOffset, -thumbHeight - boxBorder, textPaint)
     }
 
-    fun animateEnter() {
-        val targetY = y
-        y = (parent as View).height.toFloat()
-        animate().y(targetY).duration = 200
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        anchorY = top.toFloat()
     }
 
-    fun animateExit() {
-        val startY = y
-        animate().y((parent as View).height.toFloat()).withEndAction {
+    fun startAnimateEnter() {
+        y = parentHeight
+        visibility = VISIBLE
+        animate().y(anchorY).duration = 200
+    }
+
+    fun startAnimateExit() {
+        animate().y(parentHeight).withEndAction {
             visibility = View.INVISIBLE
-            y = startY
         }
     }
+
+    private val parentHeight get() = (parent as View).height.toFloat()
 }

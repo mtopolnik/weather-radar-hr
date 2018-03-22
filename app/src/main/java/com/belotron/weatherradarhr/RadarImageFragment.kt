@@ -37,8 +37,6 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
-import kotlinx.coroutines.experimental.Unconfined
-import kotlinx.coroutines.experimental.launch
 
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
@@ -344,10 +342,7 @@ class RadarImageFragment : Fragment() {
                     awaitOnDraw()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
                 }
-                seekBar?.apply {
-                    setVisible(true)
-                    animateEnter()
-                }
+                seekBar?.startAnimateEnter()
             }
         }
     }
@@ -358,7 +353,7 @@ class RadarImageFragment : Fragment() {
         start {
             val target = imgBundles[index]
             if (target.status == SHOWING) {
-                fullScreenBundle.seekBar?.animateExit()
+                fullScreenBundle.seekBar?.startAnimateExit()
                 target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
