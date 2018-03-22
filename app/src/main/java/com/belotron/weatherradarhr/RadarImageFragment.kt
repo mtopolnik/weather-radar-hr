@@ -234,6 +234,7 @@ class RadarImageFragment : Fragment() {
                     return true
                 }
                 scrollView.offsetDescendantRectToMyCoords(imgBundles[1].textView ?: return true, rect.reset())
+                val focusY = scrollView.scrollY + focusY
                 val imgIndex = if (focusY <= rect.top) 0 else 1
                 val imgView = imgBundles[imgIndex].imgView ?: return true
                 scrollView.offsetDescendantRectToMyCoords(imgView, rect.reset())
