@@ -14,7 +14,9 @@
         <ScrollView
                 android:id="@+id/radar_scrollview"
                 android:layout_height="match_parent"
-                android:layout_width="match_parent">
+                android:layout_width="match_parent"
+                android:scrollbars="none"
+        >
             <LinearLayout
                     android:orientation="vertical"
                     android:layout_width="match_parent"
