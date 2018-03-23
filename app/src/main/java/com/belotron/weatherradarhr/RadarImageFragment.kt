@@ -340,7 +340,7 @@ class RadarImageFragment : Fragment() {
             seekBar?.visibility = INVISIBLE
             start {
                 imgView?.let { it as TouchImageView }?.apply {
-                    awaitMatrixInitialized()
+                    awaitBitmapMeasured()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
                 }
                 seekBar?.startAnimateEnter()
