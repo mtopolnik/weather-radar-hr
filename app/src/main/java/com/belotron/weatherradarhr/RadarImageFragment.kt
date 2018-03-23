@@ -245,7 +245,7 @@ class RadarImageFragment : Fragment() {
             }
         }
         ScaleGestureDetector(activity, sl).also {
-            scrollView.setOnTouchListener { _, e -> it.onTouchEvent(e); false }
+            scrollView.setOnTouchListener { _, e -> it.onTouchEvent(e); e.pointerCount > 1 }
         }
         setupFullScreenBundle()
         updateFullScreenVisibility()
