@@ -90,6 +90,10 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
     }
 }
 
+fun invalidateCache(context: Context, url: String) {
+    cacheFile(context, url).delete()
+}
+
 private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
     try {
         cacheFile.dataOut().use { cachedOut ->

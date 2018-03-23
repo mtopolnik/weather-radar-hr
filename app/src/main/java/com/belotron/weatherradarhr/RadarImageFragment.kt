@@ -416,11 +416,17 @@ class RadarImageFragment : Fragment() {
                         return@start
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
-                    val gifData = editGif(imgBytes, desc.framesToKeep)
-                    bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
-                    with (animationLooper) {
-                        receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
-                        resume(rateMinsPerSec, freezeTimeMillis)
+                    try {
+                        val gifData = editGif(imgBytes, desc.framesToKeep)
+                        bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
+                        with (animationLooper) {
+                            receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
+                            resume(rateMinsPerSec, freezeTimeMillis)
+                        }
+                    } catch (t: Throwable) {
+                        error { "GIF parse error, deleting from cache" }
+                        invalidateCache(context, desc.url)
+                        throw t
                     }
                     bundle.status = SHOWING
                     context.actionBar.hide()
