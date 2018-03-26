@@ -358,18 +358,20 @@ class TouchImageView : ImageView {
         }
     }
 
-    private fun constrainTransAndPushMatrix() {
+    /**
+     * Operates on [mx], which the caller must initialize.
+     */
+    private fun constrainTrans() {
         mx.getValues(m)
         val (imageWidth, imageHeight) = imageSize(pointF)
         val (constrainedTransX, constrainedTransY) =
                 constrainedTrans(true, m[MTRANS_X], m[MTRANS_Y], imageWidth, imageHeight, pointF)
         m[MTRANS_X] = constrainedTransX
         m[MTRANS_Y] = constrainedTransY
-        applyMatrix()
     }
 
     /**
-     * Operates on [mx], which the caller must initialize to the current image matrix.
+     * Operates on [mx], which the caller must initialize.
      */
     private fun springBackZoomAndTrans(focusX: Float, focusY: Float) {
         val targetZoom = coerceToRange(currentZoom, pointF.apply { set(MIN_ZOOM, MAX_ZOOM) })
@@ -417,12 +419,18 @@ class TouchImageView : ImageView {
         }
     }
 
+    /**
+     * Given the current translation of the image and the current image size,
+     * populates [outParam] with the translation constrained within the allowed
+     * range for proper behavior. If [allowOverdrag] is true, the function will
+     * allow the translation to exceed the allowed range by [overdrag] pixels.
+     */
     private fun constrainedTrans(
             allowOverdrag: Boolean, currTransX: Float, currTransY: Float,
-            imageWidth: Float, imageHeight: Float, dest: PointF
+            imageWidth: Float, imageHeight: Float, outParam: PointF
     ): PointF {
         val overdrag = if (allowOverdrag) this.overdrag.toFloat() else 0f
-        return dest.apply { set(
+        return outParam.apply { set(
                 coerceToRange(currTransX, transBounds(viewWidth, imageWidth, overdrag, pointF)),
                 coerceToRange(currTransY, transBounds(viewHeight, imageHeight, overdrag, pointF))
         ) }
@@ -470,17 +478,17 @@ class TouchImageView : ImageView {
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            return doubleTapListener != null && doubleTapListener!!.onDoubleTap(e)
+            return doubleTapListener?.onDoubleTap(e) ?: false
         }
 
         override fun onDoubleTapEvent(e: MotionEvent): Boolean {
-            return doubleTapListener != null && doubleTapListener!!.onDoubleTapEvent(e)
+            return doubleTapListener?.onDoubleTapEvent(e) ?: false
         }
     }
 
     private inner class PrivateOnTouchListener : View.OnTouchListener {
 
-        private val initial = PointF()
+        private val initialPoint = PointF()
         private val initialMatrix = Matrix()
 
         override fun onTouch(v: View, event: MotionEvent): Boolean {
@@ -489,17 +497,18 @@ class TouchImageView : ImageView {
             if (state == NONE || state == DRAG || state == FLING) {
                 when (event.action) {
                     ACTION_DOWN -> {
-                        initial.set(event.x, event.y)
+                        initialPoint.set(event.x, event.y)
                         initialMatrix.set(imageMatrix)
                         flingJob?.cancel()
                         state = DRAG
                     }
                     ACTION_MOVE -> if (state == DRAG) {
-                        val deltaX = event.x - initial.x
-                        val deltaY = event.y - initial.y
+                        val transX = event.x - initialPoint.x
+                        val transY = event.y - initialPoint.y
                         mx.set(initialMatrix)
-                        mx.postTranslate(deltaX, deltaY)
-                        constrainTransAndPushMatrix()
+                        mx.postTranslate(transX, transY)
+                        constrainTrans()
+                        applyMatrix()
                     }
                     ACTION_UP, ACTION_POINTER_UP -> if (state == DRAG) {
                         val (imageWidth, imageHeight) = imageSize(pointF)
@@ -545,7 +554,8 @@ class TouchImageView : ImageView {
             mx.set(initialMatrix)
             mx.postTranslate(detector.focusX - initFocusX, detector.focusY - initFocusY)
             mx.postScale(scale, scale, detector.focusX, detector.focusY)
-            constrainTransAndPushMatrix()
+            constrainTrans()
+            applyMatrix()
             return true
         }
 
