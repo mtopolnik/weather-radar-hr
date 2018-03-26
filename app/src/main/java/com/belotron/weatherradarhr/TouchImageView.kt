@@ -285,8 +285,7 @@ class TouchImageView : ImageView {
         val viewCenterY = 0.5f * viewHeight
         m[MTRANS_X] = viewCenterX - state.getFloat(STATE_IMG_FOCUS_X)
         m[MTRANS_Y] = viewCenterY - state.getFloat(STATE_IMG_FOCUS_Y)
-        mx.setValues(m)
-        imageMatrix = mx
+        applyMatrix()
         springBackZoomAndTrans(viewCenterX, viewCenterY)
         return true
     }
@@ -308,14 +307,12 @@ class TouchImageView : ImageView {
                 val scale = anim.getAnimatedValue("scale") as Float
                 val transX = anim.getAnimatedValue("transX") as Float
                 val transY = anim.getAnimatedValue("transY") as Float
-                mx.set(imageMatrix)
-                mx.getValues(m)
+                loadMatrix()
                 m[MSCALE_X] = scale
                 m[MSCALE_Y] = scale
                 m[MTRANS_X] = transX
                 m[MTRANS_Y] = transY
-                mx.setValues(m)
-                imageMatrix = mx
+                applyMatrix()
                 currentZoom = scale / unitScale
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -354,8 +351,7 @@ class TouchImageView : ImageView {
                     loadMatrix()
                     m[MTRANS_X] = scroller.currX.toFloat()
                     m[MTRANS_Y] = scroller.currY.toFloat()
-                    mx.setValues(m)
-                    imageMatrix = mx
+                    applyMatrix()
                     UI.awaitFrame()
                 }
             }
@@ -369,8 +365,7 @@ class TouchImageView : ImageView {
                 constrainedTrans(true, m[MTRANS_X], m[MTRANS_Y], imageWidth, imageHeight, pointF)
         m[MTRANS_X] = constrainedTransX
         m[MTRANS_Y] = constrainedTransY
-        mx.setValues(m)
-        imageMatrix = mx
+        applyMatrix()
     }
 
     /**
@@ -436,6 +431,11 @@ class TouchImageView : ImageView {
     private fun loadMatrix() {
         mx.set(imageMatrix)
         mx.getValues(m)
+    }
+
+    private fun applyMatrix() {
+        mx.setValues(m)
+        imageMatrix = mx
     }
 
     private suspend fun withState(state: State, block: suspend () -> Unit) {
