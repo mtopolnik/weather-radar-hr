@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.PointF
+import android.graphics.RectF
 import android.os.Bundle
 import android.support.v4.content.ContextCompat.getColor
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -62,6 +63,11 @@ operator fun Point.component1() = x
 operator fun Point.component2() = y
 operator fun PointF.component1() = x
 operator fun PointF.component2() = y
+
+operator fun RectF.component1() = left
+operator fun RectF.component2() = top
+operator fun RectF.component3() = right
+operator fun RectF.component4() = bottom
 
 fun ImageView?.bitmapSize(p: Point) =
         p.also { this?.drawable

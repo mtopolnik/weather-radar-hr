@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="widget_margin">8dp</dimen>
-    <dimen name="overdrag">40dp</dimen>
+    <dimen name="fullscreen_tolerance">5dp</dimen>
+    <dimen name="fullscreen_bottom_margin">80dp</dimen>
+    <dimen name="fullscreen_allowed_overdrag">40dp</dimen>
     <dimen name="seekbar_thumb_text_size">18dp</dimen>
     <dimen name="seekbar_thumb_height">30dp</dimen>
     <dimen name="seekbar_thumb_box_border">8dp</dimen>

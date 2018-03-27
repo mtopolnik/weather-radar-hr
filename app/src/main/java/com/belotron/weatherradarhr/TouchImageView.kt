@@ -14,6 +14,7 @@ import android.graphics.Matrix.MTRANS_X
 import android.graphics.Matrix.MTRANS_Y
 import android.graphics.Point
 import android.graphics.PointF
+import android.graphics.RectF
 import android.os.Bundle
 import android.os.Parcelable
 import android.util.AttributeSet
@@ -70,16 +71,18 @@ private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
 
-
 class TouchImageView : ImageView {
 
-    private val overdrag = resources.getDimensionPixelOffset(R.dimen.overdrag)
+    private val overdrag = resources.getDimensionPixelOffset(R.dimen.fullscreen_allowed_overdrag)
+    private val bottomMargin = resources.getDimensionPixelOffset(R.dimen.fullscreen_bottom_margin)
+    private val tolerance = resources.getDimensionPixelOffset(R.dimen.fullscreen_tolerance)
 
     // Reusable value containers
     private val mx = Matrix()
     private val m = FloatArray(9)
     private val pointF = PointF()
     private val point = Point()
+    private val rectF = RectF()
 
     private var state = NONE
         set(value) {
@@ -113,12 +116,6 @@ class TouchImageView : ImageView {
     private var flingJob: Job? = null
     private var userTouchListener: View.OnTouchListener? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
-
-    private fun imageSize(outParam: PointF): PointF {
-        val (bitmapW, bitmapH) = bitmapSize(outParam) ?: return outParam.apply { set(0f, 0f) }
-        val scale = unitScale * currentZoom
-        return outParam.apply { set(bitmapW * scale, bitmapH * scale) }
-    }
 
     constructor(context: Context) : this(context, null, 0)
 
@@ -337,9 +334,8 @@ class TouchImageView : ImageView {
         flingJob = start {
             withState(FLING) {
                 loadMatrix()
-                val (imageWidth, imageHeight) = imageSize(pointF)
-                val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, 0f, pointF)
-                val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, 0f, pointF)
+                val (minTransX, minTransY, maxTransX, maxTransY) = transBounds(currentZoom, false, rectF)
+                        ?: return@withState
                 val scroller = OverScroller(context).apply {
                     fling(m[MTRANS_X].toInt(), m[MTRANS_Y].toInt(),
                             velocityX.roundToInt(), velocityY.roundToInt(),
@@ -361,18 +357,6 @@ class TouchImageView : ImageView {
     /**
      * Operates on [mx], which the caller must initialize.
      */
-    private fun constrainTrans() {
-        mx.getValues(m)
-        val (imageWidth, imageHeight) = imageSize(pointF)
-        val (constrainedTransX, constrainedTransY) =
-                constrainedTrans(true, m[MTRANS_X], m[MTRANS_Y], imageWidth, imageHeight, pointF)
-        m[MTRANS_X] = constrainedTransX
-        m[MTRANS_Y] = constrainedTransY
-    }
-
-    /**
-     * Operates on [mx], which the caller must initialize.
-     */
     private fun springBackZoomAndTrans(focusX: Float, focusY: Float) {
         val targetZoom = coerceToRange(currentZoom, pointF.apply { set(MIN_ZOOM, MAX_ZOOM) })
         mx.getValues(m)
@@ -383,10 +367,7 @@ class TouchImageView : ImageView {
             mx.getValues(m)
             val targetTransX = m[MTRANS_X]
             val targetTransY = m[MTRANS_Y]
-            val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
-            val targetImgW = bitmapW * targetZoom * unitScale
-            val targetImgH = bitmapH * targetZoom * unitScale
-            constrainedTrans(false, targetTransX, targetTransY, targetImgW, targetImgH, pointF)
+            constrainedTrans(targetTransX, targetTransY, targetZoom, false, pointF) ?: return
         }
         if (targetZoom != currentZoom || constrainedTransX != currTransX || constrainedTransY != currTransY) {
             zoomAnimator(currentZoom * unitScale, targetZoom * unitScale,
@@ -397,26 +378,14 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * This function deals with dimensions along a single axis.
-     *
-     * Given the size of the image and the view, it computes the min and max
-     * allowed translation so that either the entire span of the image stays
-     * within the view or the entire span of the view stays within the image
-     * (depending on which of the two is larger). It extends this range by
-     * the allowed "overdrag" on both sides.
-     *
-     * Populates the provided [outParam] with (minAllowed, maxAllowed)
-     * translation and returns it.
+     * Operates on [mx], which the caller must initialize.
      */
-    private fun transBounds(viewSize: Int, imgSize: Float, overdrag: Float, outParam: PointF): PointF {
-        val transToAlignRightEdgeViewAndScreen = viewSize - imgSize
-        return outParam.apply {
-            if (transToAlignRightEdgeViewAndScreen >= 0f) {
-                set(-overdrag, transToAlignRightEdgeViewAndScreen + overdrag)
-            } else {
-                set(transToAlignRightEdgeViewAndScreen - overdrag, overdrag)
-            }
-        }
+    private fun constrainTrans() {
+        mx.getValues(m)
+        val (constrainedTransX, constrainedTransY) =
+                constrainedTrans(m[MTRANS_X], m[MTRANS_Y], currentZoom, true, pointF) ?: return
+        m[MTRANS_X] = constrainedTransX
+        m[MTRANS_Y] = constrainedTransY
     }
 
     /**
@@ -426,14 +395,45 @@ class TouchImageView : ImageView {
      * allow the translation to exceed the allowed range by [overdrag] pixels.
      */
     private fun constrainedTrans(
-            allowOverdrag: Boolean, currTransX: Float, currTransY: Float,
-            imageWidth: Float, imageHeight: Float, outParam: PointF
-    ): PointF {
-        val overdrag = if (allowOverdrag) this.overdrag.toFloat() else 0f
+            desiredTransX: Float, desiredTransY: Float, zoom: Float, allowOverdrag: Boolean, outParam: PointF
+    ): PointF? {
+        val (minTransX, minTransY, maxTransX, maxTransY) = transBounds(zoom, allowOverdrag, rectF) ?: return null
         return outParam.apply { set(
-                coerceToRange(currTransX, transBounds(viewWidth, imageWidth, overdrag, pointF)),
-                coerceToRange(currTransY, transBounds(viewHeight, imageHeight, overdrag, pointF))
+                desiredTransX.coerceIn(minTransX, maxTransX),
+                desiredTransY.coerceIn(minTransY, maxTransY)
         ) }
+    }
+
+    /**
+     * Given the target zoom level, computes the bounding box on the allowed
+     * image translation so that, independently for each axis, either the
+     * entire span of the image along that axis stays within the view or the
+     * entire span of the view stays within the image (depending on which of
+     * the two spans is larger). It extends the bounding box by the allowed
+     * "overdrag" on all sides and finally adds more vertical allowance so the
+     * image can stay above the bottom margin.
+     *
+     * Populates the provided [outParam] with (minAllowedX, minAllowedY,
+     * maxAllowedX, maxAllowedY) translation and returns it.
+     *
+     * Destroys the contents of [pointF].
+     */
+    private fun transBounds(zoom: Float, allowOverdrag: Boolean, outParam: RectF): RectF? {
+        val overdrag = if (allowOverdrag) this.overdrag.toFloat() else 0f
+        val scale = zoom * unitScale
+
+        fun transBounds(viewSize: Int, bitmapSize: Float, farMargin: Float): PointF {
+            val transToAlignFarEdgeViewAndScreen = viewSize - scale * bitmapSize
+            return pointF.apply { set(
+                    min(0f, transToAlignFarEdgeViewAndScreen - farMargin) - overdrag,
+                    max(0f, transToAlignFarEdgeViewAndScreen) + overdrag
+            ) }
+        }
+
+        val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return null
+        val (minX, maxX) = transBounds(viewWidth, bitmapW, 0f)
+        val (minY, maxY) = transBounds(viewHeight, bitmapH, bottomMargin.toFloat())
+        return outParam.apply { set(minX, minY, maxX, maxY) }
     }
 
     private fun loadMatrix() {
@@ -470,7 +470,14 @@ class TouchImageView : ImageView {
             performLongClick()
         }
 
-        override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+        // Reported velocity is that of the pointer and not of the image as the user
+        // perceives it. If the image is pressing against the edge, its actual
+        // velocity is zero. We correct for this here.
+        override fun onFling(e1: MotionEvent, e2: MotionEvent, rawVelocityX: Float, rawVelocityY: Float): Boolean {
+            loadMatrix()
+            val (minX, minY, maxX, maxY) = transBounds(currentZoom, true, rectF) ?: return true
+            val velocityX = if (m[MTRANS_X] in (minX + tolerance)..(maxX - tolerance)) rawVelocityX else 0f
+            val velocityY = if (m[MTRANS_Y] in (minY + tolerance)..(maxY - tolerance)) rawVelocityY else 0f
             if (state != ANIMATE_ZOOM) {
                 startFling(velocityX, velocityY)
             }
@@ -511,14 +518,13 @@ class TouchImageView : ImageView {
                         applyMatrix()
                     }
                     ACTION_UP, ACTION_POINTER_UP -> if (state == DRAG) {
-                        val (imageWidth, imageHeight) = imageSize(pointF)
-                        val (minTransX, maxTransX) = transBounds(viewWidth, imageWidth, 0f, pointF)
-                        val (minTransY, maxTransY) = transBounds(viewHeight, imageHeight, 0f, pointF)
-                        loadMatrix()
-                        if (m[MTRANS_X] !in minTransX..maxTransX || m[MTRANS_Y] !in minTransY..maxTransY) {
-                            startFling(0f, 0f)
-                        } else {
-                            state = NONE
+                        transBounds(currentZoom, false, rectF)?.also { (minTransX, minTransY, maxTransX, maxTransY) ->
+                            loadMatrix()
+                            if (m[MTRANS_X] !in minTransX..maxTransX || m[MTRANS_Y] !in minTransY..maxTransY) {
+                                startFling(0f, 0f)
+                            } else {
+                                state = NONE
+                            }
                         }
                     }
                 }
