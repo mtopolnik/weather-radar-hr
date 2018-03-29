@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vreme na radaru</string>
+    <string name="main_activity_title">Vreme na radaru</string>
+    <string name="img_unavailable">Slika trenutno ni na voljo.</string>
+    <string name="widget_slo">Radar ARSO</string>
+    <string name="widget_hr">Radar DHMZ</string>
+    <string name="help">Pomoč in nasveti</string>
+    <string name="about">O aplikaciji</string>
+    <string name="ads_disabled">Oglasi izključeni</string>
+    <string name="settings">Nastavitve</string>
+    <string name="refresh">Osveži</string>
+    <string name="animation_rate">Hitrost animacije</string>
+    <string name="freeze_time">Pavza pred ponavljanjem</string>
+    <string name="about_text">
+        Verzija %1$s
+        \n© 2018 Belotron d.o.o.
+        \n\nRadarska slika SLO © Agencija Republike Slovenije za okolje
+        \n\nRadarska slika HR © Državni hidrometeorološki zavod
+        \n\nAvtor ikone aplikacije: Emilija Kalajžić
+    </string>
+    <string name="help_text">
+        Dvakrat tapnite sliko, da se osredotočite na to. Uporabite iskalno
+        vrstico da ročno krmilite prikazani okvir. Sliko lahko povečate in
+        zmenjšate. Za iti nazaj, ponovno dvakrat tapnite ali pritisnite
+        Androidov gumb Nazaj.
+        \n
+        \nPostavite pripomoček aplikacije na začetni zaslon, da boste imeli hiter
+        dostop do trenutne radarske slike.
+        \n
+        \nDotaknite se ikone pripomočka, da začnete aplikacijo.
+        \n
+        \nAplikacija uporablja OCR, da prebere časovni žig slikovne datoteke, ga
+        prevede v Vaš časovni pas in ga prikaže nad sliko. Včasih spletne strani
+        prenehajo posodabljati svoje slike, v tem primeru boste videli da starost
+        slike raste. Ko starost doseže eno uro, se besedilo obarva rdeče, da vas
+        opozori, da slika ni več ažurna.
+        \n
+        \nAplikacija je zelo konzervativna pri uporabi internetnega prometa in
+        nikoli ne mora dvakrat priti do iste slike, vedno pa si lahko ogledate
+        najnovejše slike zahvaljujoč HTTP glavi If-Modified-Since. Zaradi tega
+        včasih osveževanje slike traja le delček sekunde, vendar si lahko
+        zagotovite, da smo se obrnili na strežnik, ki je odgovoril, da imate že
+        zadnjo sliko. Če se ne moremo obrniti na strežnik, bo naslov nad njeno
+        sliko napisal “Offline”.
+    </string>
+</resources>
