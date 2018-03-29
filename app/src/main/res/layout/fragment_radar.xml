@@ -11,7 +11,7 @@
             android:layout_height="match_parent"
             android:layout_width="match_parent"
     >
-        <ScrollView
+        <com.belotron.weatherradarhr.MyScrollView
                 android:id="@+id/radar_scrollview"
                 android:layout_height="match_parent"
                 android:layout_width="match_parent"
@@ -114,7 +114,7 @@
                         android:paddingBottom="100dp"
                 />
             </LinearLayout>
-        </ScrollView>
+        </com.belotron.weatherradarhr.MyScrollView>
         <com.google.android.gms.ads.AdView
                 xmlns:ads="http://schemas.android.com/apk/res-auto"
                 android:id="@+id/adView"

@@ -202,27 +202,30 @@ class RadarImageFragment : Fragment() {
                 }
             }
         }
-        imgDescs.forEachIndexed { i, desc -> imgBundles[i].restoreViews(
-                viewGroup = rootView.findViewById(desc.viewGroupId),
-                textView = rootView.findViewById(desc.textViewId),
-                imgView = rootView.findViewById<ImageView>(desc.imgViewId).also { imgView ->
-                    val gl = object : SimpleOnGestureListener() {
-                        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
-                        override fun onDoubleTap(e: MotionEvent): Boolean {
-                            if (!isInFullScreen) enterFullScreen(i, imgView, e.x, e.y)
-                            return true
-                        }
+        imgDescs.forEachIndexed { i, desc ->
+            val viewGroup = rootView.findViewById<ViewGroup>(desc.viewGroupId)
+            val imgView = rootView.findViewById<ImageView>(desc.imgViewId)
+            val textView = rootView.findViewById<TextView>(desc.textViewId)
+            val brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId)
+            val progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId)
+            imgBundles[i].restoreViews(
+                viewGroup = viewGroup,
+                textView = textView.apply {
+                    GestureDetector(activity, MainViewListener(i, imgView)).also {
+                        setOnTouchListener { _, e -> it.onTouchEvent(e); true }
                     }
-                    GestureDetector(activity, gl).also {
-                        imgView.setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                },
+                imgView = imgView.apply {
+                    GestureDetector(activity, MainViewListener(i, imgView)).also {
+                        setOnTouchListener { _, e -> it.onTouchEvent(e); true }
                     }
                 },
                 seekBar = null,
-                brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId).apply {
+                brokenImgView = brokenImgView.apply {
                     setOnClickListener { switchActionBarVisible() }
                     visibility = GONE
                 },
-                progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId).apply {
+                progressBar = progressBar.apply {
                     setOnClickListener { switchActionBarVisible() }
                 }
         ) }
@@ -245,12 +248,36 @@ class RadarImageFragment : Fragment() {
             }
         }
         ScaleGestureDetector(activity, sl).also {
-            scrollView.setOnTouchListener { _, e -> it.onTouchEvent(e); e.pointerCount > 1 }
+            var secondPointerDown = false
+            scrollView.setOnTouchListener { _, e ->
+                it.onTouchEvent(e)
+                if (e.pointerCount > 1) {
+                    secondPointerDown = true
+                }
+                try {
+                    secondPointerDown
+                } finally {
+                    if (e.actionMasked == MotionEvent.ACTION_UP) {
+                        secondPointerDown = false
+                    }
+                }
+            }
         }
         setupFullScreenBundle()
         updateFullScreenVisibility()
         updateAdVisibility()
         return rootView
+    }
+
+    private inner class MainViewListener(
+            private val imgIndex: Int,
+            private val imgView: ImageView
+    ) : SimpleOnGestureListener() {
+        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            if (!isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
+            return true
+        }
     }
 
     override fun onResume() {
