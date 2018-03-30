@@ -29,11 +29,11 @@ dependencies {
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-android:0.22.5"
-    compile 'com.android.support:support-core-ui:27.0.2'
-    compile 'com.android.support:support-v13:27.0.2'
-    compile 'com.google.android.gms:play-services-ads:11.8.0'
+    compile 'com.android.support:support-core-ui:27.1.0'
+    compile 'com.android.support:support-v13:27.1.0'
+    compile 'com.google.android.gms:play-services-ads:12.0.1'
     testCompile 'junit:junit:4.12'
     testCompile 'org.mockito:mockito-core:2.15.0'
 }
