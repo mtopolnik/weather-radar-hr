@@ -171,11 +171,10 @@ private class WidgetContext (
 ) {
     fun providerName() = ComponentName(context, wDesc.providerClass)
 
-    fun isWidgetInUse() =
-            context.appWidgetManager.getAppWidgetIds(providerName()).isNotEmpty()
+    fun isWidgetInUse() = context.appWidgetManager.getAppWidgetIds(providerName()).isNotEmpty()
 
     fun onUpdateWidget() {
-        warn{"onUpdate ${wDesc.name}"}
+        warn { "onUpdate ${wDesc.name}" }
         start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
@@ -190,6 +189,7 @@ private class WidgetContext (
         try {
             val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
             if (imgBytes == null) {
+                // This may happen only with `onlyIfNew == true`
                 return null
             }
             val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes, false)
@@ -205,7 +205,7 @@ private class WidgetContext (
             }
             return null
         } catch (t: Throwable) {
-            error(t) {"Widget refresh failure"}
+            error(t) { "Widget refresh failure" }
             return null
         }
     }

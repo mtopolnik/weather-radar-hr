@@ -458,7 +458,7 @@ class RadarImageFragment : Fragment() {
                     bundle.status = SHOWING
                     context.actionBar.hide()
                 } catch (t: Throwable) {
-                    error(t) {"Failed to load animated GIF ${desc.filename}"}
+                    error(t) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN
                 }
             }
