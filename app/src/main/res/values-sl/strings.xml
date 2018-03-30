@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Vreme na radaru</string>
-    <string name="main_activity_title">Vreme na radaru</string>
+    <string name="app_name">Vreme na radarju</string>
+    <string name="main_activity_title">Vreme na radarju</string>
     <string name="img_unavailable">Slika trenutno ni na voljo.</string>
     <string name="widget_slo">Radar ARSO</string>
     <string name="widget_hr">Radar DHMZ</string>
