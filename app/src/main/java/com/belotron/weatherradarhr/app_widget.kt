@@ -175,6 +175,7 @@ private class WidgetContext (
 
     fun onUpdateWidget() {
         warn { "onUpdate ${wDesc.name}" }
+        updateRemoteViews(null)
         start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
