@@ -120,15 +120,6 @@ public class StandardGifDecoder implements GifDecoder {
     @NonNull
     private Bitmap.Config bitmapConfig = Config.ARGB_8888;
 
-    public StandardGifDecoder(@NonNull Allocator provider, GifHeader gifHeader, ByteBuffer rawData) {
-        this(provider, gifHeader, rawData, 1 /*sampleSize*/);
-    }
-
-    public StandardGifDecoder(@NonNull Allocator provider, GifHeader gifHeader, ByteBuffer rawData, int sampleSize) {
-        this(provider);
-        setData(gifHeader, rawData, sampleSize);
-    }
-
     public StandardGifDecoder(@NonNull Allocator allocator) {
         this.allocator = allocator;
         header = new GifHeader();
@@ -498,8 +489,7 @@ public class StandardGifDecoder implements GifDecoder {
                 }
                 // Start of line in source.
                 int sx = i * sampleSize * frame.iw;
-                boolean isNotDownsampling = sampleSize == 1;
-                if (isNotDownsampling) {
+                if (sampleSize == 1) {
                     while (dx < dlim) {
                         int currentColorIndex = ((int) mainPixels[sx]) & MASK_INT_LOWEST_BYTE;
                         int averageColor = act[currentColorIndex];
@@ -508,7 +498,7 @@ public class StandardGifDecoder implements GifDecoder {
                         } else if (isFirstFrame && isFirstFrameTransparent == null) {
                             isFirstFrameTransparent = true;
                         }
-                        sx += sampleSize;
+                        sx++;
                         dx++;
                     }
                 } else {
