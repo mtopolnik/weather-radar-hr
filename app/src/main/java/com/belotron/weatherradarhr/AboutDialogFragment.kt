@@ -22,15 +22,13 @@ const val TAG_ABOUT = "dialog_about"
 
 suspend fun showAboutDialogFragment(activity: Activity) {
     suspendCoroutine<Unit> { cont ->
-        AboutDialogFragment(cont).show(activity.fragmentManager, TAG_ABOUT)
+        AboutDialogFragment().apply { continuation = cont }.show(activity.fragmentManager, TAG_ABOUT)
     }
 }
 
-class AboutDialogFragment(
-        private val continuation: Continuation<Unit>?
-) : DialogFragment() {
+class AboutDialogFragment : DialogFragment() {
 
-    constructor(): this(null)
+    var continuation: Continuation<Unit>? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val inflater = activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
