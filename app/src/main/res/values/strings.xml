@@ -11,6 +11,15 @@
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
+    <string name="rateme_title">Rate our App</string>
+    <string name="rateme_question">
+        If you enjoy using our app, please take a moment to rate it.
+        Thanks for your support!
+    </string>
+    <string name="rateme_yes">Yes, let me do it</string>
+    <string name="rateme_later">Remind me later</string>
+    <string name="rateme_already_did">I already did it</string>
+    <string name="rateme_no">No, thanks</string>
     <string name="about_text">
         Version %1$s
         \n© 2018 Belotron d.o.o.

@@ -12,6 +12,15 @@
     <string name="refresh">Osveži</string>
     <string name="animation_rate">Hitrost animacije</string>
     <string name="freeze_time">Pavza pred ponavljanjem</string>
+    <string name="rateme_title">Ocenite aplikacijo</string>
+    <string name="rateme_question">
+        Če Vam je naša aplikacija koristna, bi bili veseli,
+        če ju ocenite. Hvala za podporo!
+    </string>
+    <string name="rateme_yes">Lahko</string>
+    <string name="rateme_later">Drugič</string>
+    <string name="rateme_already_did">Sem že</string>
+    <string name="rateme_no">Ne želim</string>
     <string name="about_text">
         Verzija %1$s
         \n© 2018 Belotron d.o.o.

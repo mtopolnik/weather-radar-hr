@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:padding="12dp"
+>
+    <TextView
+            android:text="@string/rateme_question"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_margin="16dp"
+            android:gravity="center"
+            android:textIsSelectable="true"
+    />
+    <Button
+            android:id="@+id/rateme_yes"
+            android:text="@string/rateme_yes"
+            android:layout_height="70dp"
+            android:layout_width="match_parent"
+    />
+    <Button
+            android:id="@+id/rateme_later"
+            android:text="@string/rateme_later"
+            android:layout_height="70dp"
+            android:layout_width="match_parent"
+    />
+    <Button
+            android:id="@+id/rateme_already_did"
+            android:text="@string/rateme_already_did"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+    />
+    <Button
+            android:id="@+id/rateme_no"
+            android:text="@string/rateme_no"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+    />
+</LinearLayout>

@@ -22,7 +22,10 @@ const val TAG_ABOUT = "dialog_about"
 
 suspend fun showAboutDialogFragment(activity: Activity) {
     suspendCoroutine<Unit> { cont ->
-        AboutDialogFragment().apply { continuation = cont }.show(activity.fragmentManager, TAG_ABOUT)
+        AboutDialogFragment().apply {
+            continuation = cont
+            retainInstance = true
+        }.show(activity.fragmentManager, TAG_ABOUT)
     }
 }
 
@@ -35,7 +38,7 @@ class AboutDialogFragment : DialogFragment() {
         val rootView = inflater.inflate(R.layout.about, null)
         val version =
                 try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }
-                catch (e: Exception) { null } ?: "??"
+                catch (e: Exception) { null } ?: "<unknown>"
         val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
             text = getString(R.string.about_text, version)
         }
@@ -43,13 +46,21 @@ class AboutDialogFragment : DialogFragment() {
             rootView.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
         }
         val gd = GestureDetector(activity, EasterEggDetector(rootView))
-        textView.setOnTouchListener { _, event -> gd.onTouchEvent(event); true }
+        textView.setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
         return AlertDialog.Builder(activity)
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
                 .setView(rootView)
                 .setPositiveButton(android.R.string.ok) { _, _ -> continuation?.resume(Unit) }
                 .create()
+    }
+
+    override fun onDestroyView() {
+        // handles https://code.google.com/p/android/issues/detail?id=17423
+        dialog?.takeIf { retainInstance }?.apply {
+            setDismissMessage(null)
+        }
+        super.onDestroyView()
     }
 }
 
