@@ -22,6 +22,15 @@ private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW }
 
+class ImageFetchException(val cached : ByteArray?) : Exception()
+
+/**
+ * The returned byte array may be `null` only with the [ONLY_IF_NEW] fetch
+ * policy, if there is no new image.
+ *
+ * In the case of an error the function throws [ImageFetchException] which
+ * holds a cached byte array, if available.
+ */
 suspend fun fetchUrl(
         context: Context, url: String, fetchPolicy: FetchPolicy
 ): Pair<Long, ByteArray?> = withContext(threadPool) {
@@ -30,18 +39,17 @@ suspend fun fetchUrl(
             return@withContext it
         }
     }
-    val conn = URL(url).openConnection() as HttpURLConnection
+    var conn: HttpURLConnection? = null
     try {
+        conn = URL(url).openConnection() as HttpURLConnection
         val ifModifiedSince = loadCachedLastModified(context, url)
         ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
         conn.connect()
         when {
             conn.responseCode == 200 ->
                 fetchContentAndUpdateCache(conn, context)
-            conn.responseCode != 304 -> {
-                logErrorResponse(conn, url)
-                throw ImageFetchException(if (fetchPolicy == ONLY_IF_NEW) null else loadCachedImage(context, url))
-            }
+            conn.responseCode != 304 ->
+                throw HttpErrorResponse()
             fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                 Pair(0L, null)
             else -> { // responseCode == 304, fetch from cache
@@ -49,11 +57,15 @@ suspend fun fetchUrl(
                 loadCachedResult(context, url)!!
             }
         }
-    } catch (e: Exception) {
-        error(e) {"Error fetching $url"}
+    } catch (t: Throwable) {
+        if (t is HttpErrorResponse) {
+            logErrorResponse(conn!!, url)
+        } else {
+            error(t) { "Error fetching $url" }
+        }
         throw ImageFetchException(if (fetchPolicy == ONLY_IF_NEW) null else loadCachedImage(context, url))
     } finally {
-        conn.disconnect()
+        conn?.disconnect()
     }
 }
 
@@ -62,20 +74,22 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
     val lastModified = lastModifiedStr.parseLastModified()
     val url = conn.url.toExternalForm()
-    info { "Last-Modified $lastModifiedStr: $url" }
+    info { "Fetching content, Last-Modified $lastModifiedStr: $url" }
     return synchronized(threadPool) {
         try {
             val cachedIn = runOrNull { cachedDataIn(context, url) }
             val imgBytes = if (cachedIn == null) {
-                updateCache(cacheFile(context, url), lastModifiedStr, responseBody.value)
-                responseBody.value
+                responseBody.value.also {
+                    updateCache(cacheFile(context, url), lastModifiedStr, it)
+                }
             }
             else {
                 val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
                 if (cachedLastModified == null || cachedLastModified < lastModified) {
                     cachedIn.close()
-                    updateCache(cacheFile(context, url), lastModifiedStr, responseBody.value)
-                    responseBody.value
+                    responseBody.value.also {
+                        updateCache(cacheFile(context, url), lastModifiedStr, it)
+                    }
                 }
                 else { // cachedLastModified >= lastModified, can happen with concurrent requests
                     conn.inputStream.close()
@@ -84,7 +98,7 @@ private fun fetchContentAndUpdateCache(conn: HttpURLConnection, context: Context
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes)
         } catch (t: Throwable) {
-            error(t) {"Failed to handle a successful image response"}
+            error(t) { "Failed to handle a successful image response" }
             throw t
         }
     }
@@ -143,4 +157,4 @@ private fun cacheFile(context: Context, url: String): File {
     return file
 }
 
-class ImageFetchException(val cached : ByteArray?) : Exception()
+private class HttpErrorResponse : Exception()
