@@ -3,7 +3,6 @@ package com.belotron.weatherradarhr
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
@@ -23,7 +22,6 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
 import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
-import kotlinx.coroutines.experimental.CoroutineStart
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
