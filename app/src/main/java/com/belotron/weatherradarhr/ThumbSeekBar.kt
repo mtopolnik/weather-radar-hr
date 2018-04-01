@@ -30,14 +30,14 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     private val textRect = RectF()
     private val trianglePath = Path()
     private val textPaint = TextPaint().apply {
-        color = resources.getColor(R.color.seekbarThumbText)
+        color = resources.getColor(R.color.seekbar_thumb_text)
         textSize = resources.getDimensionPixelSize(R.dimen.seekbar_thumb_text_size).toFloat()
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.LEFT
     }
 
     private val textBackgroundPaint = Paint().apply {
-        color = resources.getColor(R.color.seekbarBackground)
+        color = resources.getColor(R.color.seekbar_background)
     }
 
     @Synchronized

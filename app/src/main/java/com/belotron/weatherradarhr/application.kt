@@ -83,11 +83,11 @@ fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
     text = context.ageText(timestamp, isOffline)
     val isFresh = isFreshTimestamp(timestamp)
     setTextColor(getColor(context,
-            if (isFresh) R.color.textPrimary
-            else R.color.textRed))
+            if (isFresh) R.color.text_primary
+            else R.color.text_red))
     setShadowLayer(2f, 2f, 2f, getColor(context,
-            if (isFresh) R.color.textShadow
-            else R.color.textRedShadow))
+            if (isFresh) R.color.text_shadow
+            else R.color.text_red_shadow))
 }
 
 fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="primary">#004d40</color>
-    <color name="textPrimary">#ffffff</color>
-    <color name="textShadow">#000000</color>
-    <color name="textRed">#ff4444</color>
-    <color name="textRedShadow">#aa4444</color>
-    <color name="textWidgetRedShadow">#440000</color>
-    <color name="seekbarBackground">#66000000</color>
-    <color name="seekbarThumbText">#66eeff</color>
+    <color name="text_primary">#ffffff</color>
+    <color name="text_shadow">#000000</color>
+    <color name="text_red">#ff4444</color>
+    <color name="text_red_shadow">#aa4444</color>
+    <color name="text_widget_red_shadow">#440000</color>
+    <color name="seekbar_background">#66000000</color>
+    <color name="seekbar_thumb_text">#66eeff</color>
+    <color name="rateme_button_large">#c6a035</color>
+    <color name="rateme_button_small">#00806a</color>
 </resources>

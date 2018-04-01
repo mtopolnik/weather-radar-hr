@@ -6,5 +6,5 @@
         android:layout_height="wrap_content"
         android:layout_width="170dp"
         android:layout_gravity="center_horizontal|bottom"
-        android:background="@color/seekbarBackground"
+        android:background="@color/seekbar_background"
 />
