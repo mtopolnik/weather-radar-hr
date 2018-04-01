@@ -11,4 +11,13 @@
         <item name="android:displayOptions">showTitle</item>
         <item name="android:background">@color/primary</item>
     </style>
+    <style name="RatemeDialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:background">@color/primary</item>
+    </style>
+    <style name="Rateme.Button.Large" parent="@android:style/ThemeOverlay">
+        <item name="android:backgroundTint">@color/rateme_button_large</item>
+    </style>
+    <style name="Rateme.Button.Small" parent="@android:style/ThemeOverlay">
+        <item name="android:backgroundTint">@color/rateme_button_small</item>
+    </style>
 </resources>

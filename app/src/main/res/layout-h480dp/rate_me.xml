@@ -21,23 +21,27 @@
             android:text="@string/rateme_yes"
             android:layout_height="70dp"
             android:layout_width="match_parent"
+            style="@style/Rateme.Button.Large"
     />
     <Button
             android:id="@+id/rateme_later"
             android:text="@string/rateme_later"
             android:layout_height="70dp"
             android:layout_width="match_parent"
+            style="@style/Rateme.Button.Large"
     />
     <Button
             android:id="@+id/rateme_already_did"
             android:text="@string/rateme_already_did"
             android:layout_height="wrap_content"
             android:layout_width="match_parent"
+            style="@style/Rateme.Button.Small"
     />
     <Button
             android:id="@+id/rateme_no"
             android:text="@string/rateme_no"
             android:layout_height="wrap_content"
             android:layout_width="match_parent"
+            style="@style/Rateme.Button.Small"
     />
 </LinearLayout>

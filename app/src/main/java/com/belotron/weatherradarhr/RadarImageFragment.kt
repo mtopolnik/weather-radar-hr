@@ -349,7 +349,7 @@ class RadarImageFragment : Fragment() {
                 updateAdVisibility()
                 switchActionBarVisible()
             }
-//            R.id.clear_rateme -> activity.clearRatemeState()
+            R.id.clear_rateme -> activity.clearRatemeState()
         }
         return true
     }
