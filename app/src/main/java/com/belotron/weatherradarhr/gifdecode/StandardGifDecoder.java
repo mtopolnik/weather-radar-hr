@@ -616,75 +616,80 @@ public class StandardGifDecoder implements GifDecoder {
         int oldCode = NULL_CODE;
         int available = clear + 2;
         final int endOfInformation = clear + 1;
+        decoderLoop:
         for (pi = 0; pi < npix;) {
-            if (top == 0) {
-                while (bits < codeSize) {
-                    // Read a new data block.
-                    if (count == 0) {
-                        count = readBlock();
-                        if (count <= 0) {
-                            status = STATUS_PARTIAL_DECODE;
-                            break;
-                        }
-                        bi = 0;
-                    }
-                    datum += toUnsignedInt(block[bi]) << bits;
-                    bits += 8;
-                    ++bi;
-                    --count;
+            while (top > 0) {
+                // Pop a pixel off the pixel stack.
+                mainPixels[pi++] = pixelStack[--top];
+                if (pi == npix) {
+                    break decoderLoop;
                 }
-
-                // Get the next code.
-                int code = datum & codeMask;
-                datum >>= codeSize;
-                bits -= codeSize;
-
-                // Interpret the code.
-                if (code > available || code == endOfInformation) {
-                    break;
-                }
-                if (code == clear) {
-                    // Reset decoder.
-                    codeSize = dataSize + 1;
-                    codeMask = (1 << codeSize) - 1;
-                    available = clear + 2;
-                    oldCode = NULL_CODE;
-                    continue;
-                }
-                if (oldCode == NULL_CODE) {
-                    pixelStack[top++] = suffix[code];
-                    oldCode = code;
-                    first = code;
-                    continue;
-                }
-                final int inCode = code;
-                if (code == available) {
-                    pixelStack[top++] = (byte) first;
-                    code = oldCode;
-                }
-                while (code > clear) {
-                    pixelStack[top++] = suffix[code];
-                    code = prefix[code];
-                }
-                first = toUnsignedInt(suffix[code]);
-
-                // Add a new string to the string table
-
-                if (available >= MAX_STACK_SIZE) {
-                    break;
-                }
-                pixelStack[top++] = (byte) first;
-                prefix[available] = (short) oldCode;
-                suffix[available] = (byte) first;
-                ++available;
-                if (((available & codeMask) == 0) && (available < MAX_STACK_SIZE)) {
-                    ++codeSize;
-                    codeMask += available;
-                }
-                oldCode = inCode;
             }
-            // Pop a pixel off the pixel stack.
-            mainPixels[pi++] = pixelStack[--top];
+            while (bits < codeSize) {
+                // Read a new data block.
+                if (count == 0) {
+                    count = readBlock();
+                    if (count <= 0) {
+                        status = STATUS_PARTIAL_DECODE;
+                        break;
+                    }
+                    bi = 0;
+                }
+                datum += toUnsignedInt(block[bi]) << bits;
+                bits += 8;
+                ++bi;
+                --count;
+            }
+
+            // Get the next code.
+            int code = datum & codeMask;
+            datum >>= codeSize;
+            bits -= codeSize;
+
+            // Interpret the code.
+            if (code > available || code == endOfInformation) {
+                break;
+            }
+            if (code == clear) {
+                // Reset decoder.
+                codeSize = dataSize + 1;
+                codeMask = (1 << codeSize) - 1;
+                available = clear + 2;
+                oldCode = NULL_CODE;
+                continue;
+            }
+            if (oldCode == NULL_CODE) {
+                mainPixels[pi++] = suffix[code];
+                oldCode = code;
+                first = code;
+                continue;
+            }
+            final int inCode = code;
+            if (code == available) {
+                pixelStack[top++] = (byte) first;
+                code = oldCode;
+            }
+            while (code > clear) {
+                pixelStack[top++] = suffix[code];
+                code = prefix[code];
+            }
+            first = toUnsignedInt(suffix[code]);
+
+            // Add a new string to the string table
+
+            if (available >= MAX_STACK_SIZE) {
+                // We ran out of dictionary space
+                break;
+            }
+            mainPixels[pi++] = (byte) first;
+            prefix[available] = (short) oldCode;
+            suffix[available] = (byte) first;
+            ++available;
+            if (((available & codeMask) == 0) && (available < MAX_STACK_SIZE)) {
+                ++codeSize;
+                codeMask += available;
+            }
+            oldCode = inCode;
         }
 
         // Clear missing pixels.
