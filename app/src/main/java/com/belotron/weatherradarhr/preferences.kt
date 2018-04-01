@@ -56,8 +56,11 @@ inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> 
 @SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
     with (edit()) {
-        block()
-        apply()
+        try {
+            block()
+        } finally {
+            apply()
+        }
     }
 }
 

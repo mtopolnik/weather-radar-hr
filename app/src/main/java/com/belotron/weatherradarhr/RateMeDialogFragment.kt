@@ -12,40 +12,63 @@ import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.DAY_IN_MILLIS
+import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.LayoutInflater
 import android.widget.Button
 
-private const val DAYS_UNTIL_PROMPT = 0
-private const val LAUNCHES_UNTIL_PROMPT = 0
+private const val DAYS_UNTIL_PROMPT = 3
+private const val USES_UNTIL_PROMPT = 3 * DAYS_UNTIL_PROMPT
+private const val DAYS_UNTIL_REPEAT_PROMPT = 1
+private const val USES_UNTIL_REPEAT_PROMPT = 3 * DAYS_UNTIL_REPEAT_PROMPT
 
 private const val TAG_RATE_ME: String = "rate_me_fragment"
 private const val PREFS_NAME = "rate_app_reminder"
 private const val KEY_DONT_SHOW_AGAIN = "dont_show_again"
-private const val KEY_LAUNCH_COUNT = "launch_count"
-private const val KEY_FIRST_LAUNCH = "date_firstlaunch"
+private const val KEY_USE_COUNT = "use_count"
+private const val KEY_TIMESTAMP_FIRST_USE = "timestamp_first_use"
+private const val KEY_USE_COUNT_WHEN_PROMPTED = "use_count_when_prompted"
+private const val KEY_TIMESTAMP_WHEN_PROMPTED = "timestamp_prompted"
+
+fun Context.clearRatemeState() {
+    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
+        clear()
+    }
+}
 
 fun Activity.maybeAskToRate() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-    prefs.commitUpdate {
-        clear()
-    }
     val fragmentManager = fragmentManager
+    val dayInMillis = DAY_IN_MILLIS
     prefs.applyUpdate {
-        val now = System.currentTimeMillis()
-        val launchCount = (prefs.getLong(KEY_LAUNCH_COUNT, 0) + 1).also {
-            putLong(KEY_LAUNCH_COUNT, it)
+        val useCount = (prefs.getLong(KEY_USE_COUNT, 0) + 1).also {
+            putLong(KEY_USE_COUNT, it)
         }
-        val firstLaunchTimestamp = prefs.getLong(KEY_FIRST_LAUNCH, now).also {
-            if (it == now) {
-                putLong(KEY_FIRST_LAUNCH, it)
-            }
-        }
+        info { "useCount $useCount" }
         if (prefs.getBoolean(KEY_DONT_SHOW_AGAIN, false)) {
+            info { "Don't show again" }
             return
         }
-        if (launchCount >= LAUNCHES_UNTIL_PROMPT && now >= firstLaunchTimestamp + DAYS_UNTIL_PROMPT * DAY_IN_MILLIS) {
-            RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
+        val now = System.currentTimeMillis()
+        val timestampFirstUse = prefs.getLong(KEY_TIMESTAMP_FIRST_USE, now).also {
+            if (it == now) {
+                putLong(KEY_TIMESTAMP_FIRST_USE, it)
+            }
         }
+        info { "timestampFirstUse $timestampFirstUse"}
+        if (useCount < USES_UNTIL_PROMPT || now < timestampFirstUse + DAYS_UNTIL_PROMPT * dayInMillis) {
+            return
+        }
+        val timestampWhenPrompted = prefs.getLong(KEY_TIMESTAMP_WHEN_PROMPTED, Long.MIN_VALUE)
+        val useCountWhenPrompted = prefs.getLong(KEY_USE_COUNT_WHEN_PROMPTED, Long.MIN_VALUE)
+        info { "timestampWhenPrompted $timestampWhenPrompted, useCountWhenPrompted $useCountWhenPrompted"}
+        if (useCount < useCountWhenPrompted + USES_UNTIL_REPEAT_PROMPT
+                || now < timestampWhenPrompted + DAYS_UNTIL_REPEAT_PROMPT * dayInMillis) {
+            return
+        }
+        putLong(KEY_TIMESTAMP_WHEN_PROMPTED, now)
+        putLong(KEY_USE_COUNT_WHEN_PROMPTED, useCount)
+        info { "Ask to rate" }
+        RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
     }
 }
 
