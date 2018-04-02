@@ -13,6 +13,7 @@ class MainActivity : Activity()  {
         super.onCreate(savedInstanceState)
         info { "MainActivity.onCreate" }
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
+        rateMeRecordUsage()
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
         if (fragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {

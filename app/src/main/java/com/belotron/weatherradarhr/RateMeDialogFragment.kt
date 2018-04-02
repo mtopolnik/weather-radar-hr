@@ -12,14 +12,13 @@ import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.DAY_IN_MILLIS
-import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.LayoutInflater
 import android.widget.Button
 
-private const val DAYS_UNTIL_PROMPT = 3
-private const val USES_UNTIL_PROMPT = 3 * DAYS_UNTIL_PROMPT
+private const val DAYS_UNTIL_PROMPT = 2
+private const val USES_UNTIL_PROMPT = 4
 private const val DAYS_UNTIL_REPEAT_PROMPT = 1
-private const val USES_UNTIL_REPEAT_PROMPT = 3 * DAYS_UNTIL_REPEAT_PROMPT
+private const val USES_UNTIL_REPEAT_PROMPT = 3
 
 private const val TAG_RATE_ME: String = "rate_me_fragment"
 private const val PREFS_NAME = "rate_app_reminder"
@@ -35,26 +34,33 @@ fun Context.clearRatemeState() {
     }
 }
 
+fun Activity.rateMeRecordUsage() {
+    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+    prefs.applyUpdate {
+        prefs.getLong(KEY_TIMESTAMP_FIRST_USE, 0).takeIf { it == 0L } ?.also {
+            putLong(KEY_TIMESTAMP_FIRST_USE, System.currentTimeMillis())
+        }
+        (1 + prefs.getLong(KEY_USE_COUNT, 0)).also {
+            putLong(KEY_USE_COUNT, it)
+            info { "Recording new usage, count: $it" }
+        }
+    }
+}
+
 fun Activity.maybeAskToRate() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     val fragmentManager = fragmentManager
     val dayInMillis = DAY_IN_MILLIS
     prefs.applyUpdate {
-        val useCount = (prefs.getLong(KEY_USE_COUNT, 0) + 1).also {
-            putLong(KEY_USE_COUNT, it)
-        }
+        val useCount = prefs.getLong(KEY_USE_COUNT, 0)
         info { "useCount $useCount" }
         if (prefs.getBoolean(KEY_DONT_SHOW_AGAIN, false)) {
             info { "Don't show again" }
             return
         }
         val now = System.currentTimeMillis()
-        val timestampFirstUse = prefs.getLong(KEY_TIMESTAMP_FIRST_USE, now).also {
-            if (it == now) {
-                putLong(KEY_TIMESTAMP_FIRST_USE, it)
-            }
-        }
-        info { "timestampFirstUse $timestampFirstUse"}
+        val timestampFirstUse = prefs.getLong(KEY_TIMESTAMP_FIRST_USE, now)
+        info { "now $now, timestampFirstUse $timestampFirstUse"}
         if (useCount < USES_UNTIL_PROMPT || now < timestampFirstUse + DAYS_UNTIL_PROMPT * dayInMillis) {
             return
         }
@@ -62,7 +68,8 @@ fun Activity.maybeAskToRate() {
         val useCountWhenPrompted = prefs.getLong(KEY_USE_COUNT_WHEN_PROMPTED, Long.MIN_VALUE)
         info { "timestampWhenPrompted $timestampWhenPrompted, useCountWhenPrompted $useCountWhenPrompted"}
         if (useCount < useCountWhenPrompted + USES_UNTIL_REPEAT_PROMPT
-                || now < timestampWhenPrompted + DAYS_UNTIL_REPEAT_PROMPT * dayInMillis) {
+                || now < timestampWhenPrompted + DAYS_UNTIL_REPEAT_PROMPT * dayInMillis
+        ) {
             return
         }
         putLong(KEY_TIMESTAMP_WHEN_PROMPTED, now)
@@ -74,8 +81,7 @@ fun Activity.maybeAskToRate() {
 
 class RateMeDialogFragment : DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val inflater = activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val rootView = inflater.inflate(R.layout.rate_me, null).apply {
+        val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
                 openAppRating()
                 dismiss()
@@ -114,7 +120,6 @@ class RateMeDialogFragment : DialogFragment() {
                 .find { it.applicationInfo.packageName == "com.android.vending" }
                 ?.also {
                     // Play Store app is installed, use it to rate our app
-                    // allow only Play Store to intercept the intent
                     rateIntent.component = ComponentName(it.applicationInfo.packageName, it.name)
                     // don't open Play Store in the stack of our activity
                     rateIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
