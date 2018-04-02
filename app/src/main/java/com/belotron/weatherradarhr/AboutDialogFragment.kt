@@ -34,11 +34,10 @@ class AboutDialogFragment : DialogFragment() {
     var continuation: Continuation<Unit>? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val inflater = activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val rootView = inflater.inflate(R.layout.about, null)
+        val rootView = LayoutInflater.from(activity).inflate(R.layout.about, null)
         val version =
                 try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }
-                catch (e: Exception) { null } ?: "<unknown>"
+                catch (e: Exception) { null } ?: "??"
         val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
             text = getString(R.string.about_text, version)
         }
