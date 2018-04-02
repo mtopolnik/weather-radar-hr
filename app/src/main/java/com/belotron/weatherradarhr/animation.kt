@@ -46,9 +46,9 @@ class AnimationLooper(
         if (animators.none()) {
             return
         }
-        animators.forEach {
-            newRateMinsPerSec?.also { _ -> it?.rateMinsPerSec = newRateMinsPerSec }
-            newFreezeTimeMillis?.also { _ -> it?.freezeTimeMillis = newFreezeTimeMillis }
+        animators.filterNotNull().forEach {
+            newRateMinsPerSec?.also { _ -> it.rateMinsPerSec = newRateMinsPerSec }
+            newFreezeTimeMillis?.also { _ -> it.freezeTimeMillis = newFreezeTimeMillis }
         }
         stop()
         var oldLoopingJob = loopingJob
@@ -83,10 +83,9 @@ class AnimationLooper(
     }
 
     override fun onStopTrackingTouch(seekBar: SeekBar) {
-        val seekBar = seekBar as ThumbSeekBar
+        if (seekBar !is ThumbSeekBar) return
         (animators.find { it.hasSeekBar(seekBar) } ?: return).also { fullScreenAnimator ->
             seekBar.thumbText = ""
-            seekBar.invalidate()
             val fullScreenProgress = fullScreenAnimator.imgBundle.animationProgress
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
@@ -187,7 +186,6 @@ class GifAnimator(
         imgBundle.seekBar?.apply {
             thumbProgress = toProgress(frameIndex)
             thumbText = thumbDateFormat.format(timestamp)
-            invalidate()
         }
 
     }

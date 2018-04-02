@@ -15,6 +15,10 @@ import android.widget.SeekBar
 
 class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, attrs) {
     var thumbText: String = ""
+        set(value) {
+            field = value
+            invalidate()
+        }
     var thumbProgress: Int = 0
 
     // anchor position of the seekbar within its parent, needed to restore the
@@ -79,6 +83,7 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     }
 
     fun startAnimateExit() {
+        thumbText = ""
         animate().y(parentHeight).withEndAction {
             visibility = View.INVISIBLE
         }
