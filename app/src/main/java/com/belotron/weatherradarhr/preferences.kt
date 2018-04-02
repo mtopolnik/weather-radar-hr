@@ -2,6 +2,7 @@ package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Context.*
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import java.lang.Math.max
@@ -16,17 +17,21 @@ const val DEFAULT_FREEZE_TIME = 1500
 
 val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
-val SharedPreferences.adsEnabled: Boolean get() = getBoolean(KEY_ADS_ENABLED, true)
+val Context.adControlPrefs: SharedPreferences get() = getSharedPreferences("ad_control", MODE_PRIVATE)
+
+val Context.adsEnabled: Boolean get() = adControlPrefs.getBoolean(KEY_ADS_ENABLED, true)
 
 val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
 val SharedPreferences.freezeTimeMillis: Int get() = getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME)
 
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
-fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long) = putLong(KEY_LAST_RELOADED_TIMESTAMP, value)
+fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =
+        putLong(KEY_LAST_RELOADED_TIMESTAMP, value)
 
 val SharedPreferences.lastPausedTimestamp: Long get() = getLong(KEY_LAST_PAUSED_TIMESTAMP, 0L)
-fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long) = putLong(KEY_LAST_PAUSED_TIMESTAMP, value)
+fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long):SharedPreferences.Editor =
+        putLong(KEY_LAST_PAUSED_TIMESTAMP, value)
 
 fun Context.migratePrefs() {
     with(sharedPrefs) {

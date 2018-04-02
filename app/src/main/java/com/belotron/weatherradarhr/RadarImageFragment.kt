@@ -416,7 +416,7 @@ class RadarImageFragment : Fragment() {
 
     private fun updateAdVisibility() {
         val adView = adView ?: return
-        val adsEnabled = activity.sharedPrefs.adsEnabled
+        val adsEnabled = activity.adsEnabled
         adView.setVisible(adsEnabled)
         if (adsEnabled) {
             adView.loadAd(AdRequest.Builder().build())

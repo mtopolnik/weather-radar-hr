@@ -47,7 +47,7 @@ class MyApplication : Application() {
         super.onCreate()
         migratePrefs()
         initOcr(this)
-        if (sharedPrefs.adsEnabled) {
+        if (adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
         }
     }
