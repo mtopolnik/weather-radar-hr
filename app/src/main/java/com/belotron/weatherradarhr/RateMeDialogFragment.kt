@@ -8,7 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
-import android.content.Intent.ACTION_VIEW
+import android.content.Intent.*
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -121,11 +121,11 @@ class RateMeDialogFragment : DialogFragment() {
                 ?.also {
                     // Play Store app is installed, use it to rate our app
                     rateIntent.component = ComponentName(it.applicationInfo.packageName, it.name)
-                    // don't open Play Store in the stack of our activity
-                    rateIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    rateIntent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                    // make sure Play Store opens our app page, whatever it was doing before
-                    rateIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    rateIntent.addFlags(
+                            // don't open Play Store in the stack of our activity
+                            FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                            // make sure Play Store opens our app page, whatever it was doing before
+                            or FLAG_ACTIVITY_CLEAR_TOP)
                     startActivity(rateIntent)
                 }
                 // Play Store app not installed, open in web browser

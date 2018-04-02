@@ -355,7 +355,7 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * Operates on [mx], which the caller must initialize.
+     * Reads from [mx], which the caller must initialize.
      */
     private fun springBackZoomAndTrans(focusX: Float, focusY: Float) {
         val targetZoom = coerceToRange(currentZoom, pointF.apply { set(MIN_ZOOM, MAX_ZOOM) })
@@ -378,7 +378,8 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * Operates on [mx], which the caller must initialize.
+     * Loads [mx] into [m] and then updates [m], but doesn't push the
+     * changes to [mx].
      */
     private fun constrainTrans() {
         mx.getValues(m)

@@ -349,7 +349,7 @@ class RadarImageFragment : Fragment() {
                 updateAdVisibility()
                 switchActionBarVisible()
             }
-            R.id.clear_rateme -> activity.clearRatemeState()
+//            R.id.clear_rateme -> activity.clearRatemeState()
         }
         return true
     }
@@ -384,6 +384,7 @@ class RadarImageFragment : Fragment() {
             if (target.status == SHOWING) {
                 fullScreenBundle.seekBar?.startAnimateExit()
                 target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
+                animationLooper.resume()
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
                 updateFrom(target)
