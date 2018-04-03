@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Vreme na radaru</string>
     <string name="main_activity_title">Vreme na radaru</string>
-    <string name="img_unavailable">Slika je trenutačno nedostupna.</string>
+    <string name="img_unavailable">Slika trenutačno nedostupna.</string>
     <string name="widget_slo">Radar ARSO</string>
     <string name="widget_hr">Radar DHMZ</string>
     <string name="help">Pomoć i saveti</string>

@@ -1,7 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vrijeme na radaru</string>
     <string name="main_activity_title">Vrijeme na radaru</string>
-    <string name="img_unavailable">Radar image currently unavailable.</string>
+    <string name="img_unavailable">Image currently unavailable.</string>
     <string name="widget_slo">Radar SLO</string>
     <string name="widget_hr">Radar HR</string>
     <string name="settings">Settings</string>
