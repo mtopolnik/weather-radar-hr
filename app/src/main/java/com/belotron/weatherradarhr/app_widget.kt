@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit.SECONDS
 
 private const val SECS_IN_HOUR = 3600L
 private const val SECS_IN_MINUTE = 60L
+private const val UPDATE_AGE_PERIOD_MINUTES = 3
 private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
@@ -249,7 +250,7 @@ private class WidgetContext (
         val resultCode = context.jobScheduler.schedule(
                 JobInfo.Builder(wDesc.updateAgeJobId(), ComponentName(context, UpdateAgeService::class.java))
                         .setExtras(wDesc.toExtras())
-                        .setPeriodic(MINUTE_IN_MILLIS)
+                        .setPeriodic(UPDATE_AGE_PERIOD_MINUTES * MINUTE_IN_MILLIS)
                         .build())
         reportScheduleResult("update age every minute", resultCode)
     }
