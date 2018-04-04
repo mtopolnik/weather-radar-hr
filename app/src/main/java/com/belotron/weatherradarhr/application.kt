@@ -39,12 +39,14 @@ private const val KEY_SAVED_AT = "instance-state-saved-at"
 
 val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-radar-pool") }.asCoroutineDispatcher()
 
+lateinit var appContext: Context
+
 fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = UNDISPATCHED, block = block)
 
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        initOcr(this)
+        appContext = this
     }
 }
 

@@ -6,25 +6,21 @@ import java.util.Calendar
 import java.util.Calendar.*
 import java.util.TimeZone
 
-fun initOcr(context : Context) {
-    LradarOcr.initDigitBitmaps(context)
-    KradarOcr.initDigitBitmaps(context)
-}
-
 object LradarOcr {
 
     private var digitBitmaps: List<Bitmap> = emptyList()
 
-    fun initDigitBitmaps(context: Context) {
-        if (digitBitmaps.isEmpty()) {
-            digitBitmaps = context.loadDigits("lradar")
-        }
-    }
-
     fun ocrLradarTimestamp(bitmap: Bitmap): Long {
+        initDigitBitmaps()
         val dt = ocrDateTime(bitmap)
         info { "OCRed date/time: $dt" }
         return dt.toTimestamp()
+    }
+
+    private fun initDigitBitmaps() {
+        if (digitBitmaps.isEmpty()) {
+            digitBitmaps = appContext.loadDigits("lradar")
+        }
     }
 
     private fun ocrDateTime(lradar: Bitmap) = DateTime(
@@ -45,19 +41,20 @@ object KradarOcr {
     private var dateDigitBitmaps: List<Bitmap> = emptyList()
     private var timeDigitBitmaps: List<Bitmap> = emptyList()
 
-    fun initDigitBitmaps(context: Context) {
-        if (dateDigitBitmaps.isEmpty()) {
-            dateDigitBitmaps = context.loadDigits("kradar/date")
-        }
-        if (timeDigitBitmaps.isEmpty()) {
-            timeDigitBitmaps = context.loadDigits("kradar/time")
-        }
-    }
-
     fun ocrKradarTimestamp(bitmap: Bitmap): Long {
+        initDigitBitmaps()
         val dt = ocrDateTime(bitmap)
         info { "OCRed date/time: $dt" }
         return dt.toTimestamp()
+    }
+
+    private fun initDigitBitmaps() {
+        if (dateDigitBitmaps.isEmpty()) {
+            dateDigitBitmaps = appContext.loadDigits("kradar/date")
+        }
+        if (timeDigitBitmaps.isEmpty()) {
+            timeDigitBitmaps = appContext.loadDigits("kradar/time")
+        }
     }
 
     private fun ocrDateTime(bitmap: Bitmap): DateTime {
