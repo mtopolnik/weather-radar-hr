@@ -16,10 +16,12 @@ class MainActivity : Activity()  {
         rateMeRecordUsage()
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
         setContentView(R.layout.activity_main)
-        if (fragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {
-            val newFragment = RadarImageFragment()
+        if (fragmentManager.findFragmentById(R.id.radar_img_fragment) != null) {
+            return
+        }
+        RadarImageFragment().also {
             fragmentManager.beginTransaction()
-                    .add(R.id.radar_img_fragment, newFragment)
+                    .add(R.id.radar_img_fragment, it)
                     .commit()
         }
     }
