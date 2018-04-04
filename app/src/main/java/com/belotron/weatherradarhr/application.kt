@@ -20,7 +20,6 @@ import android.widget.RemoteViews
 import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
-import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.android.UI
@@ -46,9 +45,6 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         initOcr(this)
-        if (adsEnabled) {
-            MobileAds.initialize(this, ADMOB_ID)
-        }
     }
 }
 
