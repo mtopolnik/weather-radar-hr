@@ -33,23 +33,6 @@ val SharedPreferences.lastPausedTimestamp: Long get() = getLong(KEY_LAST_PAUSED_
 fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long):SharedPreferences.Editor =
         putLong(KEY_LAST_PAUSED_TIMESTAMP, value)
 
-fun Context.migratePrefs() {
-    with(sharedPrefs) {
-        commitUpdate {
-            animationRateFromOldSetting?.also {
-                info { "Migrating animation rate" }
-                putInt(KEY_ANIMATION_RATE, it)
-                remove(KEY_FRAME_DELAY_OLD)
-            }
-            freezeTimeFromOldSetting?.also {
-                info { "Migrating freeze time" }
-                putInt(KEY_FREEZE_TIME, it)
-                remove(KEY_FREEZE_TIME_OLD)
-            }
-        }
-    }
-}
-
 @SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
     with (edit()) {
@@ -68,26 +51,3 @@ inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> U
         }
     }
 }
-
-private const val KEY_FRAME_DELAY_OLD = "frame_delay"
-private const val KEY_FREEZE_TIME_OLD = "freeze_time"
-
-private val SharedPreferences.animationRateFromOldSetting: Int? get() =
-    getString(KEY_FRAME_DELAY_OLD, null).let { delayStr ->
-        when (delayStr) {
-            "frameDelay0" -> DEFAULT_ANIMATION_RATE
-            "frameDelay1" -> return 38
-            "frameDelay2" -> return 21
-            else -> null
-        }
-    }
-
-private val SharedPreferences.freezeTimeFromOldSetting: Int? get() =
-    getString(KEY_FREEZE_TIME_OLD, null).let { freezeStr ->
-        when (freezeStr) {
-            "freeze0" -> DEFAULT_FREEZE_TIME
-            "freeze1" -> return 2500
-            "freeze2" -> return 3500
-            else -> null
-        }
-    }

@@ -45,7 +45,6 @@ fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = UNDISPA
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        migratePrefs()
         initOcr(this)
         if (adsEnabled) {
             MobileAds.initialize(this, ADMOB_ID)
