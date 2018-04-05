@@ -46,11 +46,11 @@ class AnimationLooper(
         if (animators.none()) {
             return
         }
+        stop()
         animators.filterNotNull().forEach {
             newRateMinsPerSec?.also { _ -> it.rateMinsPerSec = newRateMinsPerSec }
             newFreezeTimeMillis?.also { _ -> it.freezeTimeMillis = newFreezeTimeMillis }
         }
-        stop()
         var oldLoopingJob = loopingJob
         loopingJob = start {
             oldLoopingJob?.join()

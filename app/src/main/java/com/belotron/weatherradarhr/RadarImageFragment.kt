@@ -99,6 +99,7 @@ class ImageBundle {
         this.text = that.text
         this.bitmap = that.bitmap
         this.status = that.status
+        this.animationProgress = that.animationProgress
     }
 
     fun copyTo(that: ImageBundle) {
