@@ -73,6 +73,7 @@ public class StandardGifDecoder implements GifDecoder {
 
     @ColorInt
     private static final int COLOR_TRANSPARENT_BLACK = 0x00000000;
+    private static final int BUFSIZ = 16 * 1024;
 
     // Global File Header values and parsing flags.
     /**
@@ -120,9 +121,9 @@ public class StandardGifDecoder implements GifDecoder {
     @NonNull
     private Bitmap.Config bitmapConfig = Config.ARGB_8888;
 
-    public StandardGifDecoder(@NonNull Allocator allocator) {
+    public StandardGifDecoder(@NonNull Allocator allocator, byte[] gifData) {
         this.allocator = allocator;
-        header = new GifHeader();
+        read(gifData);
     }
 
     @Override
@@ -175,6 +176,109 @@ public class StandardGifDecoder implements GifDecoder {
         return rawData.limit() + mainPixels.length + (mainScratch.length * BYTES_PER_INTEGER);
     }
 
+    @Override
+    public int read(@Nullable InputStream is, int contentLength) {
+        if (is == null) {
+            status = STATUS_OPEN_ERROR;
+            return status;
+        }
+        try {
+            int capacity = (contentLength > 0) ? (contentLength + 4 * 1024) : BUFSIZ;
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(capacity);
+            int nRead;
+            byte[] data = new byte[BUFSIZ];
+            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            buffer.flush();
+            read(buffer.toByteArray());
+        } catch (Exception e) {
+            Log.w(TAG, "Error reading data from stream", e);
+            status = STATUS_OPEN_ERROR;
+        } finally {
+            try {
+                is.close();
+            } catch (IOException e) {
+                Log.w(TAG, "Error closing stream", e);
+            }
+        }
+        return status;
+    }
+
+    @Override
+    @GifDecodeStatus
+    public synchronized int read(@NonNull byte[] data) {
+        GifHeader header = getHeaderParser().setData(data).parseHeader();
+        setData(header, data);
+        return status;
+    }
+
+    @Override
+    public void clear() {
+        header = null;
+        if (mainPixels != null) {
+            allocator.release(mainPixels);
+        }
+        if (mainScratch != null) {
+            allocator.release(mainScratch);
+        }
+        rawData = null;
+        isFirstFrameTransparent = null;
+        if (block != null) {
+            allocator.release(block);
+        }
+    }
+
+    @Override
+    public synchronized void setData(@NonNull GifHeader header, @NonNull byte[] data) {
+        setData(header, ByteBuffer.wrap(data));
+    }
+
+    @Override
+    public synchronized void setData(@NonNull GifHeader header, @NonNull ByteBuffer buffer) {
+        setData(header, buffer, 1);
+    }
+
+    @Override
+    public synchronized void setData(@NonNull GifHeader header, @NonNull ByteBuffer buffer, int sampleSize) {
+        if (sampleSize <= 0) {
+            throw new IllegalArgumentException("Sample size must be >= 0, not: " + sampleSize);
+        }
+        // Make sure sample size is a power of 2.
+        sampleSize = Integer.highestOneBit(sampleSize);
+        this.status = STATUS_OK;
+        this.header = header;
+        // Initialize the raw data buffer.
+        rawData = buffer.asReadOnlyBuffer();
+        rawData.position(0);
+        rawData.order(ByteOrder.LITTLE_ENDIAN);
+
+        this.sampleSize = sampleSize;
+        downsampledWidth = header.width / sampleSize;
+        downsampledHeight = header.height / sampleSize;
+        // Now that we know the size, init scratch arrays.
+        mainPixels = allocator.obtainByteArray(header.width * header.height);
+        mainScratch = allocator.obtainIntArray(downsampledWidth * downsampledHeight);
+    }
+
+    @NonNull
+    private GifHeaderParser getHeaderParser() {
+        if (parser == null) {
+            parser = new GifHeaderParser();
+        }
+        return parser;
+    }
+
+    @Override
+    public void setDefaultBitmapConfig(@NonNull Bitmap.Config config) {
+        if (config != Bitmap.Config.ARGB_8888 && config != Bitmap.Config.RGB_565) {
+            throw new IllegalArgumentException("Unsupported format: " + config
+                    + ", must be one of " + Bitmap.Config.ARGB_8888 + " or " + Bitmap.Config.RGB_565);
+        }
+
+        bitmapConfig = config;
+    }
+
     @NonNull @Override
     public synchronized Bitmap decodeFrame(int index) {
         if (header.frameCount <= 0 || index < 0) {
@@ -219,114 +323,6 @@ public class StandardGifDecoder implements GifDecoder {
 
         // Transfer pixel data to image.
         return setPixels(currentFrame, previousFrame);
-    }
-
-    @Override
-    public int read(@Nullable InputStream is, int contentLength) {
-        if (is != null) {
-            try {
-                int capacity = (contentLength > 0) ? (contentLength + 4 * 1024) : 16 * 1024;
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream(capacity);
-                int nRead;
-                byte[] data = new byte[16 * 1024];
-                while ((nRead = is.read(data, 0, data.length)) != -1) {
-                    buffer.write(data, 0, nRead);
-                }
-                buffer.flush();
-
-                read(buffer.toByteArray());
-            } catch (IOException e) {
-                Log.w(TAG, "Error reading data from stream", e);
-            }
-        } else {
-            status = STATUS_OPEN_ERROR;
-        }
-        try {
-            if (is != null) {
-                is.close();
-            }
-        } catch (IOException e) {
-            Log.w(TAG, "Error closing stream", e);
-        }
-
-        return status;
-    }
-
-    @Override
-    public void clear() {
-        header = null;
-        if (mainPixels != null) {
-            allocator.release(mainPixels);
-        }
-        if (mainScratch != null) {
-            allocator.release(mainScratch);
-        }
-        rawData = null;
-        isFirstFrameTransparent = null;
-        if (block != null) {
-            allocator.release(block);
-        }
-    }
-
-    @Override
-    public synchronized void setData(@NonNull GifHeader header, @NonNull byte[] data) {
-        setData(header, ByteBuffer.wrap(data));
-    }
-
-    @Override
-    public synchronized void setData(@NonNull GifHeader header, @NonNull ByteBuffer buffer) {
-        setData(header, buffer, 1);
-    }
-
-    @Override
-    public synchronized void setData(@NonNull GifHeader header, @NonNull ByteBuffer buffer, int sampleSize) {
-        if (sampleSize <= 0) {
-            throw new IllegalArgumentException("Sample size must be >=0, not: " + sampleSize);
-        }
-        // Make sure sample size is a power of 2.
-        sampleSize = Integer.highestOneBit(sampleSize);
-        this.status = STATUS_OK;
-        this.header = header;
-        // Initialize the raw data buffer.
-        rawData = buffer.asReadOnlyBuffer();
-        rawData.position(0);
-        rawData.order(ByteOrder.LITTLE_ENDIAN);
-
-        this.sampleSize = sampleSize;
-        downsampledWidth = header.width / sampleSize;
-        downsampledHeight = header.height / sampleSize;
-        // Now that we know the size, init scratch arrays.
-        mainPixels = allocator.obtainByteArray(header.width * header.height);
-        mainScratch = allocator.obtainIntArray(downsampledWidth * downsampledHeight);
-    }
-
-    @NonNull
-    private GifHeaderParser getHeaderParser() {
-        if (parser == null) {
-            parser = new GifHeaderParser();
-        }
-        return parser;
-    }
-
-    @Override
-    @GifDecodeStatus
-    public synchronized int read(@Nullable byte[] data) {
-        this.header = getHeaderParser().setData(data).parseHeader();
-        if (data != null) {
-            setData(header, data);
-        }
-
-        return status;
-    }
-
-    @Override
-    public void setDefaultBitmapConfig(@NonNull Bitmap.Config config) {
-        if (config != Bitmap.Config.ARGB_8888 && config != Bitmap.Config.RGB_565) {
-            throw new IllegalArgumentException("Unsupported format: " + config
-                    + ", must be one of " + Bitmap.Config.ARGB_8888 + " or " + Bitmap.Config.RGB_565);
-        }
-
-        bitmapConfig = config;
     }
 
     /**

@@ -133,7 +133,7 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap() = StandardGifDecoder(BitmapFreelists()).also { it.read(this) }.decodeFrame(0)
+fun ByteArray.toBitmap() = StandardGifDecoder(BitmapFreelists(), this).decodeFrame(0)
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()

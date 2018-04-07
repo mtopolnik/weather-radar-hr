@@ -153,7 +153,7 @@ public interface GifDecoder {
      * @return read status code (0 = no errors).
      */
     @GifDecodeStatus
-    int read(@Nullable byte[] data);
+    int read(@NonNull byte[] data);
 
 
     /**

@@ -109,7 +109,7 @@ class GifAnimator(
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
-    private val gifDecoder = StandardGifDecoder(bitmapProvider).apply { read(gifData) }
+    private val gifDecoder = StandardGifDecoder(bitmapProvider, gifData)
     private val timestamps = LongArray(gifDecoder.frameCount)
     private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
