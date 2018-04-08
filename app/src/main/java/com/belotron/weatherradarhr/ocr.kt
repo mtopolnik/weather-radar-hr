@@ -34,7 +34,7 @@ object LradarOcr {
             indices.fold(0, { acc, ind -> 10 * acc + readDigit(lradar, ind) })
 
     private fun readDigit(lradar: Bitmap, pos : Int) =
-        (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) } ?: 1
+        (0..9).find { stripeEqual(lradar, 7 * pos + 9, 28, digitBitmaps[it], 0) } ?: ocrFailed()
 }
 
 object KradarOcr {
@@ -81,7 +81,7 @@ object KradarOcr {
         xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(bitmap, x) })
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
-            (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) } ?: 1
+            (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) } ?: ocrFailed()
 
     private fun readDateNumber(bitmap: Bitmap, vararg indices : Int): Int =
             indices.fold(0, { acc, i -> 10 * acc + readDateDigit(bitmap, i) })
@@ -91,7 +91,7 @@ object KradarOcr {
         val imgY = 168
         return when {
             (0 until 13).all { rectY -> bitmap.getPixel(imgX + 1, imgY + rectY) != -1 } -> 0 // blank space
-            else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) } ?: 1
+            else -> (0..9).find { stripeEqual(bitmap, imgX, imgY, dateDigitBitmaps[it], 1) } ?: ocrFailed()
         }
     }
 }
@@ -143,4 +143,8 @@ class DateTime(
 
     override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d UTC".format(
             year, month, day, hour, minute, second)
+}
+
+private fun ocrFailed(): Int {
+    return 1
 }

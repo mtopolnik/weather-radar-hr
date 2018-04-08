@@ -42,7 +42,7 @@ class AnimationLooper(
         animators[desc.index] = GifAnimator(imgBundles, desc, parsedGif, isOffline)
     }
 
-    fun resume(newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
+    fun resume(isFullScreen: Boolean, newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
         info { "AnimationLooper.resume" }
         if (animators.none()) {
             return
@@ -59,7 +59,7 @@ class AnimationLooper(
             while (true) {
                 animatorJobs.forEach { it?.join() }
                 animators.forEachIndexed { i, it ->
-                    animatorJobs[i] = it?.animate()
+                    animatorJobs[i] = it?.animate(isFullScreen)
                 }
             }
         }
@@ -91,7 +91,7 @@ class AnimationLooper(
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
             }
-            resume()
+            resume(true)
         }
     }
 
@@ -116,9 +116,10 @@ class GifAnimator(
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
 
-    fun animate(): Job? {
+    fun animate(isFullRange: Boolean): Job? {
         val frameCount = gifDecoder.frameCount
-        currFrameIndex = toFrameIndex(imgBundle.animationProgress)
+        val startFrameIndex = if (isFullRange) 0 else frameCount - imgDesc.framesToKeep
+        currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return start {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
@@ -157,7 +158,7 @@ class GifAnimator(
     }
 
     suspend fun seekTo(animationProgress: Int) {
-        toFrameIndex(animationProgress).also { it ->
+        toFrameIndex(animationProgress, 0).also { it ->
             if (it == currFrameIndex) {
                 return
             }
@@ -212,8 +213,9 @@ class GifAnimator(
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 
-    private fun toFrameIndex(animationProgress: Int) =
-            (animationProgress / 100f * (gifDecoder.frameCount - 1)).roundToInt()
+    private fun toFrameIndex(animationProgress: Int, startFrameIndex: Int) =
+            (animationProgress / 100f * (gifDecoder.frameCount - startFrameIndex - 1) + startFrameIndex)
+                    .roundToInt()
 
     private fun toProgress(frameIndex: Int) = 100 * frameIndex / (gifDecoder.frameCount - 1)
 }

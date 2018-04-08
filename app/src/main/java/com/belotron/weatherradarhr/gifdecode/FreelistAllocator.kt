@@ -16,8 +16,9 @@ class BitmapFreelists : Allocator {
 
     override fun obtain(width: Int, height: Int, config: Bitmap.Config): Bitmap = synchronized (bitmapQueues) {
         debug { "Obtain $width x $height bitmap" }
-        val bitmap = bitmapQueues[Pair(width, height)]?.poll()
-        return bitmap?.apply { this.config = config }
+        bitmapQueues[Pair(width, height)]
+                ?.poll()
+                ?.apply { this.config = config }
                 ?: Bitmap.createBitmap(width, height, config)
     }
 
@@ -33,7 +34,7 @@ class BitmapFreelists : Allocator {
 
     override fun obtainByteArray(size: Int): ByteArray = synchronized(byteArrayQueues) {
         debug { "Obtain $size bytes" }
-        return if (size == 0) emptyByteArray
+        if (size == 0) emptyByteArray
         else byteArrayQueues[size]?.poll() ?: ByteArray(size)
     }
 
@@ -48,7 +49,7 @@ class BitmapFreelists : Allocator {
 
     override fun obtainIntArray(size: Int): IntArray = synchronized(intArrayQueues) {
         debug { "Obtain $size ints" }
-        return if (size == 0) emptyIntArray
+        if (size == 0) emptyIntArray
         else intArrayQueues[size]?.poll() ?: IntArray(size)
     }
 

@@ -57,19 +57,16 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.*;
 public class GifDecoder {
 
     /** File read status: No errors. */
-    public static final int STATUS_OK = 0;
+    static final int STATUS_OK = 0;
 
     /** File read status: Error decoding file (may be partially decoded). */
-    public static final int STATUS_FORMAT_ERROR = 1;
+    static final int STATUS_FORMAT_ERROR = 1;
 
     /** File read status: Unable to open source. */
-    public static final int STATUS_OPEN_ERROR = 2;
+    static final int STATUS_OPEN_ERROR = 2;
 
     /** Unable to fully decode the current frame. */
-    public static final int STATUS_PARTIAL_DECODE = 3;
-
-    /** The total iteration count which means repeat forever. */
-    public static final int TOTAL_ITERATION_COUNT_FOREVER = 0;
+    static final int STATUS_PARTIAL_DECODE = 3;
 
     /**
      * Android Lint annotation for status codes that can be used with a GIF decoder.
@@ -220,7 +217,7 @@ public class GifDecoder {
      */
     private Bitmap setPixels(GifFrame currentFrame, GifFrame previousFrame) {
         // Final location of blended pixels.
-        final int[] dest = mainScratch;
+        final int[] pixels = mainScratch;
 
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
             throw new RuntimeException(
@@ -231,7 +228,7 @@ public class GifDecoder {
         // fill in starting image contents based on last image's dispose code
         if (previousFrame != null && previousFrame.dispose > DISPOSAL_UNSPECIFIED) {
             // We don't need to do anything for DISPOSAL_NONE, if it has the correct pixels so will our
-            // mainScratch and therefore so will our dest array.
+            // mainScratch and therefore so will our pixels array.
             if (previousFrame.dispose == DISPOSAL_BACKGROUND) {
                 // Start with a canvas filled with the background color
                 @ColorInt int c = COLOR_TRANSPARENT_BLACK;
@@ -244,20 +241,19 @@ public class GifDecoder {
                     isFirstFrameTransparent = true;
                 }
                 // The area used by the graphic must be restored to the background color.
-                int downsampledIH = previousFrame.ih;
                 int downsampledIW = previousFrame.iw;
                 int topLeft = previousFrame.iy * parsedGif.width + previousFrame.ix;
-                int bottomLeft = topLeft + downsampledIH * parsedGif.width;
+                int bottomLeft = topLeft + previousFrame.ih * parsedGif.width;
                 for (int left = topLeft; left < bottomLeft; left += parsedGif.width) {
                     int right = left + downsampledIW;
                     for (int pointer = left; pointer < right; pointer++) {
-                        dest[pointer] = c;
+                        pixels[pointer] = c;
                     }
                 }
             }
         }
 
-        // Decode pixels for this frame into the global pixels[] scratch.
+        // Decode pixels for this frame into mainPixels.
         decodeBitmapData(currentFrame);
 
         if (currentFrame.interlace) {
@@ -267,30 +263,30 @@ public class GifDecoder {
         }
 
         // Set pixels for current image.
-        Bitmap result = getNextBitmap();
-        result.setPixels(dest, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
+        Bitmap result = obtainBitmap();
+        result.setPixels(pixels, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
         return result;
     }
 
     private void copyIntoScratchFast(GifFrame frame) {
         int[] dest = mainScratch;
-        int downsampledIH = frame.ih;
-        int downsampledIY = frame.iy;
-        int downsampledIW = frame.iw;
-        int downsampledIX = frame.ix;
+        int ix = frame.ix;
+        int iy = frame.iy;
+        int ih = frame.ih;
+        int iw = frame.iw;
         // Copy each source line to the appropriate place in the destination.
         boolean isFirstFrame = frame.index == 0;
         int width = this.parsedGif.width;
         byte[] mainPixels = this.mainPixels;
         int[] act = this.act;
         byte transparentColorIndex = -1;
-        for (int i = 0; i < downsampledIH; i++) {
-            int line = i + downsampledIY;
+        for (int i = 0; i < ih; i++) {
+            int line = i + iy;
             int k = line * width;
             // Start of line in dest.
-            int dx = k + downsampledIX;
+            int dx = k + ix;
             // End of dest line.
-            int dlim = dx + downsampledIW;
+            int dlim = dx + iw;
             if (k + width < dlim) {
                 // Past dest edge.
                 dlim = k + width;
@@ -300,7 +296,7 @@ public class GifDecoder {
 
             while (dx < dlim) {
                 byte byteCurrentColorIndex = mainPixels[sx];
-                int currentColorIndex = ((int) byteCurrentColorIndex) & MASK_INT_LOWEST_BYTE;
+                int currentColorIndex = toUnsignedInt(byteCurrentColorIndex);
                 if (currentColorIndex != transparentColorIndex) {
                     int color = act[currentColorIndex];
                     if (color != COLOR_TRANSPARENT_BLACK) {
@@ -328,10 +324,16 @@ public class GifDecoder {
         int[] act = this.act;
         @Nullable
         Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
-        for (int i = 0; i < frame.ih; i++) {
+        int ix = frame.ix;
+        int iy = frame.iy;
+        int ih = frame.ih;
+        int iw = frame.iw;
+        int gifHeight = parsedGif.height;
+        int gifWidth = parsedGif.width;
+        for (int i = 0; i < ih; i++) {
             int line = i;
             if (frame.interlace) {
-                if (iline >= frame.ih) {
+                if (iline >= ih) {
                     pass++;
                     switch (pass) {
                         case 2:
@@ -352,21 +354,21 @@ public class GifDecoder {
                 line = iline;
                 iline += inc;
             }
-            line += frame.iy;
-            if (line < parsedGif.height) {
-                int k = line * parsedGif.width;
+            line += iy;
+            if (line < gifHeight) {
+                int k = line * gifWidth;
                 // Start of line in dest.
-                int dx = k + frame.ix;
+                int dx = k + ix;
                 // End of dest line.
-                int dlim = dx + frame.iw;
-                if (k + parsedGif.width < dlim) {
+                int dlim = dx + iw;
+                if (k + gifWidth < dlim) {
                     // Past dest edge.
-                    dlim = k + parsedGif.width;
+                    dlim = k + gifWidth;
                 }
                 // Start of line in source.
-                int sx = i * frame.iw;
+                int sx = i * iw;
                 while (dx < dlim) {
-                    int currentColorIndex = ((int) mainPixels[sx]) & MASK_INT_LOWEST_BYTE;
+                    int currentColorIndex = toUnsignedInt(mainPixels[sx]);
                     int averageColor = act[currentColorIndex];
                     if (averageColor != COLOR_TRANSPARENT_BLACK) {
                         dest[dx] = averageColor;
@@ -526,7 +528,7 @@ public class GifDecoder {
         return blockSize;
     }
 
-    private Bitmap getNextBitmap() {
+    private Bitmap obtainBitmap() {
         Bitmap.Config config = isFirstFrameTransparent == null || isFirstFrameTransparent
                 ? Bitmap.Config.ARGB_8888 : bitmapConfig;
         Bitmap result = allocator.obtain(parsedGif.width, parsedGif.height, config);

@@ -39,6 +39,7 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
+import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CommonPool
@@ -303,7 +304,7 @@ class RadarImageFragment : Fragment() {
         val isAnimationShowing = imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.resume(rateMinsPerSec, freezeTimeMillis)
+                animationLooper.resume(isInFullScreen, rateMinsPerSec, freezeTimeMillis)
             }
         } else {
             info { "Reloading animations" }
@@ -374,6 +375,7 @@ class RadarImageFragment : Fragment() {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
+            animationLooper.resume(true)
             seekBar?.visibility = INVISIBLE
             start {
                 imgView?.let { it as TouchImageView }?.apply {
@@ -393,7 +395,7 @@ class RadarImageFragment : Fragment() {
             if (target.status == SHOWING) {
                 fullScreenBundle.seekBar?.startAnimateExit()
                 target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
-                animationLooper.resume()
+                animationLooper.resume(false)
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
                 updateFrom(target)
@@ -456,36 +458,14 @@ class RadarImageFragment : Fragment() {
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     try {
-                        val parsedGif = GifHeaderParser(imgBytes).parse()
-                        BitmapFreelists().also { freelists ->
-                            (0 until parsedGif.getFrameCount()).map { i ->
-                                async(CommonPool) {
-                                    val decoder = GifDecoder(freelists, parsedGif)
-                                    decoder.decodeFrame(i).let { frame ->
-                                        decoder.clear()
-                                        desc.ocrTimestamp(frame).also {
-                                            freelists.release(frame)
-                                        }
-                                    }
-                                }
-                            }.forEachIndexed { i, it ->
-                                parsedGif.frames[i].timestamp = it.await()
-                            }
-                        }
-                        val sortedFrames = TreeSet<GifFrame>(compareBy(GifFrame::timestamp)).apply {
-                            addAll(parsedGif.frames)
-                            while (size > desc.framesToKeep) {
-                                remove(first())
-                            }
-                        }
-                        parsedGif.frames.apply {
-                            clear()
-                            addAll(sortedFrames)
+                        val parsedGif = GifHeaderParser(imgBytes).parse().apply {
+                            assignTimestamps(desc.ocrTimestamp)
+                            sortAndDeduplicateFrames()
                         }
                         bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
                             receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
-                            resume(rateMinsPerSec, freezeTimeMillis)
+                            resume(isInFullScreen, rateMinsPerSec, freezeTimeMillis)
                         }
                     } catch (t: Throwable) {
                         error { "GIF parse error, deleting from cache" }
@@ -503,6 +483,35 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
+}
+
+private suspend fun ParsedGif.assignTimestamps(ocrTimestamp: (Bitmap) -> Long) {
+    val parsedGif = this
+    BitmapFreelists().also { freelists ->
+        (0 until frameCount).map { i ->
+            async(CommonPool) {
+                val decoder = GifDecoder(freelists, parsedGif)
+                decoder.decodeFrame(i).let { frame ->
+                    decoder.clear()
+                    ocrTimestamp(frame).also {
+                        freelists.release(frame)
+                    }
+                }
+            }
+        }.forEachIndexed { i, it ->
+            frames[i].timestamp = it.await()
+        }
+    }
+}
+
+private fun ParsedGif.sortAndDeduplicateFrames() {
+    val sortedFrames = TreeSet<GifFrame>(compareBy(GifFrame::timestamp)).apply {
+        addAll(frames)
+    }
+    frames.apply {
+        clear()
+        addAll(sortedFrames)
+    }
 }
 
 private fun Rect.reset(): Rect {
