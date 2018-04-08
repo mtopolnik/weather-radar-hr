@@ -20,8 +20,10 @@ import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
+import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.android.UI
@@ -135,9 +137,15 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap(): Bitmap = GifHeaderParser(this).parse().let {
+fun ByteArray.toBitmap(): Bitmap = gifDecode().toBitmap()
+
+fun ByteArray.toPixels(): Pixels = gifDecode().toPixels()
+
+private fun ByteArray.gifDecode(): GifDecoder = GifHeaderParser(this).parse().let {
     GifDecoder(BitmapFreelists(), it).decodeFrame(0)
 }
+
+fun Bitmap.asPixels() = BitmapPixels(this)
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()

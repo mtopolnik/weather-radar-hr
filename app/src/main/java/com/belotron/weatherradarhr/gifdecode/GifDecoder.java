@@ -169,7 +169,22 @@ public class GifDecoder {
         bitmapConfig = config;
     }
 
-    public Bitmap decodeFrame(int index) {
+    public Bitmap toBitmap() {
+        // Set pixels for current image.
+        Bitmap result = obtainBitmap();
+        result.setPixels(mainScratch, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
+        return result;
+    }
+
+    public Pixels toPixels() {
+        return new IntArrayPixels(mainScratch.clone(), parsedGif.width);
+    }
+
+    public Pixels asPixels() {
+        return new IntArrayPixels(mainScratch, parsedGif.width);
+    }
+
+    public GifDecoder decodeFrame(int index) {
         if (parsedGif.getFrameCount() == 0 || index < 0) {
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(TAG, "Unable to decode frame, frameCount=" + parsedGif.getFrameCount() + ", index=" + index);
@@ -206,16 +221,15 @@ public class GifDecoder {
             // Set transparent color if specified.
             act[currentFrame.transIndex] = COLOR_TRANSPARENT_BLACK;
         }
-
-        // Transfer pixel data to image.
-        return setPixels(currentFrame, previousFrame);
+        setPixels(currentFrame, previousFrame);
+        return this;
     }
 
     /**
      * Creates new frame image from current data (and previous frames as specified by their
      * disposal codes).
      */
-    private Bitmap setPixels(GifFrame currentFrame, GifFrame previousFrame) {
+    private void setPixels(GifFrame currentFrame, GifFrame previousFrame) {
         // Final location of blended pixels.
         final int[] pixels = mainScratch;
 
@@ -242,9 +256,10 @@ public class GifDecoder {
                 }
                 // The area used by the graphic must be restored to the background color.
                 int downsampledIW = previousFrame.iw;
-                int topLeft = previousFrame.iy * parsedGif.width + previousFrame.ix;
-                int bottomLeft = topLeft + previousFrame.ih * parsedGif.width;
-                for (int left = topLeft; left < bottomLeft; left += parsedGif.width) {
+                int gifWidth = parsedGif.width;
+                int topLeft = previousFrame.iy * gifWidth + previousFrame.ix;
+                int bottomLeft = topLeft + previousFrame.ih * gifWidth;
+                for (int left = topLeft; left < bottomLeft; left += gifWidth) {
                     int right = left + downsampledIW;
                     for (int pointer = left; pointer < right; pointer++) {
                         pixels[pointer] = c;
@@ -261,11 +276,6 @@ public class GifDecoder {
         } else {
             copyIntoScratchFast(currentFrame);
         }
-
-        // Set pixels for current image.
-        Bitmap result = obtainBitmap();
-        result.setPixels(pixels, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
-        return result;
     }
 
     private void copyIntoScratchFast(GifFrame frame) {

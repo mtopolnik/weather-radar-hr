@@ -40,6 +40,7 @@ import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CommonPool
@@ -69,7 +70,7 @@ class ImgDescriptor(
         val imgViewId: Int,
         val progressBarId: Int,
         val brokenImgViewId: Int,
-        val ocrTimestamp: (Bitmap) -> Long
+        val ocrTimestamp: (Pixels) -> Long
 ) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
     val filename = url.substringAfterLast('/')
@@ -485,16 +486,14 @@ class RadarImageFragment : Fragment() {
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
 }
 
-private suspend fun ParsedGif.assignTimestamps(ocrTimestamp: (Bitmap) -> Long) {
+private suspend fun ParsedGif.assignTimestamps(ocrTimestamp: (Pixels) -> Long) {
     val parsedGif = this
     BitmapFreelists().also { freelists ->
         (0 until frameCount).map { i ->
             async(CommonPool) {
-                val decoder = GifDecoder(freelists, parsedGif)
-                decoder.decodeFrame(i).let { frame ->
-                    decoder.clear()
-                    ocrTimestamp(frame).also {
-                        freelists.release(frame)
+                GifDecoder(freelists, parsedGif).decodeFrame(i).let { decoder ->
+                    ocrTimestamp(decoder.asPixels()).also {
+                        decoder.clear()
                     }
                 }
             }

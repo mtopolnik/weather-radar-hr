@@ -209,7 +209,7 @@ class GifAnimator(
     private fun timestamp(frameIndex: Int) = parsedGif.frames[frameIndex].timestamp
 
     private suspend fun suspendDecodeFrame(frameIndex: Int, coroCtx: CoroutineDispatcher = threadPool) =
-            withContext(coroCtx) { gifDecoder.decodeFrame(frameIndex) }
+            withContext(coroCtx) { gifDecoder.decodeFrame(frameIndex).toBitmap() }
 
     private fun Bitmap.dispose() = bitmapProvider.release(this)
 
