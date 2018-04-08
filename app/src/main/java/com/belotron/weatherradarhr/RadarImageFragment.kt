@@ -353,7 +353,10 @@ class RadarImageFragment : Fragment() {
                 startReloadAnimations(UP_TO_DATE)
                 activity.startFetchWidgetImages()
             }
-            R.id.settings -> startActivity(Intent(activity, SettingsActivity::class.java))
+            R.id.settings -> {
+                activity.actionBar.hide()
+                startActivity(Intent(activity, SettingsActivity::class.java))
+            }
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
             R.id.about -> start {
                 showAboutDialogFragment(activity)
