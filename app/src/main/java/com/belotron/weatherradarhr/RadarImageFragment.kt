@@ -46,6 +46,7 @@ import kotlinx.coroutines.experimental.async
 import java.util.TreeSet
 
 
+private const val ANIMATION_COVERS_MINUTES = 100
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
 val imgDescs = arrayOf(
