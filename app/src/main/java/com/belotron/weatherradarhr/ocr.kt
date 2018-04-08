@@ -13,7 +13,7 @@ object LradarOcr {
     fun ocrLradarTimestamp(bitmap: Bitmap): Long {
         initDigitBitmaps()
         val dt = ocrDateTime(bitmap)
-        info { "OCRed date/time: $dt" }
+        debug { "ARSO OCRed date/time: $dt" }
         return dt.toTimestamp()
     }
 
@@ -44,7 +44,7 @@ object KradarOcr {
     fun ocrKradarTimestamp(bitmap: Bitmap): Long {
         initDigitBitmaps()
         val dt = ocrDateTime(bitmap)
-        info { "OCRed date/time: $dt" }
+        debug { "DHMZ OCRed date/time: $dt" }
         return dt.toTimestamp()
     }
 
@@ -81,7 +81,7 @@ object KradarOcr {
         xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(bitmap, x) })
 
     private fun readTimeDigit(bitmap: Bitmap, x : Int) =
-            (0..13).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) } ?: 1
+            (0..9).find { stripeEqual(bitmap, x, 143, timeDigitBitmaps[it], 3) } ?: 1
 
     private fun readDateNumber(bitmap: Bitmap, vararg indices : Int): Int =
             indices.fold(0, { acc, i -> 10 * acc + readDateDigit(bitmap, i) })

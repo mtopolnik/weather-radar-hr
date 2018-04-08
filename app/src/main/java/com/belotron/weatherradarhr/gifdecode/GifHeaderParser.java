@@ -1,9 +1,5 @@
 package com.belotron.weatherradarhr.gifdecode;
 
-import static com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_FORMAT_ERROR;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
-
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -13,8 +9,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import static com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_FORMAT_ERROR;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
+
 /**
- * A class responsible for creating {@link com.belotron.weatherradarhr.gifdecode.GifHeader}s from data
+ * A class responsible for creating {@link ParsedGif}s from data
  * representing animated GIFs.
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
@@ -118,92 +118,62 @@ public class GifHeaderParser {
     /**
      * The minimum frame delay in hundredths of a second.
      */
-    static final int MIN_FRAME_DELAY = 2;
+    private static final int MIN_FRAME_DELAY = 2;
     /**
      * The default frame delay in hundredths of a second.
      * This is used for GIFs with frame delays less than the minimum.
      */
-    static final int DEFAULT_FRAME_DELAY = 10;
+    private static final int DEFAULT_FRAME_DELAY = 10;
 
     private static final int MAX_BLOCK_SIZE = 256;
     // Raw data read working array.
     private final byte[] block = new byte[MAX_BLOCK_SIZE];
 
     private ByteBuffer rawData;
-    private GifHeader header;
+    private ParsedGif parsedGif;
+    private GifFrame currentFrame;
     private int blockSize = 0;
 
-    public GifHeaderParser setData(@NonNull ByteBuffer data) {
+    private GifHeaderParser(@NonNull ByteBuffer data) {
         reset();
         rawData = data.asReadOnlyBuffer();
         rawData.position(0);
         rawData.order(ByteOrder.LITTLE_ENDIAN);
-        return this;
     }
 
-    public GifHeaderParser setData(@Nullable byte[] data) {
-        if (data != null) {
-            setData(ByteBuffer.wrap(data));
-        } else {
-            rawData = null;
-            header.status = GifDecoder.STATUS_OPEN_ERROR;
-        }
-        return this;
+    public GifHeaderParser(@NonNull byte[] data) {
+        this(ByteBuffer.wrap(data));
     }
 
     private void reset() {
         rawData = null;
         Arrays.fill(block, (byte) 0);
-        header = new GifHeader();
+        parsedGif = new ParsedGif();
         blockSize = 0;
     }
 
     @NonNull
-    public GifHeader parseHeader() {
+    public ParsedGif parse() {
         if (rawData == null) {
             throw new IllegalStateException("You must call setData() before parseHeader()");
         }
         if (err()) {
-            return header;
+            return parsedGif;
         }
-
         readHeader();
         if (!err()) {
             readContents();
-            if (header.frameCount < 0) {
-                header.status = STATUS_FORMAT_ERROR;
-            }
         }
-
-        return header;
-    }
-
-    /**
-     * Determines if the GIF is animated by trying to read in the first 2 frames
-     * This method re-parses the data even if the header has already been read.
-     */
-    public boolean isAnimated() {
-        readHeader();
-        if (!err()) {
-            readContents(2 /* maxFrames */);
-        }
-        return header.frameCount > 1;
-    }
-
-    /**
-     * Main file parser. Reads GIF content blocks.
-     */
-    private void readContents() {
-        readContents(Integer.MAX_VALUE /* maxFrames */);
+        return parsedGif;
     }
 
     /**
      * Main file parser. Reads GIF content blocks. Stops after reading maxFrames
      */
-    private void readContents(int maxFrames) {
+    private void readContents() {
         // Read GIF file content blocks.
         boolean done = false;
-        while (!(done || err() || header.frameCount == maxFrames)) {
+        while (!done && !err()) {
             int code = read();
             switch (code) {
                 case IMAGE_SEPARATOR:
@@ -211,8 +181,8 @@ public class GifHeaderParser {
                     // If one did exist, there will be a non-null current frame which we should use.
                     // However if one did not exist, the current frame will be null
                     // and we must create it here. See issue #134.
-                    if (header.currentFrame == null) {
-                        header.currentFrame = new GifFrame(header.frameCount);
+                    if (currentFrame == null) {
+                        currentFrame = new GifFrame(parsedGif.getFrameCount());
                     }
                     readBitmap();
                     break;
@@ -221,7 +191,7 @@ public class GifHeaderParser {
                     switch (extensionLabel) {
                         case LABEL_GRAPHIC_CONTROL_EXTENSION:
                             // Start a new frame.
-                            header.currentFrame = new GifFrame(header.frameCount);
+                            currentFrame = new GifFrame(parsedGif.getFrameCount());
                             readGraphicControlExt();
                             break;
                         case LABEL_APPLICATION_EXTENSION:
@@ -255,7 +225,7 @@ public class GifHeaderParser {
                 // Bad byte, but keep going and see what happens
                 case 0x00:
                 default:
-                    header.status = STATUS_FORMAT_ERROR;
+                    parsedGif.status = STATUS_FORMAT_ERROR;
             }
         }
     }
@@ -280,20 +250,20 @@ public class GifHeaderParser {
         int packed = read();
         // Disposal method.
         //noinspection WrongConstant field has to be extracted from packed value
-        header.currentFrame.dispose = (packed & GCE_MASK_DISPOSAL_METHOD) >> GCE_DISPOSAL_METHOD_SHIFT;
-        if (header.currentFrame.dispose == DISPOSAL_UNSPECIFIED) {
+        currentFrame.dispose = (packed & GCE_MASK_DISPOSAL_METHOD) >> GCE_DISPOSAL_METHOD_SHIFT;
+        if (currentFrame.dispose == DISPOSAL_UNSPECIFIED) {
             // Elect to keep old image if discretionary.
-            header.currentFrame.dispose = DISPOSAL_NONE;
+            currentFrame.dispose = DISPOSAL_NONE;
         }
-        header.currentFrame.transparency = (packed & GCE_MASK_TRANSPARENT_COLOR_FLAG) != 0;
+        currentFrame.transparency = (packed & GCE_MASK_TRANSPARENT_COLOR_FLAG) != 0;
         // Delay in milliseconds.
         int delayInHundredthsOfASecond = readShort();
         if (delayInHundredthsOfASecond < MIN_FRAME_DELAY) {
             delayInHundredthsOfASecond = DEFAULT_FRAME_DELAY;
         }
-        header.currentFrame.delay = delayInHundredthsOfASecond * 10;
+        currentFrame.delay = delayInHundredthsOfASecond * 10;
         // Transparent color index
-        header.currentFrame.transIndex = read();
+        currentFrame.transIndex = read();
         // Block terminator
         read();
     }
@@ -303,10 +273,10 @@ public class GifHeaderParser {
      */
     private void readBitmap() {
         // (sub)image position & size.
-        header.currentFrame.ix = readShort();
-        header.currentFrame.iy = readShort();
-        header.currentFrame.iw = readShort();
-        header.currentFrame.ih = readShort();
+        currentFrame.ix = readShort();
+        currentFrame.iy = readShort();
+        currentFrame.iw = readShort();
+        currentFrame.ih = readShort();
 
         /*
          * Image Descriptor packed field:
@@ -323,27 +293,25 @@ public class GifHeaderParser {
         int packed = read();
         boolean lctFlag = (packed & DESCRIPTOR_MASK_LCT_FLAG) != 0;
         int lctSize = (int) Math.pow(2, (packed & DESCRIPTOR_MASK_LCT_SIZE) + 1);
-        header.currentFrame.interlace = (packed & DESCRIPTOR_MASK_INTERLACE_FLAG) != 0;
+        currentFrame.interlace = (packed & DESCRIPTOR_MASK_INTERLACE_FLAG) != 0;
         if (lctFlag) {
-            header.currentFrame.lct = readColorTable(lctSize);
+            currentFrame.lct = readColorTable(lctSize);
         } else {
             // No local color table.
-            header.currentFrame.lct = null;
+            currentFrame.lct = null;
         }
-
-        // Save this as the decoding position pointer.
-        header.currentFrame.bufferFrameStart = rawData.position();
-
-        // False decode pixel data to advance buffer.
+        int bufferFrameStart = rawData.position();
         skipImageData();
-
+        byte[] frameBuf = new byte[rawData.position() - bufferFrameStart];
+        rawData.position(bufferFrameStart);
+        rawData.get(frameBuf);
+        currentFrame.frameData = frameBuf;
         if (err()) {
             return;
         }
 
-        header.frameCount++;
         // Add image to frame.
-        header.frames.add(header.currentFrame);
+        parsedGif.frames.add(currentFrame);
     }
 
     /**
@@ -356,7 +324,7 @@ public class GifHeaderParser {
                 // Loop count sub-block.
                 int b1 = ((int) block[1]) & MASK_INT_LOWEST_BYTE;
                 int b2 = ((int) block[2]) & MASK_INT_LOWEST_BYTE;
-                header.loopCount = (b2 << 8) | b1;
+                parsedGif.loopCount = (b2 << 8) | b1;
             }
         } while ((blockSize > 0) && !err());
     }
@@ -371,13 +339,17 @@ public class GifHeaderParser {
             id.append((char) read());
         }
         if (!id.toString().startsWith("GIF")) {
-            header.status = STATUS_FORMAT_ERROR;
+            parsedGif.status = STATUS_FORMAT_ERROR;
             return;
         }
         readLSD();
-        if (header.gctFlag && !err()) {
-            header.gct = readColorTable(header.gctSize);
-            header.bgColor = header.gct[header.bgIndex];
+        if (parsedGif.gctFlag && !err()) {
+            int[] gct = readColorTable(parsedGif.gctSize);
+            if (gct == null) {
+                return;
+            }
+            parsedGif.gct = gct;
+            parsedGif.bgColor = parsedGif.gct[parsedGif.bgIndex];
         }
     }
 
@@ -386,8 +358,8 @@ public class GifHeaderParser {
      */
     private void readLSD() {
         // Logical screen size.
-        header.width = readShort();
-        header.height = readShort();
+        parsedGif.width = readShort();
+        parsedGif.height = readShort();
         /*
          * Logical Screen Descriptor packed field:
          *      7 6 5 4 3 2 1 0
@@ -400,12 +372,12 @@ public class GifHeaderParser {
          * Size of Global Color Table  3 Bits
          */
         int packed = read();
-        header.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
-        header.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
+        parsedGif.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
+        parsedGif.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
         // Background color index.
-        header.bgIndex = read();
+        parsedGif.bgIndex = read();
         // Pixel aspect ratio
-        header.pixelAspect = read();
+        parsedGif.pixelAspect = read();
     }
 
     /**
@@ -416,14 +388,12 @@ public class GifHeaderParser {
      */
     @Nullable
     private int[] readColorTable(int nColors) {
-        int nBytes = 3 * nColors;
-        int[] tab = null;
-        byte[] c = new byte[nBytes];
-
         try {
+            int nBytes = 3 * nColors;
+            byte[] c = new byte[nBytes];
             rawData.get(c);
             // Max size to avoid bounds checks.
-            tab = new int[MAX_BLOCK_SIZE];
+            int[] tab = new int[MAX_BLOCK_SIZE];
             int i = 0;
             int j = 0;
             while (i < nColors) {
@@ -432,14 +402,14 @@ public class GifHeaderParser {
                 int b = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
                 tab[i++] = 0xFF000000 | (r << 16) | (g << 8) | b;
             }
+            return tab;
         } catch (BufferUnderflowException e) {
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(TAG, "Format Error Reading Color Table", e);
             }
-            header.status = STATUS_FORMAT_ERROR;
+            parsedGif.status = STATUS_FORMAT_ERROR;
+            return null;
         }
-
-        return tab;
     }
 
     /**
@@ -459,7 +429,11 @@ public class GifHeaderParser {
         int blockSize;
         do {
             blockSize = read();
-            int newPosition = Math.min(rawData.position() + blockSize, rawData.limit());
+            int newPosition = rawData.position() + blockSize;
+            if (newPosition >= rawData.limit()) {
+                rawData.position(rawData.limit());
+                break;
+            }
             rawData.position(newPosition);
         } while (blockSize > 0);
     }
@@ -469,14 +443,13 @@ public class GifHeaderParser {
      */
     private void readBlock() {
         blockSize = read();
-        int n = 0;
         if (blockSize > 0) {
             int count = 0;
+            int n = 0;
             try {
                 while (n < blockSize) {
                     count = blockSize - n;
                     rawData.get(block, n, count);
-
                     n += count;
                 }
             } catch (Exception e) {
@@ -484,7 +457,7 @@ public class GifHeaderParser {
                     Log.d(TAG,
                             "Error Reading Block n: " + n + " count: " + count + " blockSize: " + blockSize, e);
                 }
-                header.status = STATUS_FORMAT_ERROR;
+                parsedGif.status = STATUS_FORMAT_ERROR;
             }
         }
     }
@@ -497,7 +470,7 @@ public class GifHeaderParser {
         try {
             currByte = rawData.get() & MASK_INT_LOWEST_BYTE;
         } catch (Exception e) {
-            header.status = STATUS_FORMAT_ERROR;
+            parsedGif.status = STATUS_FORMAT_ERROR;
         }
         return currByte;
     }
@@ -511,6 +484,6 @@ public class GifHeaderParser {
     }
 
     private boolean err() {
-        return header.status != GifDecoder.STATUS_OK;
+        return parsedGif.status != GifDecoder.STATUS_OK;
     }
 }

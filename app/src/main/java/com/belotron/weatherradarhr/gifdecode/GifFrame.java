@@ -11,7 +11,7 @@ import java.lang.annotation.RetentionPolicy;
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
-class GifFrame {
+public class GifFrame {
     /**
      * GIF Disposal Method meaning take no action.
      * <p><b>GIF89a</b>: <i>No disposal specified.
@@ -62,35 +62,31 @@ class GifFrame {
      */
     int index;
 
+    /** WeatherRadar-specific: OCR-ed timestamp of the image. */
+    public long timestamp;
+
     int ix, iy, iw, ih;
-    /**
-     * Control Flag.
-     */
+
+    /** Control Flag. */
     boolean interlace;
-    /**
-     * Control Flag.
-     */
+
+    /** Control Flag. */
     boolean transparency;
-    /**
-     * Disposal Method.
-     */
+
+    /** Disposal Method. */
     @GifDisposalMethod
     int dispose;
-    /**
-     * Transparency Index.
-     */
+
+    /** Transparency Index. */
     int transIndex;
-    /**
-     * Delay, in milliseconds, to next frame.
-     */
+
+    /** Delay, in milliseconds, to next frame. */
     int delay;
-    /**
-     * Index in the raw buffer where we need to start reading to decode.
-     */
-    int bufferFrameStart;
-    /**
-     * Local Color Table.
-     */
+
+    /** Buffer with the LZW stream data. */
+    byte[] frameData;
+
+    /** Local Color Table. */
     @ColorInt
     int[] lct;
 }

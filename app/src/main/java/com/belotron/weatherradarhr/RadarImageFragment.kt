@@ -35,8 +35,15 @@ import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
+import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.GifDecoder
+import com.belotron.weatherradarhr.gifdecode.GifFrame
+import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.async
+import java.util.TreeSet
 
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
@@ -448,10 +455,35 @@ class RadarImageFragment : Fragment() {
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     try {
-                        val gifData = editGif(imgBytes, desc.framesToKeep)
+                        val parsedGif = GifHeaderParser(imgBytes).parse()
+                        BitmapFreelists().also { freelists ->
+                            (0 until parsedGif.getFrameCount()).map { i ->
+                                async(CommonPool) {
+                                    val decoder = GifDecoder(freelists, parsedGif)
+                                    decoder.decodeFrame(i).let { frame ->
+                                        decoder.clear()
+                                        desc.ocrTimestamp(frame).also {
+                                            freelists.release(frame)
+                                        }
+                                    }
+                                }
+                            }.forEachIndexed { i, it ->
+                                parsedGif.frames[i].timestamp = it.await()
+                            }
+                        }
+                        val sortedFrames = TreeSet<GifFrame>(compareBy(GifFrame::timestamp)).apply {
+                            addAll(parsedGif.frames)
+                            while (size > desc.framesToKeep) {
+                                remove(first())
+                            }
+                        }
+                        parsedGif.frames.apply {
+                            clear()
+                            addAll(sortedFrames)
+                        }
                         bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
-                            receiveNewGif(desc, gifData, isOffline = lastModified == 0L)
+                            receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
                             resume(rateMinsPerSec, freezeTimeMillis)
                         }
                     } catch (t: Throwable) {

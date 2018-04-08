@@ -6,7 +6,8 @@ import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
+import com.belotron.weatherradarhr.gifdecode.GifDecoder
+import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.experimental.CoroutineDispatcher
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
@@ -37,8 +38,8 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewGif(desc: ImgDescriptor, gifData: ByteArray, isOffline: Boolean) {
-        animators[desc.index] = GifAnimator(imgBundles, desc, gifData, isOffline)
+    fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
+        animators[desc.index] = GifAnimator(imgBundles, desc, parsedGif, isOffline)
     }
 
     fun resume(newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
@@ -100,7 +101,7 @@ class AnimationLooper(
 class GifAnimator(
         private val imgBundles: List<ImageBundle>,
         private val imgDesc: ImgDescriptor,
-        gifData: ByteArray,
+        private val parsedGif: ParsedGif,
         private val isOffline: Boolean
 ) {
     var rateMinsPerSec: Int = 20
@@ -109,8 +110,7 @@ class GifAnimator(
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
-    private val gifDecoder = StandardGifDecoder(bitmapProvider, gifData)
-    private val timestamps = LongArray(gifDecoder.frameCount)
+    private val gifDecoder = GifDecoder(bitmapProvider, parsedGif)
     private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
@@ -157,19 +157,15 @@ class GifAnimator(
     }
 
     suspend fun seekTo(animationProgress: Int) {
-        val frameIndex = toFrameIndex(animationProgress)
-        if (frameIndex == currFrameIndex) {
-            return
-        }
-        currFrameIndex = frameIndex
-        val thumbUpdated = timestamps[frameIndex].takeIf { it != 0L}
-                ?.let { updateSeekBarThumb(frameIndex, it); true }
-                ?: false
-        val newFrame = suspendDecodeFrame(frameIndex, singleThread)
-        showFrame(newFrame, animationProgress)
-        updateAgeText()
-        if (!thumbUpdated) {
-            updateSeekBarThumb(frameIndex, getTimestamp(frameIndex, newFrame))
+        toFrameIndex(animationProgress).also { it ->
+            if (it == currFrameIndex) {
+                return
+            }
+            currFrameIndex = it
+            updateSeekBarThumb(it, timestamp(it))
+            val newFrame = suspendDecodeFrame(it, singleThread)
+            showFrame(newFrame, animationProgress)
+            updateAgeText()
         }
     }
 
@@ -187,7 +183,6 @@ class GifAnimator(
             thumbProgress = toProgress(frameIndex)
             thumbText = thumbDateFormat.format(timestamp)
         }
-
     }
 
     private fun animateSeekBarIfNeeded() {
@@ -205,28 +200,12 @@ class GifAnimator(
         }
     }
 
-    private suspend fun updateAgeText() {
+    private fun updateAgeText() {
         imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(
-                suspendGetTimestamp(timestamps.size - 1), isOffline)
+                timestamp(parsedGif.frameCount - 1), isOffline)
     }
 
-    @Suppress("NOTHING_TO_INLINE")
-    private suspend inline fun suspendGetTimestamp(frameIndex: Int): Long {
-        if (timestamps[frameIndex] == 0L) {
-            suspendDecodeFrame(frameIndex).also {
-                timestamps[frameIndex] = imgDesc.ocrTimestamp(it)
-                it.dispose()
-            }
-        }
-        return timestamps[frameIndex]
-    }
-
-    private fun getTimestamp(frameIndex: Int, frame: Bitmap): Long {
-        if (timestamps[frameIndex] == 0L) {
-            timestamps[frameIndex] = imgDesc.ocrTimestamp(frame)
-        }
-        return timestamps[frameIndex]
-    }
+    private fun timestamp(frameIndex: Int) = parsedGif.frames[frameIndex].timestamp
 
     private suspend fun suspendDecodeFrame(frameIndex: Int, coroCtx: CoroutineDispatcher = threadPool) =
             withContext(coroCtx) { gifDecoder.decodeFrame(frameIndex) }

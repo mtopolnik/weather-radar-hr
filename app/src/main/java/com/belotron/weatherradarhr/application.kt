@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
@@ -19,7 +20,8 @@ import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.StandardGifDecoder
+import com.belotron.weatherradarhr.gifdecode.GifDecoder
+import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.android.UI
@@ -133,7 +135,9 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap() = StandardGifDecoder(BitmapFreelists(), this).decodeFrame(0)
+fun ByteArray.toBitmap(): Bitmap = GifHeaderParser(this).parse().let {
+    GifDecoder(BitmapFreelists(), it).decodeFrame(0)
+}
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()
