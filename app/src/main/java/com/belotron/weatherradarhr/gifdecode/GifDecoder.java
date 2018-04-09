@@ -30,6 +30,7 @@ import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import com.belotron.weatherradarhr.LogKt;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -76,7 +77,7 @@ public class GifDecoder {
     @interface GifDecodeStatus {
     }
 
-    private static final String TAG = GifDecoder.class.getSimpleName();
+    private static final String TAG = LogKt.LOGTAG;
 
     /**
      * Maximum pixel stack size for decoding LZW compressed data.
@@ -400,7 +401,7 @@ public class GifDecoder {
      * Decodes LZW image data into pixel array. Adapted from John Cristy's BitmapMagick.
      */
     private void decodeBitmapData(GifFrame frame) {
-        ByteBuffer frameData = ByteBuffer.wrap(frame.frameData);
+        ByteBuffer frameData = frame.frameData.duplicate();
 
         final int npix = (frame == null) ? parsedGif.width * parsedGif.height : frame.iw * frame.ih;
 
