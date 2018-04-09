@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+import static com.belotron.weatherradarhr.LogKt.LOGTAG;
 import static com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_FORMAT_ERROR;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
@@ -19,8 +20,8 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIE
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
-public class GifHeaderParser {
-    private static final String TAG = "GifHeaderParser";
+public class GifParser {
+    private static final String TAG = "GifParser";
 
     private static final int MASK_INT_LOWEST_BYTE = 0x000000FF;
 
@@ -134,14 +135,14 @@ public class GifHeaderParser {
     private GifFrame currentFrame;
     private int blockSize = 0;
 
-    private GifHeaderParser(@NonNull ByteBuffer data) {
+    private GifParser(@NonNull ByteBuffer data) {
         reset();
         rawData = data.asReadOnlyBuffer();
         rawData.position(0);
         rawData.order(ByteOrder.LITTLE_ENDIAN);
     }
 
-    public GifHeaderParser(@NonNull byte[] data) {
+    public GifParser(@NonNull byte[] data) {
         this(ByteBuffer.wrap(data));
     }
 
@@ -291,21 +292,22 @@ public class GifHeaderParser {
          * Size of Local Color Table  3 Bits
          */
         int packed = read();
-        boolean lctFlag = (packed & DESCRIPTOR_MASK_LCT_FLAG) != 0;
         int lctSize = (int) Math.pow(2, (packed & DESCRIPTOR_MASK_LCT_SIZE) + 1);
         currentFrame.interlace = (packed & DESCRIPTOR_MASK_INTERLACE_FLAG) != 0;
-        if (lctFlag) {
+        if ((packed & DESCRIPTOR_MASK_LCT_FLAG) != 0) {
             currentFrame.lct = readColorTable(lctSize);
         } else {
             // No local color table.
             currentFrame.lct = null;
         }
-        int bufferFrameStart = rawData.position();
+        rawData.mark();
         skipImageData();
-        byte[] frameBuf = new byte[rawData.position() - bufferFrameStart];
-        rawData.position(bufferFrameStart);
-        rawData.get(frameBuf);
-        currentFrame.frameData = frameBuf;
+        int frameEndOffset = rawData.position();
+        rawData.reset();
+        rawData.limit(frameEndOffset);
+        currentFrame.frameData = rawData.slice();
+        rawData.position(frameEndOffset);
+        rawData.limit(rawData.capacity());
         if (err()) {
             return;
         }

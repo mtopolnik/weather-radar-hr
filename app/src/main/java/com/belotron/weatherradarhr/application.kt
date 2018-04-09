@@ -22,7 +22,7 @@ import android.widget.TextView
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
-import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
+import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
@@ -141,7 +141,7 @@ fun ByteArray.toBitmap(): Bitmap = gifDecode().toBitmap()
 
 fun ByteArray.toPixels(): Pixels = gifDecode().toPixels()
 
-private fun ByteArray.gifDecode(): GifDecoder = GifHeaderParser(this).parse().let {
+private fun ByteArray.gifDecode(): GifDecoder = GifParser(this).parse().let {
     GifDecoder(BitmapFreelists(), it).decodeFrame(0)
 }
 

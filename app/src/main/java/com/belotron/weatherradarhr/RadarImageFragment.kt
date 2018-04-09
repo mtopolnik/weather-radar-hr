@@ -38,7 +38,7 @@ import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
-import com.belotron.weatherradarhr.gifdecode.GifHeaderParser
+import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdRequest
@@ -462,7 +462,7 @@ class RadarImageFragment : Fragment() {
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     try {
-                        val parsedGif = GifHeaderParser(imgBytes).parse().apply {
+                        val parsedGif = GifParser(imgBytes).parse().apply {
                             assignTimestamps(desc.ocrTimestamp)
                             sortAndDeduplicateFrames()
                         }
