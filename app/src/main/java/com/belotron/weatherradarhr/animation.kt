@@ -1,7 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.animation.ObjectAnimator
+import android.content.Context
 import android.graphics.Bitmap
+import android.text.format.DateFormat
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
@@ -13,8 +15,6 @@ import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.withContext
-import java.text.SimpleDateFormat
-import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
@@ -38,8 +38,8 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(ds.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
-        animators[desc.index] = GifAnimator(ds.imgBundles, desc, parsedGif, isOffline)
+    fun receiveNewGif(context: Context, desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
+        animators[desc.index] = GifAnimator(context, ds.imgBundles, desc, parsedGif, isOffline)
     }
 
     fun resume(newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
@@ -99,6 +99,7 @@ class AnimationLooper(
 }
 
 class GifAnimator(
+        context: Context,
         private val imgBundles: List<ImageBundle>,
         private val imgDesc: ImgDescriptor,
         private val parsedGif: ParsedGif,
@@ -111,7 +112,7 @@ class GifAnimator(
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val bitmapProvider = BitmapFreelists()
     private val gifDecoder = GifDecoder(bitmapProvider, parsedGif)
-    private val thumbDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private val thumbDateFormat = DateFormat.getTimeFormat(context)// SimpleDateFormat("HH:mm", Locale.getDefault())
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null

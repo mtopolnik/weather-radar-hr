@@ -469,7 +469,7 @@ class RadarImageFragment : Fragment() {
                         }
                         bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
-                            receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
+                            receiveNewGif(context, desc, parsedGif, isOffline = lastModified == 0L)
                             resume(rateMinsPerSec, freezeTimeMillis)
                         }
                     } catch (t: Throwable) {
