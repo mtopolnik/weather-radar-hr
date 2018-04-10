@@ -41,7 +41,6 @@ import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
-import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
@@ -160,18 +159,22 @@ class ImageBundle {
     }
 }
 
-class RadarImageFragment : Fragment() {
-    var isInFullScreen: Boolean = false
+class DisplayState {
+    var indexOfImgInFullScreen: Int? = null
+    val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
+    val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
+}
 
-    private val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
+class RadarImageFragment : Fragment() {
+
+    val ds = DisplayState()
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
-    private val animationLooper = AnimationLooper(imgBundles)
+    private val animationLooper = AnimationLooper(ds)
     private var rootView: View? = null
     private val adView get() = rootView?.findViewById<AdView>(R.id.adView)
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
-    private var indexOfImgInFullScreen: Int? = null
     private var lastReloadedTimestamp = 0L
     private var wasFastResume = false
 
@@ -219,7 +222,7 @@ class RadarImageFragment : Fragment() {
             val textView = rootView.findViewById<TextView>(desc.textViewId)
             val brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId)
             val progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId)
-            imgBundles[i].restoreViews(
+            ds.imgBundles[i].restoreViews(
                 viewGroup = viewGroup,
                 textView = textView.apply {
                     GestureDetector(activity, MainViewListener(i, imgView)).also {
@@ -244,13 +247,13 @@ class RadarImageFragment : Fragment() {
         val sl = object : SimpleOnScaleGestureListener() {
             private val rect = Rect()
             override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {
-                if (isInFullScreen || scaleFactor <= 1) {
+                if (ds.isInFullScreen || scaleFactor <= 1) {
                     return true
                 }
-                scrollView.offsetDescendantRectToMyCoords(imgBundles[1].textView ?: return true, rect.reset())
+                scrollView.offsetDescendantRectToMyCoords(ds.imgBundles[1].textView ?: return true, rect.reset())
                 val focusY = scrollView.scrollY + focusY
                 val imgIndex = if (focusY <= rect.top) 0 else 1
-                val imgView = imgBundles[imgIndex].imgView ?: return true
+                val imgView = ds.imgBundles[imgIndex].imgView ?: return true
                 scrollView.offsetDescendantRectToMyCoords(imgView, rect.reset())
                 imgView.also {
                     enterFullScreen(imgIndex, it, focusX - rect.left, focusY - rect.top)
@@ -286,7 +289,7 @@ class RadarImageFragment : Fragment() {
     ) : SimpleOnGestureListener() {
         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            if (!isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
+            if (!ds.isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
             return true
         }
     }
@@ -297,15 +300,15 @@ class RadarImageFragment : Fragment() {
         super.onResume()
         activity.sharedPrefs.also {
             lastReloadedTimestamp = it.lastReloadedTimestamp
-            if (it.lastPausedTimestamp < aWhileAgo && isInFullScreen) {
+            if (it.lastPausedTimestamp < aWhileAgo && ds.isInFullScreen) {
                 exitFullScreen()
             }
         }
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
-        val isAnimationShowing = imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
+        val isAnimationShowing = ds.imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.resume(isInFullScreen, rateMinsPerSec, freezeTimeMillis)
+                animationLooper.resume(rateMinsPerSec, freezeTimeMillis)
             }
         } else {
             info { "Reloading animations" }
@@ -322,7 +325,7 @@ class RadarImageFragment : Fragment() {
     override fun onDestroyView() {
         info { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
-        imgBundles.forEach { it.destroyViews() }
+        ds.imgBundles.forEach { it.destroyViews() }
         fullScreenBundle.destroyViews()
         stashedImgBundle.destroyViews()
         adView?.destroy()
@@ -374,12 +377,12 @@ class RadarImageFragment : Fragment() {
         val focusInBitmapY = (focusY / srcImgView.height) * bitmapH
         val (imgOnScreenX, imgOnScreenY) = IntArray(2).also { srcImgView.getLocationInWindow(it) }
 
-        indexOfImgInFullScreen = index
+        ds.indexOfImgInFullScreen = index
         with (fullScreenBundle) {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
-            animationLooper.resume(true)
+            animationLooper.resume()
             seekBar?.visibility = INVISIBLE
             start {
                 imgView?.let { it as TouchImageView }?.apply {
@@ -392,14 +395,14 @@ class RadarImageFragment : Fragment() {
     }
 
     fun exitFullScreen() {
-        val index = indexOfImgInFullScreen ?: return
-        indexOfImgInFullScreen = null
+        val index = ds.indexOfImgInFullScreen ?: return
+        ds.indexOfImgInFullScreen = null
         start {
-            val target = imgBundles[index]
+            val target = ds.imgBundles[index]
             if (target.status == SHOWING) {
                 fullScreenBundle.seekBar?.startAnimateExit()
                 target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
-                animationLooper.resume(false)
+                animationLooper.resume()
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
                 updateFrom(target)
@@ -413,15 +416,13 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun updateFullScreenVisibility() {
-        val index = indexOfImgInFullScreen
-        val makeFullScreenVisible = index != null
-        isInFullScreen = makeFullScreenVisible
+        val makeFullScreenVisible = ds.isInFullScreen
         vGroupFullScreen?.setVisible(makeFullScreenVisible)
         vGroupOverview?.setVisible(!makeFullScreenVisible)
     }
 
     private fun setupFullScreenBundle() {
-        val target = imgBundles[indexOfImgInFullScreen ?: return]
+        val target = ds.imgBundles[ds.indexOfImgInFullScreen ?: return]
         target.copyTo(stashedImgBundle)
         with(fullScreenBundle) {
             updateFrom(target)
@@ -434,21 +435,21 @@ class RadarImageFragment : Fragment() {
         val adsEnabled = activity.adsEnabled
         adView.setVisible(adsEnabled)
         if (adsEnabled) {
-            adView.loadAd(AdRequest.Builder().build())
+            adView.loadAd(adRequest())
         }
     }
 
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         val context = activity ?: return
         animationLooper.stop()
-        imgDescs.map { imgBundles[it.index] }.forEach {
+        imgDescs.map { ds.imgBundles[it.index] }.forEach {
             it.status = LOADING
             it.animationProgress = 0
         }
         val rateMinsPerSec = context.sharedPrefs.rateMinsPerSec
         val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
         for (desc in imgDescs) {
-            val bundle = imgBundles[desc.index]
+            val bundle = ds.imgBundles[desc.index]
             start {
                 try {
                     val (lastModified, imgBytes) = try {
@@ -466,10 +467,10 @@ class RadarImageFragment : Fragment() {
                             assignTimestamps(desc.ocrTimestamp)
                             sortAndDeduplicateFrames()
                         }
-                        bundle.animationProgress = imgBundles.map { it.animationProgress }.max() ?: 0
+                        bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
                             receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
-                            resume(isInFullScreen, rateMinsPerSec, freezeTimeMillis)
+                            resume(rateMinsPerSec, freezeTimeMillis)
                         }
                     } catch (t: Throwable) {
                         error { "GIF parse error, deleting from cache" }

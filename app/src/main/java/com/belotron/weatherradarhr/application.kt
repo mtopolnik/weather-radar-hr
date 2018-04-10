@@ -119,11 +119,12 @@ fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (is
         getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
 
 fun Activity.switchActionBarVisible():Boolean {
-    val actionBar = actionBar!!
-    if (actionBar.isShowing) {
-        actionBar.hide()
-    } else {
-        actionBar.show()
+    with(actionBar!!) {
+        if (isShowing) {
+            hide()
+        } else {
+            show()
+        }
     }
     return true
 }

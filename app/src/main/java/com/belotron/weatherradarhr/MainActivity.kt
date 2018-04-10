@@ -1,9 +1,11 @@
 package com.belotron.weatherradarhr
 
 import android.app.Activity
+import android.location.Location
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
 
 private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
@@ -48,7 +50,7 @@ class MainActivity : Activity()  {
     override fun onBackPressed() {
         fragmentManager.findFragmentById(R.id.radar_img_fragment)
                 ?.let { it as RadarImageFragment? }
-                ?.takeIf { it.isInFullScreen }
+                ?.takeIf { it.ds.isInFullScreen }
                 ?.also {
                     it.exitFullScreen()
                     return

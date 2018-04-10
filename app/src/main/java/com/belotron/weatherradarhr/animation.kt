@@ -31,18 +31,18 @@ private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQue
 private val linear = LinearInterpolator()
 
 class AnimationLooper(
-        private val imgBundles: List<ImageBundle>
+        private val ds: DisplayState
 ) : SeekBar.OnSeekBarChangeListener {
 
-    private val animators = arrayOfNulls<GifAnimator>(imgBundles.size)
-    private val animatorJobs = arrayOfNulls<Job>(imgBundles.size)
+    private val animators = arrayOfNulls<GifAnimator>(ds.imgBundles.size)
+    private val animatorJobs = arrayOfNulls<Job>(ds.imgBundles.size)
     private var loopingJob: Job? = null
 
     fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
-        animators[desc.index] = GifAnimator(imgBundles, desc, parsedGif, isOffline)
+        animators[desc.index] = GifAnimator(ds.imgBundles, desc, parsedGif, isOffline)
     }
 
-    fun resume(isFullScreen: Boolean, newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
+    fun resume(newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
         info { "AnimationLooper.resume" }
         if (animators.none()) {
             return
@@ -58,9 +58,9 @@ class AnimationLooper(
             oldLoopingJob = null
             while (true) {
                 animatorJobs.forEach { it?.join() }
-                animators.forEachIndexed { i, it ->
-                    animatorJobs[i] = it?.animate(isFullScreen)
-                }
+                animators.withIndex()
+                        .filter { (i, _) -> ds.indexOfImgInFullScreen?.let { it == i } ?: true }
+                        .forEach { (i, it) -> animatorJobs[i] = it?.animate(ds.isInFullScreen) }
             }
         }
     }
@@ -91,7 +91,7 @@ class AnimationLooper(
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
             }
-            resume(true)
+            resume()
         }
     }
 
