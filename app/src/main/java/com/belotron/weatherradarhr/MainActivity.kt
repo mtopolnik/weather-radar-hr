@@ -57,3 +57,12 @@ class MainActivity : Activity()  {
     }
 }
 
+
+fun adRequest(): AdRequest = AdRequest.Builder().run {
+    setLocation(Location("custom").apply {
+        latitude = 45.8
+        longitude = 16.0
+    })
+    build()
+}
+
