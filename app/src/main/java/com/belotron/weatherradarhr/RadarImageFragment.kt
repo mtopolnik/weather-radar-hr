@@ -308,7 +308,7 @@ class RadarImageFragment : Fragment() {
         val isAnimationShowing = ds.imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.sharedPrefs) {
-                animationLooper.resume(rateMinsPerSec, freezeTimeMillis)
+                animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
             }
         } else {
             info { "Reloading animations" }
@@ -382,7 +382,7 @@ class RadarImageFragment : Fragment() {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
-            animationLooper.resume()
+            animationLooper.resume(activity)
             seekBar?.visibility = INVISIBLE
             start {
                 imgView?.let { it as TouchImageView }?.apply {
@@ -398,15 +398,18 @@ class RadarImageFragment : Fragment() {
         val index = ds.indexOfImgInFullScreen ?: return
         ds.indexOfImgInFullScreen = null
         start {
-            val target = ds.imgBundles[index]
-            if (target.status == SHOWING) {
+            val bundleInTransition = ds.imgBundles[index]
+            if (bundleInTransition.status == SHOWING) {
                 fullScreenBundle.seekBar?.startAnimateExit()
-                target.imgView?.let { it as? TouchImageView }?.animateZoomExit()
-                animationLooper.resume()
+                bundleInTransition.imgView?.let { it as? TouchImageView }?.animateZoomExit()
+                ds.imgBundles.forEach {
+                    it.animationProgress = bundleInTransition.animationProgress
+                }
+                animationLooper.resume(activity)
             }
             stashedImgBundle.takeIf { it.imgView != null }?.apply {
-                updateFrom(target)
-                copyTo(target)
+                updateFrom(bundleInTransition)
+                copyTo(bundleInTransition)
                 clear()
             }
             fullScreenBundle.bitmap = null
@@ -469,8 +472,8 @@ class RadarImageFragment : Fragment() {
                         }
                         bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
-                            receiveNewGif(context, desc, parsedGif, isOffline = lastModified == 0L)
-                            resume(rateMinsPerSec, freezeTimeMillis)
+                            receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
+                            resume(context, rateMinsPerSec, freezeTimeMillis)
                         }
                     } catch (t: Throwable) {
                         error { "GIF parse error, deleting from cache" }
