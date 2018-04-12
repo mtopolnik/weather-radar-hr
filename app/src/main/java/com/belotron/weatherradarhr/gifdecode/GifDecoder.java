@@ -108,17 +108,16 @@ public class GifDecoder {
 
     private final Allocator allocator;
 
-    /** Raw data read working array. */
-    private byte[] block;
-
     // LZW decoder working arrays.
-    private short[] prefix;
-    private byte[] suffix;
-    private byte[] pixelStack;
-    private byte[] mainPixels;
+    private final byte[] block = new byte[256];
+    private final short[] prefix = new short[MAX_STACK_SIZE];
+    private final byte[] suffix = new byte[MAX_STACK_SIZE];
+    private final byte[] pixelStack = new byte[MAX_STACK_SIZE + 1];
+
+    private final byte[] pixelCodes;
 
     @ColorInt
-    private int[] mainScratch;
+    private final int[] outPixels;
 
     private ParsedGif parsedGif;
 
@@ -134,9 +133,9 @@ public class GifDecoder {
     public GifDecoder(@NonNull Allocator allocator, @NonNull ParsedGif parsedGif) {
         this.allocator = allocator;
         this.parsedGif = parsedGif;
-        this.status = STATUS_OK;
-        mainPixels = allocator.obtainByteArray(parsedGif.width * parsedGif.height);
-        mainScratch = allocator.obtainIntArray(parsedGif.width * parsedGif.height);
+        status = STATUS_OK;
+        pixelCodes = allocator.obtainByteArray(parsedGif.width * parsedGif.height);
+        outPixels = allocator.obtainIntArray(parsedGif.width * parsedGif.height);
     }
 
     public int getStatus() {
@@ -149,16 +148,9 @@ public class GifDecoder {
 
     public void clear() {
         parsedGif = null;
-        if (mainPixels != null) {
-            allocator.release(mainPixels);
-        }
-        if (mainScratch != null) {
-            allocator.release(mainScratch);
-        }
+        allocator.release(pixelCodes);
+        allocator.release(outPixels);
         isFirstFrameTransparent = null;
-        if (block != null) {
-            allocator.release(block);
-        }
     }
 
     public void setDefaultBitmapConfig(@NonNull Bitmap.Config config) {
@@ -173,16 +165,16 @@ public class GifDecoder {
     public Bitmap toBitmap() {
         // Set pixels for current image.
         Bitmap result = obtainBitmap();
-        result.setPixels(mainScratch, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
+        result.setPixels(outPixels, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
         return result;
     }
 
     public Pixels toPixels() {
-        return new IntArrayPixels(mainScratch.clone(), parsedGif.width);
+        return new IntArrayPixels(outPixels.clone(), parsedGif.width);
     }
 
     public Pixels asPixels() {
-        return new IntArrayPixels(mainScratch, parsedGif.width);
+        return new IntArrayPixels(outPixels, parsedGif.width);
     }
 
     public GifDecoder decodeFrame(int index) {
@@ -196,10 +188,6 @@ public class GifDecoder {
             throw new RuntimeException("Unable to decode frame, status=" + status);
         }
         status = STATUS_OK;
-
-        if (block == null) {
-            block = allocator.obtainByteArray(255);
-        }
 
         GifFrame currentFrame = parsedGif.frames.get(index);
         int previousIndex = index - 1;
@@ -230,9 +218,9 @@ public class GifDecoder {
      * Creates new frame image from current data (and previous frames as specified by their
      * disposal codes).
      */
-    private void setPixels(GifFrame currentFrame, GifFrame previousFrame) {
+    private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
         // Final location of blended pixels.
-        final int[] pixels = mainScratch;
+        final int[] pixels = this.outPixels;
 
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
             throw new RuntimeException(
@@ -279,8 +267,8 @@ public class GifDecoder {
         }
     }
 
-    private void copyIntoScratchFast(GifFrame frame) {
-        int[] dest = mainScratch;
+    private void copyIntoScratchFast(@NonNull GifFrame frame) {
+        int[] dest = outPixels;
         int ix = frame.ix;
         int iy = frame.iy;
         int ih = frame.ih;
@@ -288,7 +276,7 @@ public class GifDecoder {
         // Copy each source line to the appropriate place in the destination.
         boolean isFirstFrame = frame.index == 0;
         int width = this.parsedGif.width;
-        byte[] mainPixels = this.mainPixels;
+        byte[] mainPixels = this.pixelCodes;
         int[] act = this.act;
         byte transparentColorIndex = -1;
         for (int i = 0; i < ih; i++) {
@@ -324,14 +312,14 @@ public class GifDecoder {
         isFirstFrameTransparent = isFirstFrameTransparent == null && isFirstFrame && transparentColorIndex != -1;
     }
 
-    private void copyCopyIntoScratchRobust(GifFrame frame) {
-        int[] dest = mainScratch;
+    private void copyCopyIntoScratchRobust(@NonNull GifFrame frame) {
+        int[] dest = outPixels;
         // Copy each source line to the appropriate place in the destination.
         int pass = 1;
         int inc = 8;
         int iline = 0;
         boolean isFirstFrame = frame.index == 0;
-        byte[] mainPixels = this.mainPixels;
+        byte[] mainPixels = this.pixelCodes;
         int[] act = this.act;
         @Nullable
         Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
@@ -400,27 +388,11 @@ public class GifDecoder {
     /**
      * Decodes LZW image data into pixel array. Adapted from John Cristy's BitmapMagick.
      */
-    private void decodeBitmapData(GifFrame frame) {
+    private void decodeBitmapData(@NonNull GifFrame frame) {
         ByteBuffer frameData = frame.frameData.duplicate();
-
-        final int npix = (frame == null) ? parsedGif.width * parsedGif.height : frame.iw * frame.ih;
-
-        if (mainPixels == null || mainPixels.length < npix) {
-            // Allocate new pixel array.
-            mainPixels = allocator.obtainByteArray(npix);
-        }
-        final byte[] mainPixels = this.mainPixels;
-        if (prefix == null) {
-            prefix = new short[MAX_STACK_SIZE];
-        }
+        final byte[] mainPixels = this.pixelCodes;
         final short[] prefix = this.prefix;
-        if (suffix == null) {
-            suffix = new byte[MAX_STACK_SIZE];
-        }
         final byte[] suffix = this.suffix;
-        if (pixelStack == null) {
-            pixelStack = new byte[MAX_STACK_SIZE + 1];
-        }
         final byte[] pixelStack = this.pixelStack;
 
         // Initialize GIF data stream decoder.
@@ -438,6 +410,7 @@ public class GifDecoder {
         int oldCode = NULL_CODE;
         int available = clear + 2;
         final int endOfInformation = clear + 1;
+        final int npix = frame.iw * frame.ih;
         decoderLoop:
         for (pi = 0; pi < npix;) {
             while (top > 0) {
