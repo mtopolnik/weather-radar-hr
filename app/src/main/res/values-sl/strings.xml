@@ -11,10 +11,10 @@
     <string name="settings">Nastavitve</string>
     <string name="refresh">Osveži</string>
     <string name="animation_rate">Hitrost animacije</string>
-    <string name="freeze_time">Pavza pred ponavljanjem</string>
+    <string name="freeze_time">Premor med ponovitvijo</string>
     <string name="rateme_title">Ocenite aplikacijo</string>
     <string name="rateme_question">
-        Če Vam je naša aplikacija koristna, bi bili veseli,
+        V kolikor se vam naša aplikacija zdi uporabna, bi bili veseli,
         če ju ocenite. Hvala za podporo!
     </string>
     <string name="rateme_yes">Lahko</string>
@@ -29,28 +29,28 @@
         \n\nAvtor ikone aplikacije: Emilija Kalajžić
     </string>
     <string name="help_text">
-        Dvakrat tapnite sliko, da se osredotočite na to. Uporabite iskalno
-        vrstico da ročno krmilite prikazani okvir. Sliko lahko povečate in
+        Dvakrat tapnite sliko, da se osredotočite na to. Uporabite iskalni
+        drsnik da ročno krmilite prikazani okvir. Sliko lahko povečate in
         zmenjšate. Za iti nazaj, ponovno dvakrat tapnite ali pritisnite
         Androidov gumb Nazaj.
         \n
-        \nPostavite pripomoček aplikacije na začetni zaslon, da boste imeli hiter
+        \nPostavite widget aplikacije na začetni zaslon, da boste imeli hiter
         dostop do trenutne radarske slike.
         \n
-        \nDotaknite se ikone pripomočka, da začnete aplikacijo.
+        \nDotaknite se ikone widgeta, da začnete aplikacijo.
         \n
-        \nAplikacija uporablja OCR, da prebere časovni žig slikovne datoteke, ga
-        prevede v Vaš časovni pas in ga prikaže nad sliko. Včasih spletne strani
-        prenehajo posodabljati svoje slike, v tem primeru boste videli da starost
-        slike raste. Ko starost doseže eno uro, se besedilo obarva rdeče, da vas
-        opozori, da slika ni več ažurna.
+        \nAplikacija uporablja OCR, da prebere navedbo časa iz slike, ga prevede
+        v Vaš časovni pas in ga prikaže nad sliko. Včasih spletne strani
+        prenehajo posodabljati svoje slike, v tem primeru boste videli da
+        starost slike raste. Ko starost doseže eno uro, se besedilo obarva rdeče,
+        da vas opozori, da slika ni več ažurna.
         \n
-        \nAplikacija je zelo konzervativna pri uporabi internetnega prometa in
-        nikoli ne mora dvakrat priti do iste slike, vedno pa si lahko ogledate
-        najnovejše slike zahvaljujoč HTTP glavi If-Modified-Since. Zaradi tega
-        včasih osveževanje slike traja le delček sekunde, vendar si lahko
-        zagotovite, da smo se obrnili na strežnik, ki je odgovoril, da imate že
-        zadnjo sliko. Če se ne moremo obrniti na strežnik, bo naslov nad njeno
-        sliko napisal “Offline”.
+        \nAplikacija je zelo varčna pri uporabi internetnega prometa in nikoli ne
+        mora dvakrat priti do iste slike, vedno pa si lahko ogledate najnovejše
+        slike zahvaljujoč HTTP glavi If-Modified-Since. Zaradi tega včasih
+        osveževanje slike traja le delček sekunde, vendar si lahko zagotovite, da
+        smo se obrnili na strežnik, ki je odgovoril, da imate že zadnjo sliko. Če
+        se ne moremo obrniti na strežnik, bo naslov nad njeno sliko napisal
+        “Offline”.
     </string>
 </resources>
