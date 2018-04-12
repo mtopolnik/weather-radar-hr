@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr
 
 import android.app.Activity
-import android.location.Location
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -51,8 +50,8 @@ class MainActivity : Activity()  {
         fragmentManager.findFragmentById(R.id.radar_img_fragment)
                 ?.let { it as RadarImageFragment? }
                 ?.takeIf { it.ds.isInFullScreen }
-                ?.also {
-                    it.exitFullScreen()
+                ?.apply {
+                    exitFullScreen()
                     return
                 }
         super.onBackPressed()
@@ -60,11 +59,5 @@ class MainActivity : Activity()  {
 }
 
 
-fun adRequest(): AdRequest = AdRequest.Builder().run {
-    setLocation(Location("custom").apply {
-        latitude = 45.8
-        longitude = 16.0
-    })
-    build()
-}
+fun adRequest(): AdRequest = AdRequest.Builder().build()
 
