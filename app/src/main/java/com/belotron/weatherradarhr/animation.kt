@@ -125,7 +125,7 @@ class GifAnimator(
 
     fun animate(isFullRange: Boolean): Job? {
         val frameCount = gifDecoder.frameCount
-        val startFrameIndex = /* if (isFullRange) 0 else */ frameCount - imgDesc.framesToKeep
+        val startFrameIndex = if (isFullRange) 0 else frameCount - imgDesc.framesToKeep
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return start {
             updateAgeText()

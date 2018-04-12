@@ -469,6 +469,11 @@ class RadarImageFragment : Fragment() {
                         val parsedGif = GifParser(imgBytes).parse().apply {
                             assignTimestamps(desc.ocrTimestamp)
                             sortAndDeduplicateFrames()
+                            with (frames) {
+                                while (size > desc.framesToKeep) {
+                                    removeAt(0)
+                                }
+                            }
                         }
                         bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
                         with (animationLooper) {
