@@ -79,26 +79,17 @@ public class GifDecoder {
 
     private static final String TAG = LogKt.LOGTAG;
 
-    /**
-     * Maximum pixel stack size for decoding LZW compressed data.
-     */
-    private static final int MAX_STACK_SIZE = 4 * 1024;
+    /** Dictionary size for decoding LZW compressed data. */
+    private static final int DICT_SIZE = 4 * 1024;
 
     private static final int NULL_CODE = -1;
-
-    private static final int BYTES_PER_INTEGER = Integer.SIZE / 8;
 
     private static final int MASK_INT_LOWEST_BYTE = 0x000000FF;
 
     @ColorInt
     private static final int COLOR_TRANSPARENT_BLACK = 0x00000000;
-    private static final int BUFSIZ = 16 * 1024;
 
-    // Global File Header values and parsing flags.
-    /**
-     * Active color table.
-     * Maximum size is 256, see GifHeaderParser.readColorTable
-     */
+    /** Active color table. Maximum size is 256, see GifHeaderParser.readColorTable */
     @ColorInt
     private int[] act;
 
@@ -110,9 +101,9 @@ public class GifDecoder {
 
     // LZW decoder working arrays.
     private final byte[] block = new byte[256];
-    private final short[] prefix = new short[MAX_STACK_SIZE];
-    private final byte[] suffix = new byte[MAX_STACK_SIZE];
-    private final byte[] pixelStack = new byte[MAX_STACK_SIZE + 1];
+    private final short[] prefix = new short[DICT_SIZE];
+    private final byte[] suffix = new byte[DICT_SIZE];
+    private final byte[] pixelStack = new byte[DICT_SIZE + 1];
 
     private final byte[] pixelCodes;
 
@@ -146,7 +137,7 @@ public class GifDecoder {
         return parsedGif.frames.size();
     }
 
-    public void clear() {
+    public void dispose() {
         parsedGif = null;
         allocator.release(pixelCodes);
         allocator.release(outPixels);
@@ -219,9 +210,6 @@ public class GifDecoder {
      * disposal codes).
      */
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
-        // Final location of blended pixels.
-        final int[] pixels = this.outPixels;
-
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
             throw new RuntimeException(
                     "The animated GIF contains a frame with the Restore To Previous frame disposal method" +
@@ -248,10 +236,12 @@ public class GifDecoder {
                 int gifWidth = parsedGif.width;
                 int topLeft = previousFrame.iy * gifWidth + previousFrame.ix;
                 int bottomLeft = topLeft + previousFrame.ih * gifWidth;
+                // Final location of blended pixels.
+                int[] outPixels = this.outPixels;
                 for (int left = topLeft; left < bottomLeft; left += gifWidth) {
                     int right = left + downsampledIW;
                     for (int pointer = left; pointer < right; pointer++) {
-                        pixels[pointer] = c;
+                        outPixels[pointer] = c;
                     }
                 }
             }
@@ -268,7 +258,6 @@ public class GifDecoder {
     }
 
     private void copyIntoScratchFast(@NonNull GifFrame frame) {
-        int[] dest = outPixels;
         int ix = frame.ix;
         int iy = frame.iy;
         int ih = frame.ih;
@@ -276,7 +265,6 @@ public class GifDecoder {
         // Copy each source line to the appropriate place in the destination.
         boolean isFirstFrame = frame.index == 0;
         int width = this.parsedGif.width;
-        byte[] mainPixels = this.pixelCodes;
         int[] act = this.act;
         byte transparentColorIndex = -1;
         for (int i = 0; i < ih; i++) {
@@ -294,12 +282,12 @@ public class GifDecoder {
             int sx = i * frame.iw;
 
             while (dx < dlim) {
-                byte byteCurrentColorIndex = mainPixels[sx];
+                byte byteCurrentColorIndex = this.pixelCodes[sx];
                 int currentColorIndex = toUnsignedInt(byteCurrentColorIndex);
                 if (currentColorIndex != transparentColorIndex) {
                     int color = act[currentColorIndex];
                     if (color != COLOR_TRANSPARENT_BLACK) {
-                        dest[dx] = color;
+                        outPixels[dx] = color;
                     } else {
                         transparentColorIndex = byteCurrentColorIndex;
                     }
@@ -313,13 +301,11 @@ public class GifDecoder {
     }
 
     private void copyCopyIntoScratchRobust(@NonNull GifFrame frame) {
-        int[] dest = outPixels;
         // Copy each source line to the appropriate place in the destination.
         int pass = 1;
         int inc = 8;
         int iline = 0;
         boolean isFirstFrame = frame.index == 0;
-        byte[] mainPixels = this.pixelCodes;
         int[] act = this.act;
         @Nullable
         Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
@@ -367,10 +353,10 @@ public class GifDecoder {
                 // Start of line in source.
                 int sx = i * iw;
                 while (dx < dlim) {
-                    int currentColorIndex = toUnsignedInt(mainPixels[sx]);
+                    int currentColorIndex = toUnsignedInt(this.pixelCodes[sx]);
                     int averageColor = act[currentColorIndex];
                     if (averageColor != COLOR_TRANSPARENT_BLACK) {
-                        dest[dx] = averageColor;
+                        outPixels[dx] = averageColor;
                     } else if (isFirstFrame && isFirstFrameTransparent == null) {
                         isFirstFrameTransparent = true;
                     }
@@ -390,10 +376,6 @@ public class GifDecoder {
      */
     private void decodeBitmapData(@NonNull GifFrame frame) {
         ByteBuffer frameData = frame.frameData.duplicate();
-        final byte[] mainPixels = this.pixelCodes;
-        final short[] prefix = this.prefix;
-        final byte[] suffix = this.suffix;
-        final byte[] pixelStack = this.pixelStack;
 
         // Initialize GIF data stream decoder.
         final int dataSize = readByte(frameData);
@@ -415,7 +397,7 @@ public class GifDecoder {
         for (pi = 0; pi < npix;) {
             while (top > 0) {
                 // Pop a pixel off the pixel stack.
-                mainPixels[pi++] = pixelStack[--top];
+                pixelCodes[pi++] = pixelStack[--top];
                 if (pi == npix) {
                     break decoderLoop;
                 }
@@ -454,7 +436,7 @@ public class GifDecoder {
                 continue;
             }
             if (oldCode == NULL_CODE) {
-                mainPixels[pi++] = suffix[code];
+                pixelCodes[pi++] = suffix[code];
                 oldCode = code;
                 first = code;
                 continue;
@@ -469,26 +451,22 @@ public class GifDecoder {
                 code = prefix[code];
             }
             first = toUnsignedInt(suffix[code]);
-
-            // Add a new string to the string table
-
-            if (available >= MAX_STACK_SIZE) {
-                // We ran out of dictionary space
-                break;
-            }
-            mainPixels[pi++] = (byte) first;
-            prefix[available] = (short) oldCode;
-            suffix[available] = (byte) first;
-            ++available;
-            if (((available & codeMask) == 0) && (available < MAX_STACK_SIZE)) {
-                ++codeSize;
-                codeMask += available;
+            pixelCodes[pi++] = (byte) first;
+            if (available < DICT_SIZE) {
+                // Add a new string to the string table.
+                prefix[available] = (short) oldCode;
+                suffix[available] = (byte) first;
+                ++available;
+                if (((available & codeMask) == 0) && (available < DICT_SIZE)) {
+                    ++codeSize;
+                    codeMask += available;
+                }
             }
             oldCode = inCode;
         }
 
         // Clear missing pixels.
-        Arrays.fill(mainPixels, pi, npix, (byte) COLOR_TRANSPARENT_BLACK);
+        Arrays.fill(pixelCodes, pi, npix, (byte) COLOR_TRANSPARENT_BLACK);
     }
 
     /**

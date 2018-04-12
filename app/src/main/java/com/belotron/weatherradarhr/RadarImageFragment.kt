@@ -500,7 +500,7 @@ private suspend fun ParsedGif.assignTimestamps(ocrTimestamp: (Pixels) -> Long) {
             async(CommonPool) {
                 GifDecoder(freelists, parsedGif).decodeFrame(i).let { decoder ->
                     ocrTimestamp(decoder.asPixels()).also {
-                        decoder.clear()
+                        decoder.dispose()
                     }
                 }
             }
