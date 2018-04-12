@@ -43,6 +43,7 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
+        animators[desc.index]?.apply { dispose() }
         animators[desc.index] = GifAnimator(ds.imgBundles, desc, parsedGif, isOffline)
     }
 
@@ -116,8 +117,8 @@ class GifAnimator(
     val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
-    private val bitmapProvider = BitmapFreelists()
-    private val gifDecoder = GifDecoder(bitmapProvider, parsedGif)
+    private val allocator = BitmapFreelists()
+    private val gifDecoder = GifDecoder(allocator, parsedGif)
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
@@ -176,6 +177,12 @@ class GifAnimator(
         }
     }
 
+    fun dispose() {
+        currFrame?.dispose()
+        gifDecoder.dispose()
+        allocator.dispose()
+    }
+
     private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
         with (imgBundle) {
             imgView?.setImageBitmap(newFrame)
@@ -221,7 +228,7 @@ class GifAnimator(
                 }
             }
 
-    private fun Bitmap.dispose() = bitmapProvider.release(this)
+    private fun Bitmap.dispose() = allocator.release(this)
 
     private fun toFrameIndex(animationProgress: Int, startFrameIndex: Int) =
             (animationProgress / 100f * (gifDecoder.frameCount - startFrameIndex - 1) + startFrameIndex)
