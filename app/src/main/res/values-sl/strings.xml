@@ -29,28 +29,27 @@
         \n\nAvtor ikone aplikacije: Emilija Kalajžić
     </string>
     <string name="help_text">
-        Dvakrat tapnite sliko, da se osredotočite na to. Uporabite iskalni
-        drsnik da ročno krmilite prikazani okvir. Sliko lahko povečate in
-        zmenjšate. Za iti nazaj, ponovno dvakrat tapnite ali pritisnite
-        Androidov gumb Nazaj.
+        Z dvojnim dotikom posamezne animacije se ta prikaže na celotnem zaslonu.
+        Z dotikom iskalnega drsnika se prevzame nadzor nad prikazovanjem slik
+        animacije. Povečava dela slike je možna z gesto “vščipanja”. Povratek na
+        prikaz obeh animacij je možen z dvojnim dotikom ali z Androidovo tipko za
+        vrnitev.
         \n
-        \nPostavite widget aplikacije na začetni zaslon, da boste imeli hiter
-        dostop do trenutne radarske slike.
+        \nZa hiter dostop do trenutnega stanja radarja postavitvite widget
+        aplikacije na začetni zaslon.
         \n
-        \nDotaknite se ikone widgeta, da začnete aplikacijo.
+        \nAplikacijo odprete z dotikom widgeta.
         \n
-        \nAplikacija uporablja OCR, da prebere navedbo časa iz slike, ga prevede
-        v Vaš časovni pas in ga prikaže nad sliko. Včasih spletne strani
-        prenehajo posodabljati svoje slike, v tem primeru boste videli da
-        starost slike raste. Ko starost doseže eno uro, se besedilo obarva rdeče,
-        da vas opozori, da slika ni več ažurna.
+        \nAplikacija s posamezne radarske slike s pomočjo OCR prebere čas izdelave
+        posnetka, ga pretvori v vaš časovni pas in prikaže nad sliko.
+        Kadar spletni servisi radarskih slik ne osvežujejo, boste opazili, da
+        starost animacije narašča. Če bi starost slike presegla 1 uro, se starost
+        izpiše v rdeči barvi.
         \n
-        \nAplikacija je zelo varčna pri uporabi internetnega prometa in nikoli ne
-        mora dvakrat priti do iste slike, vedno pa si lahko ogledate najnovejše
-        slike zahvaljujoč HTTP glavi If-Modified-Since. Zaradi tega včasih
-        osveževanje slike traja le delček sekunde, vendar si lahko zagotovite, da
-        smo se obrnili na strežnik, ki je odgovoril, da imate že zadnjo sliko. Če
-        se ne moremo obrniti na strežnik, bo naslov nad njeno sliko napisal
-        “Offline”.
+        \nAplikacija je zelo varčna s podatkovnim prometom, a zahvaljujoč
+        If-Modified-Since HTTP glavi vedno postreže z najnovejšimi slikami. Ne
+        bodite presenečeni, če se osveževanje prikaza izvede v trenutku. To se
+        zgodi, kadar servis ne ponuja novejše slike in zato prenos podatkov ni
+        potreben. Kadar je servis nedostopen, se nad animacijo izpiše “Offline”.
     </string>
 </resources>
