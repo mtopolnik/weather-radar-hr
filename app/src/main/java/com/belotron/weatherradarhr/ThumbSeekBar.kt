@@ -77,13 +77,13 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     }
 
     fun startAnimateEnter() {
+        thumbText = ""
         y = parentHeight
         visibility = VISIBLE
         animate().y(anchorY).duration = 200
     }
 
     fun startAnimateExit() {
-        thumbText = ""
         animate().y(parentHeight).withEndAction {
             visibility = View.INVISIBLE
         }
