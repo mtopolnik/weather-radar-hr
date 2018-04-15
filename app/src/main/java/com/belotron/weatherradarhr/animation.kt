@@ -43,7 +43,6 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
-        animators[desc.index]?.apply { dispose() }
         animators[desc.index] = GifAnimator(ds.imgBundles, desc, parsedGif, isOffline)
     }
 
@@ -175,12 +174,6 @@ class GifAnimator(
             showFrame(newFrame, animationProgress)
             updateAgeText()
         }
-    }
-
-    fun dispose() {
-        currFrame?.dispose()
-        gifDecoder.dispose()
-        allocator.dispose()
     }
 
     private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
