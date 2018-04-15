@@ -12,7 +12,7 @@ import android.support.v4.content.ContextCompat.getColor
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.SECOND_IN_MILLIS
-import android.text.format.DateUtils.getRelativeDateTimeString
+import android.text.format.DateUtils.getRelativeTimeSpanString
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -34,8 +34,10 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.text.DateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.HOURS
+import android.text.format.DateFormat as AndroidDateFormat
 
 const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
 const val KEY_ADS_ENABLED = "ads_enabled"
@@ -80,9 +82,15 @@ fun ImageView?.bitmapSize(p: PointF) =
                 ?: it.set(0f, 0f)
         }.takeIf { it.x > 0 && it.y > 0 }
 
-fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
-    text = context.ageText(timestamp, isOffline)
-    val isFresh = isFreshTimestamp(timestamp)
+fun TextView.setAgeText(
+        timestamp: Long, isOffline: Boolean,
+        dateFormat: DateFormat, timeFormat: DateFormat
+) {
+    val now = System.currentTimeMillis()
+    text = ageText(
+            timestamp = timestamp, now = now, isOffline = isOffline,
+            dateFormat = dateFormat, timeFormat = timeFormat)
+    val isFresh = isFreshTimestamp(timestamp = timestamp, now = now)
     setTextColor(getColor(context,
             if (isFresh) R.color.text_primary
             else R.color.text_red))
@@ -92,13 +100,28 @@ fun TextView.setAgeText(timestamp: Long, isOffline: Boolean) {
 }
 
 fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {
-    val ageText = context.ageText(timestamp, isOffline)
-    if (isFreshTimestamp(timestamp)) {
+    val now = System.currentTimeMillis()
+    val ageText = ageText(
+            timestamp = timestamp, now = now, isOffline = isOffline,
+            dateFormat = context.dateFormat, timeFormat = context.timeFormat)
+    if (isFreshTimestamp(timestamp, now)) {
         setBlackText(ageText)
     } else {
         setRedText(ageText)
     }
 }
+
+private fun ageText(
+        timestamp: Long, now: Long, isOffline: Boolean,
+        dateFormat: DateFormat, timeFormat: DateFormat
+): CharSequence {
+    val format = if (timestamp > now - DAY_IN_MILLIS) timeFormat else dateFormat
+    return (if (isOffline) "Offline - " else "") +
+            getRelativeTimeSpanString(timestamp, now, MINUTE_IN_MILLIS, 0) +
+            ", ${format.format(timestamp)}"
+}
+
+private fun isFreshTimestamp(timestamp: Long, now: Long) = timestamp > now - HOURS.toMillis(1)
 
 fun RemoteViews.setBlackText(text: CharSequence) = setWidgetText(text, R.id.text_black, R.id.text_red)
 
@@ -111,12 +134,7 @@ fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleV
     setTextViewText(invisibleViewId, "")
 }
 
-private fun isFreshTimestamp(timestamp: Long) = timestamp > System.currentTimeMillis() - HOURS.toMillis(1)
-
 fun Context.file(name: String) = File(cacheDir, name)
-
-fun Context.ageText(timestamp: Long, isOffline: Boolean): CharSequence = (if (isOffline) "Offline - " else "") +
-        getRelativeDateTimeString(this, timestamp, MINUTE_IN_MILLIS, DAY_IN_MILLIS, 0)
 
 fun Activity.switchActionBarVisible():Boolean {
     with(actionBar!!) {
@@ -128,6 +146,9 @@ fun Activity.switchActionBarVisible():Boolean {
     }
     return true
 }
+
+val Context.dateFormat get() = AndroidDateFormat.getDateFormat(this)
+val Context.timeFormat get() = AndroidDateFormat.getTimeFormat(this)
 
 fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis())
 

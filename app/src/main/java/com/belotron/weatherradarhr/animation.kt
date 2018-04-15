@@ -3,7 +3,6 @@ package com.belotron.weatherradarhr
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.text.format.DateFormat.getTimeFormat
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
@@ -32,7 +31,8 @@ private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQue
 
 private val linear = LinearInterpolator()
 
-lateinit var thumbDateFormat: DateFormat
+lateinit var dateFormat: DateFormat
+lateinit var timeFormat: DateFormat
 
 class AnimationLooper(
         private val ds: DisplayState
@@ -49,7 +49,8 @@ class AnimationLooper(
     fun resume(context: Context? = null, newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
         info { "AnimationLooper.resume" }
         context?.also {
-            thumbDateFormat = getTimeFormat(it)
+            dateFormat = it.dateFormat
+            timeFormat = it.timeFormat
         }
         if (animators.none()) {
             return
@@ -188,7 +189,7 @@ class GifAnimator(
     private fun updateSeekBarThumb(frameIndex: Int, timestamp: Long) {
         imgBundle.seekBar?.apply {
             thumbProgress = toProgress(frameIndex)
-            thumbText = thumbDateFormat.format(timestamp)
+            thumbText = timeFormat.format(timestamp)
         }
     }
 
@@ -209,7 +210,7 @@ class GifAnimator(
 
     private fun updateAgeText() {
         imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(
-                timestamp(parsedGif.frameCount - 1), isOffline)
+                timestamp(parsedGif.frameCount - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
     }
 
     private fun timestamp(frameIndex: Int) = parsedGif.frames[frameIndex].timestamp
