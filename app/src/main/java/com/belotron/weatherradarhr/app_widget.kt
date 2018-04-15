@@ -24,6 +24,8 @@ import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import java.io.IOException
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -129,7 +131,7 @@ class RefreshImageService : JobService() {
             }
         } catch (e: Throwable) {
             error(e) {"Error in RefreshImageService"}
-            throw e
+            throw e.toParcelableException()
         }
     }
 
@@ -137,7 +139,6 @@ class RefreshImageService : JobService() {
         info { "RefreshImageService stop job" }
         return true
     }
-
 }
 
 class UpdateAgeService : JobService() {
@@ -156,7 +157,7 @@ class UpdateAgeService : JobService() {
             return false
         } catch (e: Throwable) {
             error(e) {"error in UpdateAgeService"}
-            throw e
+            throw e.toParcelableException()
         }
     }
 
@@ -320,4 +321,10 @@ private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long)
 private fun hourRelativeCurrentTime() : Long {
     val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
     return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
+}
+
+private fun Throwable.toParcelableException(): IllegalStateException {
+    val sw = StringWriter()
+    PrintWriter(sw).use { printStackTrace(it) }
+    return IllegalStateException("${javaClass.name}: ${message}\n$sw")
 }
