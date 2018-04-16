@@ -118,9 +118,9 @@ private fun fetchContentAndUpdateCache(
     }
 }
 
-fun invalidateCache(context: Context, url: String): Boolean {
+fun Context.invalidateCache(url: String): Boolean {
     error { "Invalidating cache for $url" }
-    return cacheFile(context, url).delete()
+    return cacheFile(this, url).delete()
 }
 
 private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
@@ -144,7 +144,7 @@ private fun ByteArray.parseGif(context: Context, url: String): ParsedGif {
         return GifParser.parse(this)
     } catch (e: GifDecodeException) {
         error { "GIF parsing error" }
-        if (!invalidateCache(context, url)) {
+        if (!context.invalidateCache(url)) {
             error { "Failed to invalidate a broken cached image for $url"}
         }
         throw e

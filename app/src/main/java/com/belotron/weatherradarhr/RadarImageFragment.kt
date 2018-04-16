@@ -36,6 +36,7 @@ import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
+import com.belotron.weatherradarhr.gifdecode.Allocator
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
@@ -483,7 +484,7 @@ class RadarImageFragment : Fragment() {
                         }
                     } catch (t: Throwable) {
                         error { "GIF parse error, deleting from cache" }
-                        invalidateCache(context, desc.url)
+                        context.invalidateCache(desc.url)
                         throw t
                     }
                     bundle.status = SHOWING
@@ -501,24 +502,30 @@ class RadarImageFragment : Fragment() {
 
 private suspend fun ParsedGif.assignTimestamps(context: Context, desc: ImgDescriptor) {
     val parsedGif = this
-    BitmapFreelists().also { freelists ->
-        (0 until frameCount).map { i ->
+    BitmapFreelists().also { allocator ->
+        (0 until frameCount).map { frameIndex ->
             async(CommonPool) {
-                try {
-                    GifDecoder(freelists, parsedGif).decodeFrame(i).let { decoder ->
-                        desc.ocrTimestamp(decoder.asPixels()).also {
-                            decoder.dispose()
-                        }
-                    }
-                } catch (e: GifDecodeException) {
-                    error { "Animated GIF decoding error" }
-                    invalidateCache(context, desc.url)
-                    throw e
-                }
+                context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
             }
         }.forEachIndexed { i, it ->
             frames[i].timestamp = it.await()
         }
+    }
+}
+
+private fun Context.decodeAndAssignTimestamp(
+        parsedGif: ParsedGif, frameIndex: Int, desc: ImgDescriptor, allocator: Allocator
+): Long {
+    return try {
+        GifDecoder(allocator, parsedGif).decodeFrame(frameIndex).let { decoder ->
+            desc.ocrTimestamp(decoder.asPixels()).also {
+                decoder.dispose()
+            }
+        }
+    } catch (e: GifDecodeException) {
+        error { "Animated GIF decoding error" }
+        invalidateCache(desc.url)
+        throw e
     }
 }
 

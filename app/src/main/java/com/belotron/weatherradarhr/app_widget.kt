@@ -218,7 +218,7 @@ private class WidgetContext (
             return wDesc.toTimestampedBitmap(parsedGif.toBitmap(), isOffline)
         } catch (e: GifDecodeException) {
             error { "GIF decoding error" }
-            invalidateCache(context, url)
+            context.invalidateCache(url)
             throw e
         }
     }
