@@ -33,6 +33,7 @@ import com.belotron.weatherradarhr.LogKt;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -55,25 +56,6 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.*;
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
 public class GifDecoder {
-
-    /** File read status: No errors. */
-    static final int STATUS_OK = 0;
-
-    /** File read status: Error decoding file (may be partially decoded). */
-    static final int STATUS_FORMAT_ERROR = 1;
-
-    /** Unable to fully decode the current frame. */
-    static final int STATUS_PARTIAL_DECODE = 2;
-
-    /**
-     * Android Lint annotation for status codes that can be used with a GIF decoder.
-     */
-    @Retention(RetentionPolicy.SOURCE)
-    @IntDef(value = {STATUS_OK, STATUS_FORMAT_ERROR, STATUS_PARTIAL_DECODE})
-    @interface GifDecodeStatus {
-    }
-
-    private static final String TAG = LogKt.LOGTAG;
 
     /** Dictionary size for decoding LZW compressed data. */
     private static final int DICT_SIZE = 4 * 1024;
@@ -141,7 +123,6 @@ public class GifDecoder {
     }
 
     public Bitmap toBitmap() {
-        // Set pixels for current image.
         Bitmap result = obtainBitmap();
         result.setPixels(outPixels, 0, parsedGif.width, 0, 0, parsedGif.width, parsedGif.height);
         return result;
@@ -156,32 +137,38 @@ public class GifDecoder {
     }
 
     public GifDecoder decodeFrame(int index) {
-        if (index >= parsedGif.getFrameCount()) {
-            throw new IllegalArgumentException("Asked to decode frame " + index + ", but frame count is " +
-                    parsedGif.getFrameCount());
-        }
-        GifFrame currentFrame = parsedGif.frames.get(index);
-        int previousIndex = index - 1;
-        GifFrame previousFrame = previousIndex >= 0 ? parsedGif.frames.get(previousIndex) : null;
+        try {
+            if (index >= parsedGif.getFrameCount()) {
+                throw new GifDecodeException("Asked to decode frame " + index + ", but frame count is " +
+                        parsedGif.getFrameCount());
+            }
+            GifFrame currentFrame = parsedGif.frames.get(index);
+            int previousIndex = index - 1;
+            GifFrame previousFrame = previousIndex >= 0 ? parsedGif.frames.get(previousIndex) : null;
 
-        // Set the appropriate color table.
-        act = currentFrame.lct != null ? currentFrame.lct : parsedGif.gct;
-        if (act == null) {
-            // No color table defined.
-            throw new RuntimeException("No valid color table found for frame #" + index);
-        }
+            // Set the appropriate color table.
+            act = currentFrame.lct != null ? currentFrame.lct : parsedGif.gct;
+            if (act == null) {
+                // No color table defined.
+                throw new GifDecodeException("No valid color table found for frame #" + index);
+            }
 
-        // Reset the transparent pixel in the color table
-        if (currentFrame.transparency) {
-            // Prepare local copy of color table ("pct = act"), see #1068
-            System.arraycopy(act, 0, pct, 0, act.length);
-            // Forget about act reference from shared header object, use copied version
-            act = pct;
-            // Set transparent color if specified.
-            act[currentFrame.transIndex] = COLOR_TRANSPARENT_BLACK;
+            // Reset the transparent pixel in the color table
+            if (currentFrame.transparency) {
+                // Prepare local copy of color table ("pct = act"), see #1068
+                System.arraycopy(act, 0, pct, 0, act.length);
+                // Forget about act reference from shared header object, use copied version
+                act = pct;
+                // Set transparent color if specified.
+                act[currentFrame.transIndex] = COLOR_TRANSPARENT_BLACK;
+            }
+            setPixels(currentFrame, previousFrame);
+            return this;
+        } catch (GifDecodeException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new GifDecodeException(t);
         }
-        setPixels(currentFrame, previousFrame);
-        return this;
     }
 
     /**
@@ -190,7 +177,7 @@ public class GifDecoder {
      */
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
-            throw new RuntimeException(
+            throw new GifDecodeException(
                     "The animated GIF contains a frame with the Restore To Previous frame disposal method" +
                             " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
         }

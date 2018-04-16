@@ -7,7 +7,6 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import static com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_FORMAT_ERROR;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
@@ -133,24 +132,23 @@ public class GifParser {
     private final ParsedGif parsedGif = new ParsedGif();
     private GifFrame currentFrame;
     private int blockSize = 0;
-    @GifDecoder.GifDecodeStatus
-    private int status;
 
-    private GifParser(@NonNull ByteBuffer data) {
-        rawData = data.asReadOnlyBuffer();
+    private GifParser(@NonNull byte[] data) {
+        rawData = ByteBuffer.wrap(data).asReadOnlyBuffer();
         rawData.position(0);
         rawData.order(ByteOrder.LITTLE_ENDIAN);
     }
 
-    public GifParser(@NonNull byte[] data) {
-        this(ByteBuffer.wrap(data));
-    }
-
     @NonNull
-    public ParsedGif parse() {
+    private ParsedGif parse() {
         readHeader();
         readContents();
         return parsedGif;
+    }
+
+    @NonNull
+    public static ParsedGif parse(byte[] data) {
+        return new GifParser(data).parse();
     }
 
     /**
@@ -439,13 +437,11 @@ public class GifParser {
      * Reads a single byte from the input stream.
      */
     private int read() {
-        int currByte = 0;
         try {
-            currByte = rawData.get() & MASK_INT_LOWEST_BYTE;
-        } catch (Exception e) {
-            status = STATUS_FORMAT_ERROR;
+            return rawData.get() & MASK_INT_LOWEST_BYTE;
+        } catch (BufferUnderflowException e) {
+            throw new GifDecodeException("GIF parse error", e);
         }
-        return currByte;
     }
 
     /**

@@ -119,7 +119,7 @@ private fun stripeEqual(img: Pixels, imgX: Int, imgY: Int, rect: Pixels, rectX: 
 private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
 
 private fun Context.loadDigit(path: String, digit: Int) =
-        assets.open("$path/$digit.gif").use { it.readBytes() }.toPixels()
+        assets.open("$path/$digit.gif").use { it.readBytes() }.parseGif().toPixels()
 
 class DateTime(
         copyFrom: DateTime? = null,

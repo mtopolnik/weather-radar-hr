@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.app.Fragment
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
@@ -36,9 +37,9 @@ import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
-import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdView
@@ -455,19 +456,19 @@ class RadarImageFragment : Fragment() {
             val bundle = ds.imgBundles[desc.index]
             start {
                 try {
-                    val (lastModified, imgBytes) = try {
+                    val (lastModified, parsedGif) = try {
                         fetchUrl(context, desc.url, fetchPolicy)
                     } catch (e: ImageFetchException) {
                         Pair(0L, e.cached)
                     }
-                    if (imgBytes == null) {
+                    if (parsedGif == null) {
                         bundle.status = BROKEN
                         return@start
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     try {
-                        val parsedGif = GifParser(imgBytes).parse().apply {
-                            assignTimestamps(desc.ocrTimestamp)
+                        parsedGif.apply {
+                            assignTimestamps(context, desc)
                             sortAndDeduplicateFrames()
                             with (frames) {
                                 while (size > desc.framesToKeep) {
@@ -498,15 +499,21 @@ class RadarImageFragment : Fragment() {
     private fun switchActionBarVisible() = activity.switchActionBarVisible()
 }
 
-private suspend fun ParsedGif.assignTimestamps(ocrTimestamp: (Pixels) -> Long) {
+private suspend fun ParsedGif.assignTimestamps(context: Context, desc: ImgDescriptor) {
     val parsedGif = this
     BitmapFreelists().also { freelists ->
         (0 until frameCount).map { i ->
             async(CommonPool) {
-                GifDecoder(freelists, parsedGif).decodeFrame(i).let { decoder ->
-                    ocrTimestamp(decoder.asPixels()).also {
-                        decoder.dispose()
+                try {
+                    GifDecoder(freelists, parsedGif).decodeFrame(i).let { decoder ->
+                        desc.ocrTimestamp(decoder.asPixels()).also {
+                            decoder.dispose()
+                        }
                     }
+                } catch (e: GifDecodeException) {
+                    error { "Animated GIF decoding error" }
+                    invalidateCache(context, desc.url)
+                    throw e
                 }
             }
         }.forEachIndexed { i, it ->

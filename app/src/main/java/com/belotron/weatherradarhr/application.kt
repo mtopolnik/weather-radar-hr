@@ -23,6 +23,7 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifParser
+import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
@@ -159,13 +160,14 @@ fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
-fun ByteArray.toBitmap(): Bitmap = gifDecode().toBitmap()
+fun ByteArray.parseGif() = GifParser.parse(this)
 
-fun ByteArray.toPixels(): Pixels = gifDecode().toPixels()
+private fun ParsedGif.decodeFrame0(): GifDecoder = GifDecoder(BitmapFreelists(), this).decodeFrame(0)
 
-private fun ByteArray.gifDecode(): GifDecoder = GifParser(this).parse().let {
-    GifDecoder(BitmapFreelists(), it).decodeFrame(0)
-}
+fun ParsedGif.toBitmap(): Bitmap = decodeFrame0().toBitmap()
+
+fun ParsedGif.toPixels(): Pixels = decodeFrame0().toPixels()
+
 
 fun Bitmap.asPixels() = BitmapPixels(this)
 

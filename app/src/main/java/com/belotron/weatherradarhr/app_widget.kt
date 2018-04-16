@@ -23,6 +23,8 @@ import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
+import com.belotron.weatherradarhr.gifdecode.GifDecodeException
+import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import java.io.IOException
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -45,8 +47,7 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
                 LradarWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
-                { bytes, isOffline ->
-                    val bitmap = bytes.toBitmap()
+                { bitmap, isOffline ->
                     TimestampedBitmap(
                             ocrLradarTimestamp(bitmap),
                             isOffline,
@@ -55,8 +56,7 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("KRadar", "http://vrijeme.hr/kradar.gif", 15,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
-                { bytes, isOffline ->
-                    val bitmap = bytes.toBitmap()
+                { bitmap, isOffline ->
                     TimestampedBitmap(
                             ocrKradarTimestamp(bitmap),
                             isOffline,
@@ -69,7 +69,7 @@ private data class WidgetDescriptor(
         val updatePeriodMinutes: Long,
         val providerClass: Class<out AppWidgetProvider>,
         val previewResourceId: Int,
-        val timestampedBitmapFrom: (ByteArray, Boolean) -> TimestampedBitmap
+        val toTimestampedBitmap: (Bitmap, Boolean) -> TimestampedBitmap
 ) {
     fun imgFilename() = url.substringAfterLast('/')
     fun timestampFilename() = imgFilename() + ".timestamp"
@@ -130,7 +130,7 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            error(e) {"Error in RefreshImageService"}
+            error(e) { "Error in RefreshImageService" }
             throw e.toParcelableException()
         }
     }
@@ -156,7 +156,7 @@ class UpdateAgeService : JobService() {
             }
             return false
         } catch (e: Throwable) {
-            error(e) {"error in UpdateAgeService"}
+            error(e) { "error in UpdateAgeService" }
             throw e.toParcelableException()
         }
     }
@@ -190,26 +190,36 @@ private class WidgetContext (
 
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
-            val (lastModified, imgBytes) = fetchUrl(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
-            if (imgBytes == null) {
-                // This may happen only with `onlyIfNew == true`
-                return null
+            try {
+                val (lastModified, parsedGif) = fetchUrl(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
+                if (parsedGif == null) {
+                    // This may happen only with `onlyIfNew == true`
+                    return null
+                }
+                val tsBitmap = wDesc.timestampedBitmapFrom(parsedGif, false)
+                writeImgAndTimestamp(tsBitmap)
+                updateRemoteViews(tsBitmap)
+                return lastModified
+            } catch (e: ImageFetchException) {
+                if (e.cached != null) {
+                    updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
+                } else if (!onlyIfNew) {
+                    warn { "Failed to fetch ${wDesc.imgFilename()}" }
+                }
             }
-            val tsBitmap = wDesc.timestampedBitmapFrom(imgBytes, false)
-            writeImgAndTimestamp(tsBitmap)
-            updateRemoteViews(tsBitmap)
-            return lastModified
-        } catch (e: ImageFetchException) {
-            if (e.cached != null) {
-                updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
-            } else if (!onlyIfNew) {
-                warn { "Failed to fetch ${wDesc.imgFilename()}, using preview" }
-                updateRemoteViews(null)
-            }
-            return null
         } catch (t: Throwable) {
-            error(t) { "Widget refresh failure" }
-            return null
+            error(t) { "Failed to refresh widget ${wDesc.imgFilename()}" }
+        }
+        return null
+    }
+
+    private fun WidgetDescriptor.timestampedBitmapFrom(parsedGif: ParsedGif, isOffline: Boolean): TimestampedBitmap {
+        try {
+            return wDesc.toTimestampedBitmap(parsedGif.toBitmap(), isOffline)
+        } catch (e: GifDecodeException) {
+            error { "GIF decoding error" }
+            invalidateCache(context, url)
+            throw e
         }
     }
 
