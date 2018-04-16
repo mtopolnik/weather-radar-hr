@@ -29,7 +29,6 @@ import android.support.annotation.ColorInt;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.util.Log;
 import com.belotron.weatherradarhr.LogKt;
 
 import java.lang.annotation.Retention;
@@ -63,17 +62,14 @@ public class GifDecoder {
     /** File read status: Error decoding file (may be partially decoded). */
     static final int STATUS_FORMAT_ERROR = 1;
 
-    /** File read status: Unable to open source. */
-    static final int STATUS_OPEN_ERROR = 2;
-
     /** Unable to fully decode the current frame. */
-    static final int STATUS_PARTIAL_DECODE = 3;
+    static final int STATUS_PARTIAL_DECODE = 2;
 
     /**
      * Android Lint annotation for status codes that can be used with a GIF decoder.
      */
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef(value = {STATUS_OK, STATUS_FORMAT_ERROR, STATUS_OPEN_ERROR, STATUS_PARTIAL_DECODE})
+    @IntDef(value = {STATUS_OK, STATUS_FORMAT_ERROR, STATUS_PARTIAL_DECODE})
     @interface GifDecodeStatus {
     }
 
@@ -112,9 +108,6 @@ public class GifDecoder {
 
     private ParsedGif parsedGif;
 
-    @GifDecodeStatus
-    private int status;
-
     @Nullable
     private Boolean isFirstFrameTransparent;
 
@@ -124,13 +117,8 @@ public class GifDecoder {
     public GifDecoder(@NonNull Allocator allocator, @NonNull ParsedGif parsedGif) {
         this.allocator = allocator;
         this.parsedGif = parsedGif;
-        status = STATUS_OK;
         pixelCodes = allocator.obtainByteArray(parsedGif.width * parsedGif.height);
         outPixels = allocator.obtainIntArray(parsedGif.width * parsedGif.height);
-    }
-
-    public int getStatus() {
-        return status;
     }
 
     public int getFrameCount() {
@@ -149,7 +137,6 @@ public class GifDecoder {
             throw new IllegalArgumentException("Unsupported format: " + config
                     + ", must be one of " + Bitmap.Config.ARGB_8888 + " or " + Bitmap.Config.RGB_565);
         }
-
         bitmapConfig = config;
     }
 
@@ -169,17 +156,10 @@ public class GifDecoder {
     }
 
     public GifDecoder decodeFrame(int index) {
-        if (parsedGif.getFrameCount() == 0 || index < 0) {
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "Unable to decode frame, frameCount=" + parsedGif.getFrameCount() + ", index=" + index);
-            }
-            status = STATUS_FORMAT_ERROR;
+        if (index >= parsedGif.getFrameCount()) {
+            throw new IllegalArgumentException("Asked to decode frame " + index + ", but frame count is " +
+                    parsedGif.getFrameCount());
         }
-        if (status == STATUS_FORMAT_ERROR || status == STATUS_OPEN_ERROR) {
-            throw new RuntimeException("Unable to decode frame, status=" + status);
-        }
-        status = STATUS_OK;
-
         GifFrame currentFrame = parsedGif.frames.get(index);
         int previousIndex = index - 1;
         GifFrame previousFrame = previousIndex >= 0 ? parsedGif.frames.get(previousIndex) : null;
@@ -188,7 +168,6 @@ public class GifDecoder {
         act = currentFrame.lct != null ? currentFrame.lct : parsedGif.gct;
         if (act == null) {
             // No color table defined.
-            status = STATUS_FORMAT_ERROR;
             throw new RuntimeException("No valid color table found for frame #" + index);
         }
 
@@ -407,7 +386,7 @@ public class GifDecoder {
                 if (count == 0) {
                     count = readBlock(frameData);
                     if (count <= 0) {
-                        status = STATUS_PARTIAL_DECODE;
+                        // End of data before emitting all the pixels
                         break;
                     }
                     bi = 0;

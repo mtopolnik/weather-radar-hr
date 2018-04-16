@@ -2,14 +2,11 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.util.Log;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 
-import static com.belotron.weatherradarhr.LogKt.LOGTAG;
 import static com.belotron.weatherradarhr.gifdecode.GifDecoder.STATUS_FORMAT_ERROR;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
@@ -130,13 +127,16 @@ public class GifParser {
     // Raw data read working array.
     private final byte[] block = new byte[MAX_BLOCK_SIZE];
 
-    private ByteBuffer rawData;
-    private ParsedGif parsedGif;
+    @NonNull
+    private final ByteBuffer rawData;
+    @NonNull
+    private final ParsedGif parsedGif = new ParsedGif();
     private GifFrame currentFrame;
     private int blockSize = 0;
+    @GifDecoder.GifDecodeStatus
+    private int status;
 
     private GifParser(@NonNull ByteBuffer data) {
-        reset();
         rawData = data.asReadOnlyBuffer();
         rawData.position(0);
         rawData.order(ByteOrder.LITTLE_ENDIAN);
@@ -146,26 +146,88 @@ public class GifParser {
         this(ByteBuffer.wrap(data));
     }
 
-    private void reset() {
-        rawData = null;
-        Arrays.fill(block, (byte) 0);
-        parsedGif = new ParsedGif();
-        blockSize = 0;
-    }
-
     @NonNull
     public ParsedGif parse() {
-        if (rawData == null) {
-            throw new IllegalStateException("You must call setData() before parseHeader()");
-        }
-        if (err()) {
-            return parsedGif;
-        }
         readHeader();
-        if (!err()) {
-            readContents();
-        }
+        readContents();
         return parsedGif;
+    }
+
+    /**
+     * Reads GIF file header information.
+     */
+    private void readHeader() {
+        StringBuilder id = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            id.append((char) read());
+        }
+        if (!id.toString().startsWith("GIF")) {
+            throw new GifDecodeException("Image data doesn't start with 'GIF'");
+        }
+        readLSD();
+        if (parsedGif.gctFlag) {
+            int[] gct = readColorTable(parsedGif.gctSize);
+            if (gct == null) {
+                return;
+            }
+            parsedGif.gct = gct;
+            parsedGif.bgColor = parsedGif.gct[parsedGif.bgIndex];
+        }
+    }
+
+    /**
+     * Reads Logical Screen Descriptor.
+     */
+    private void readLSD() {
+        // Logical screen size.
+        parsedGif.width = readShort();
+        parsedGif.height = readShort();
+        /*
+         * Logical Screen Descriptor packed field:
+         *      7 6 5 4 3 2 1 0
+         *     +---------------+
+         *  4  | |     | |     |
+         *
+         * Global Color Table Flag     1 Bit
+         * Color Resolution            3 Bits
+         * Sort Flag                   1 Bit
+         * Size of Global Color Table  3 Bits
+         */
+        int packed = read();
+        parsedGif.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
+        parsedGif.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
+        // Background color index.
+        parsedGif.bgIndex = read();
+        // Pixel aspect ratio
+        parsedGif.pixelAspect = read();
+    }
+
+    /**
+     * Reads color table as 256 RGB integer values.
+     *
+     * @param nColors int number of colors to read.
+     * @return int array containing 256 colors (packed ARGB with full alpha).
+     */
+    @Nullable
+    private int[] readColorTable(int nColors) {
+        try {
+            int nBytes = 3 * nColors;
+            byte[] c = new byte[nBytes];
+            rawData.get(c);
+            // Max size to avoid bounds checks.
+            int[] tab = new int[MAX_BLOCK_SIZE];
+            int i = 0;
+            int j = 0;
+            while (i < nColors) {
+                int r = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
+                int g = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
+                int b = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
+                tab[i++] = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
+            return tab;
+        } catch (BufferUnderflowException e) {
+            throw new GifDecodeException("Format error while redaing color table", e);
+        }
     }
 
     /**
@@ -173,8 +235,7 @@ public class GifParser {
      */
     private void readContents() {
         // Read GIF file content blocks.
-        boolean done = false;
-        while (!done && !err()) {
+        readLoop: while (true) {
             int code = read();
             switch (code) {
                 case IMAGE_SEPARATOR:
@@ -221,12 +282,11 @@ public class GifParser {
                     break;
                 case TRAILER:
                     // This block is a single-field block indicating the end of the GIF Data Stream.
-                    done = true;
-                    break;
+                    break readLoop;
                 // Bad byte, but keep going and see what happens
                 case 0x00:
                 default:
-                    parsedGif.status = STATUS_FORMAT_ERROR;
+                    throw new GifDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
             }
         }
     }
@@ -308,10 +368,6 @@ public class GifParser {
         currentFrame.frameData = rawData.slice();
         rawData.position(frameEndOffset);
         rawData.limit(rawData.capacity());
-        if (err()) {
-            return;
-        }
-
         // Add image to frame.
         parsedGif.frames.add(currentFrame);
     }
@@ -328,91 +384,9 @@ public class GifParser {
                 int b2 = ((int) block[2]) & MASK_INT_LOWEST_BYTE;
                 parsedGif.loopCount = (b2 << 8) | b1;
             }
-        } while ((blockSize > 0) && !err());
+        } while (blockSize > 0);
     }
 
-
-    /**
-     * Reads GIF file header information.
-     */
-    private void readHeader() {
-        StringBuilder id = new StringBuilder();
-        for (int i = 0; i < 6; i++) {
-            id.append((char) read());
-        }
-        if (!id.toString().startsWith("GIF")) {
-            parsedGif.status = STATUS_FORMAT_ERROR;
-            return;
-        }
-        readLSD();
-        if (parsedGif.gctFlag && !err()) {
-            int[] gct = readColorTable(parsedGif.gctSize);
-            if (gct == null) {
-                return;
-            }
-            parsedGif.gct = gct;
-            parsedGif.bgColor = parsedGif.gct[parsedGif.bgIndex];
-        }
-    }
-
-    /**
-     * Reads Logical Screen Descriptor.
-     */
-    private void readLSD() {
-        // Logical screen size.
-        parsedGif.width = readShort();
-        parsedGif.height = readShort();
-        /*
-         * Logical Screen Descriptor packed field:
-         *      7 6 5 4 3 2 1 0
-         *     +---------------+
-         *  4  | |     | |     |
-         *
-         * Global Color Table Flag     1 Bit
-         * Color Resolution            3 Bits
-         * Sort Flag                   1 Bit
-         * Size of Global Color Table  3 Bits
-         */
-        int packed = read();
-        parsedGif.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
-        parsedGif.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
-        // Background color index.
-        parsedGif.bgIndex = read();
-        // Pixel aspect ratio
-        parsedGif.pixelAspect = read();
-    }
-
-    /**
-     * Reads color table as 256 RGB integer values.
-     *
-     * @param nColors int number of colors to read.
-     * @return int array containing 256 colors (packed ARGB with full alpha).
-     */
-    @Nullable
-    private int[] readColorTable(int nColors) {
-        try {
-            int nBytes = 3 * nColors;
-            byte[] c = new byte[nBytes];
-            rawData.get(c);
-            // Max size to avoid bounds checks.
-            int[] tab = new int[MAX_BLOCK_SIZE];
-            int i = 0;
-            int j = 0;
-            while (i < nColors) {
-                int r = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
-                int g = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
-                int b = ((int) c[j++]) & MASK_INT_LOWEST_BYTE;
-                tab[i++] = 0xFF000000 | (r << 16) | (g << 8) | b;
-            }
-            return tab;
-        } catch (BufferUnderflowException e) {
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "Format Error Reading Color Table", e);
-            }
-            parsedGif.status = STATUS_FORMAT_ERROR;
-            return null;
-        }
-    }
 
     /**
      * Skips LZW image data for a single frame to advance buffer.
@@ -455,11 +429,8 @@ public class GifParser {
                     n += count;
                 }
             } catch (Exception e) {
-                if (Log.isLoggable(TAG, Log.DEBUG)) {
-                    Log.d(TAG,
-                            "Error Reading Block n: " + n + " count: " + count + " blockSize: " + blockSize, e);
-                }
-                parsedGif.status = STATUS_FORMAT_ERROR;
+                throw new GifDecodeException(
+                        "Error reading block, n = " + n + " count = " + count + " blockSize = " + blockSize, e);
             }
         }
     }
@@ -472,7 +443,7 @@ public class GifParser {
         try {
             currByte = rawData.get() & MASK_INT_LOWEST_BYTE;
         } catch (Exception e) {
-            parsedGif.status = STATUS_FORMAT_ERROR;
+            status = STATUS_FORMAT_ERROR;
         }
         return currByte;
     }
@@ -483,9 +454,5 @@ public class GifParser {
     private int readShort() {
         // Read 16-bit value.
         return rawData.getShort();
-    }
-
-    private boolean err() {
-        return parsedGif.status != GifDecoder.STATUS_OK;
     }
 }

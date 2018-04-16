@@ -29,9 +29,6 @@ public class ParsedGif {
     @ColorInt
     int[] gct;
 
-    @GifDecoder.GifDecodeStatus
-    int status = GifDecoder.STATUS_OK;
-
     /** Logical screen size: Full image width. */
     int width;
 
