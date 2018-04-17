@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
+import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
@@ -61,7 +62,7 @@ suspend fun fetchUrl(
                 Pair(0L, null)
             else -> { // responseCode == 304, fetch from cache
                 info { "Not Modified since $ifModifiedSince: $url" }
-                loadCachedResult(context, url)!!
+                loadCachedResult(context, url) ?: fetchUrl(context, url, UP_TO_DATE)
             }
         }
     } catch (t: Throwable) {
@@ -98,7 +99,7 @@ private fun handleSuccessResponse(conn: HttpURLConnection, context: Context): Pa
                 }
                 else { // cachedLastModified >= lastModified, can happen with concurrent requests
                     conn.inputStream.close()
-                    cachedIn.use { it.readBytes() }.parseGif(context, url)
+                    cachedIn.use { it.readBytes() }.parseOrInvalidateGif(context, url)
                 }
             }
             Pair(parseHourRelativeModTime(lastModifiedStr), parsedGif)
@@ -118,9 +119,16 @@ private fun fetchContentAndUpdateCache(
     }
 }
 
-fun Context.invalidateCache(url: String): Boolean {
+fun Context.invalidateCache(url: String) {
     error { "Invalidating cache for $url" }
-    return cacheFile(this, url).delete()
+    val cacheFile = cacheFile(this, url)
+    if (!cacheFile.delete()) {
+        error { "Failed to invalidate a broken cached image for $url"}
+        // At least write a stale last-modified date to prevent retry loops
+        cacheFile.dataOut().use { cachedOut ->
+            cachedOut.writeUTF(DEFAULT_LAST_MODIFIED)
+        }
+    }
 }
 
 private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
@@ -136,17 +144,15 @@ private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: 
 
 private fun loadCachedResult(context: Context, url: String): Pair<Long, ParsedGif>? = runOrNull {
     val (lastModifiedStr, imgBytes) = cachedDataIn(context, url).use { Pair(it.readUTF(), it.readBytes()) }
-    return Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes.parseGif(context, url))
+    return Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes.parseOrInvalidateGif(context, url))
 }
 
-private fun ByteArray.parseGif(context: Context, url: String): ParsedGif {
+private fun ByteArray.parseOrInvalidateGif(context: Context, url: String): ParsedGif {
     try {
-        return GifParser.parse(this)
+        return parseGif()
     } catch (e: GifDecodeException) {
         error { "GIF parsing error" }
-        if (!context.invalidateCache(url)) {
-            error { "Failed to invalidate a broken cached image for $url"}
-        }
+        context.invalidateCache(url)
         throw e
     }
 }
@@ -157,7 +163,7 @@ private fun loadCachedLastModified(context: Context, url: String) = runOrNull {
 
 private fun loadCachedImage(context: Context, url: String) = runOrNull {
     cachedDataIn(context, url).use { it.readUTF(); it.readBytes() }
-}?.parseGif(context, url)
+}?.parseOrInvalidateGif(context, url)
 
 private fun logErrorResponse(conn: HttpURLConnection, url: String) {
     val responseBody = conn.inputStream.use { it.readBytes() }
