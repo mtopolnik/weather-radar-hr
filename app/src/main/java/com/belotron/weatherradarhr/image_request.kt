@@ -20,6 +20,8 @@ import java.util.logging.Logger as JulLogger
 private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
+private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
+
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
@@ -80,33 +82,34 @@ suspend fun fetchUrl(
 }
 
 private fun handleSuccessResponse(conn: HttpURLConnection, context: Context): Pair<Long, ParsedGif> {
-    val responseBody = lazy { conn.inputStream.use { it.readBytes() } }
+    val contentLength = conn.getHeaderFieldInt("Content-Length", ESTIMATED_CONTENT_LENGTH)
+    val responseBody = lazy { conn.inputStream.use { it.readBytes(contentLength) } }
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
     val lastModified = lastModifiedStr.parseLastModified()
     val url = conn.url.toExternalForm()
-    info { "Fetching content, Last-Modified $lastModifiedStr: $url" }
-    return synchronized(threadPool) {
-        try {
-            val cachedIn = runOrNull { cachedDataIn(context, url) }
-            val parsedGif = if (cachedIn == null) {
+    info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
+    return try {
+        val cachedIn = runOrNull { cachedDataIn(context, url) }
+        val parsedGif = if (cachedIn == null) {
+            fetchContentAndUpdateCache(responseBody, context, url, lastModifiedStr)
+        }
+        else {
+            // These checks are repeated in updateCache(). While the response body is being
+            // loaded, another thread could write a newer cached image.
+            val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
+            if (cachedLastModified == null || cachedLastModified < lastModified) {
+                cachedIn.close()
                 fetchContentAndUpdateCache(responseBody, context, url, lastModifiedStr)
             }
-            else {
-                val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
-                if (cachedLastModified == null || cachedLastModified < lastModified) {
-                    cachedIn.close()
-                    fetchContentAndUpdateCache(responseBody, context, url, lastModifiedStr)
-                }
-                else { // cachedLastModified >= lastModified, can happen with concurrent requests
-                    conn.inputStream.close()
-                    cachedIn.use { it.readBytes() }.parseOrInvalidateGif(context, url)
-                }
+            else { // cachedLastModified >= lastModified, can happen with concurrent requests
+                conn.inputStream.close()
+                cachedIn.use { it.readBytes() }.parseOrInvalidateGif(context, url)
             }
-            Pair(parseHourRelativeModTime(lastModifiedStr), parsedGif)
-        } catch (t: Throwable) {
-            error(t) { "Failed to handle a successful image response for $url" }
-            throw t
         }
+        Pair(parseHourRelativeModTime(lastModifiedStr), parsedGif)
+    } catch (t: Throwable) {
+        error(t) { "Failed to handle a successful image response for $url" }
+        throw t
     }
 }
 
@@ -120,25 +123,32 @@ private fun fetchContentAndUpdateCache(
 }
 
 fun Context.invalidateCache(url: String) {
-    error { "Invalidating cache for $url" }
-    val cacheFile = cacheFile(this, url)
-    if (!cacheFile.delete()) {
-        error { "Failed to invalidate a broken cached image for $url"}
-        // At least write a stale last-modified date to prevent retry loops
-        cacheFile.dataOut().use { cachedOut ->
-            cachedOut.writeUTF(DEFAULT_LAST_MODIFIED)
+    synchronized (threadPool) {
+        error { "Invalidating cache for $url" }
+        val cacheFile = cacheFile(this, url)
+        if (!cacheFile.delete()) {
+            error { "Failed to delete a broken cached image for $url"}
+            // At least write a stale last-modified date to prevent retry loops
+            cacheFile.dataOut().use { cachedOut ->
+                cachedOut.writeUTF(DEFAULT_LAST_MODIFIED)
+            }
         }
     }
 }
 
 private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
-    try {
-        cacheFile.dataOut().use { cachedOut ->
-            cachedOut.writeUTF(lastModifiedStr)
-            cachedOut.write(responseBody)
+    synchronized (threadPool) {
+        try {
+            val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
+            if (cachedLastModified == null || cachedLastModified < lastModifiedStr.parseLastModified()) {
+                cacheFile.dataOut().use { cachedOut ->
+                    cachedOut.writeUTF(lastModifiedStr)
+                    cachedOut.write(responseBody)
+                }
+            }
+        } catch (e: IOException) {
+            error(e) {"Failed to write cached image to $cacheFile"}
         }
-    } catch (e: IOException) {
-        error(e) {"Failed to write cached image to $cacheFile"}
     }
 }
 
