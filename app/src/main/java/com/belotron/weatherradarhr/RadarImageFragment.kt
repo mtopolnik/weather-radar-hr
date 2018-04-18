@@ -467,25 +467,19 @@ class RadarImageFragment : Fragment() {
                         return@start
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
-                    try {
-                        parsedGif.apply {
-                            assignTimestamps(context, desc)
-                            sortAndDeduplicateFrames()
-                            with (frames) {
-                                while (size > desc.framesToKeep) {
-                                    removeAt(0)
-                                }
+                    parsedGif.apply {
+                        assignTimestamps(context, desc)
+                        sortAndDeduplicateFrames()
+                        with (frames) {
+                            while (size > desc.framesToKeep) {
+                                removeAt(0)
                             }
                         }
-                        bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
-                        with (animationLooper) {
-                            receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
-                            resume(context, rateMinsPerSec, freezeTimeMillis)
-                        }
-                    } catch (t: Throwable) {
-                        error { "GIF parse error, deleting from cache" }
-                        context.invalidateCache(desc.url)
-                        throw t
+                    }
+                    bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
+                    with (animationLooper) {
+                        receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
+                        resume(context, rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
                     context.actionBar.hide()
