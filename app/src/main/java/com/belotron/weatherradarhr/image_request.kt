@@ -83,9 +83,9 @@ suspend fun fetchUrl(
 
 private fun handleSuccessResponse(conn: HttpURLConnection, context: Context): Pair<Long, ParsedGif> {
     val contentLength = conn.getHeaderFieldInt("Content-Length", ESTIMATED_CONTENT_LENGTH)
-    val responseBody = lazy { conn.inputStream.use { it.readBytes(contentLength) } }
     val lastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
-    val lastModified = lastModifiedStr.parseLastModified()
+    val fetchedLastModified = lastModifiedStr.parseLastModified()
+    val responseBody = lazy { conn.inputStream.use { it.readBytes(contentLength) } }
     val url = conn.url.toExternalForm()
     info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
     return try {
@@ -97,11 +97,11 @@ private fun handleSuccessResponse(conn: HttpURLConnection, context: Context): Pa
             // These checks are repeated in updateCache(). While the response body is being
             // loaded, another thread could write a newer cached image.
             val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
-            if (cachedLastModified == null || cachedLastModified < lastModified) {
+            if (cachedLastModified == null || cachedLastModified < fetchedLastModified) {
                 cachedIn.close()
                 fetchContentAndUpdateCache(responseBody, context, url, lastModifiedStr)
             }
-            else { // cachedLastModified >= lastModified, can happen with concurrent requests
+            else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
                 conn.inputStream.close()
                 cachedIn.use { it.readBytes() }.parseOrInvalidateGif(context, url)
             }
@@ -140,11 +140,13 @@ private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: 
     synchronized (threadPool) {
         try {
             val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
-            if (cachedLastModified == null || cachedLastModified < lastModifiedStr.parseLastModified()) {
-                cacheFile.dataOut().use { cachedOut ->
-                    cachedOut.writeUTF(lastModifiedStr)
-                    cachedOut.write(responseBody)
-                }
+            val fetchedLastModified = lastModifiedStr.parseLastModified()
+            cachedLastModified?.takeIf { it >= fetchedLastModified }?.also {
+                return
+            }
+            cacheFile.dataOut().use { cachedOut ->
+                cachedOut.writeUTF(lastModifiedStr)
+                cachedOut.write(responseBody)
             }
         } catch (e: IOException) {
             error(e) {"Failed to write cached image to $cacheFile"}
