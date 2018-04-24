@@ -45,10 +45,11 @@
         image is no longer up-to-date.
         \n
         \nThe app is very conservative with internet traffic usage and never has
-        to fetch the same image twice, but you always get the latest images thanks
-        to the If-Modified-Since HTTP headers. Owing to this, sometimes an image
-        refresh takes just fraction of a second, but you can rest assured that we
-        contacted the server and it replied that you already have the latest image.
-        If we can\'t contact a server, the title above its image will say “Offline”.
+        to fetch the same image twice, but you always get the latest images
+        thanks to the If-Modified-Since HTTP headers. Owing to this, sometimes
+        an image refresh takes just a fraction of a second, but you can rest
+        assured that we contacted the server and it replied that you already
+        have the latest image. If we can\'t contact a server, the title above
+        its image will say “Offline”.
     </string>
 </resources>
