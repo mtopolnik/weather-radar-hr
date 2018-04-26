@@ -140,15 +140,15 @@ public class GifParser {
     }
 
     @NonNull
-    private ParsedGif parse() {
-        readHeader();
-        readContents();
-        return parsedGif;
-    }
-
-    @NonNull
     public static ParsedGif parse(byte[] data) {
-        return new GifParser(data).parse();
+        GifParser parser = new GifParser(data);
+        parser.readHeader();
+        parser.readContents();
+        ParsedGif parsedGif = parser.parsedGif;
+        if (parsedGif.getFrameCount() == 0) {
+            throw new GifDecodeException("The GIF contains zero images");
+        }
+        return parsedGif;
     }
 
     /**
