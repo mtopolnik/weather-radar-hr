@@ -252,7 +252,12 @@ class RadarImageFragment : Fragment() {
                 if (ds.isInFullScreen || scaleFactor <= 1) {
                     return true
                 }
-                scrollView.offsetDescendantRectToMyCoords(ds.imgBundles[1].textView ?: return true, rect.reset())
+                val textView = ds.imgBundles[1].textView ?: return true
+                if (!textView.isDescendantOf(scrollView)) {
+                    // can happen if the event is processed late, after textView was already recreated
+                    return true
+                }
+                scrollView.offsetDescendantRectToMyCoords(textView, rect.reset())
                 val focusY = scrollView.scrollY + focusY
                 val imgIndex = if (focusY <= rect.top) 0 else 1
                 val imgView = ds.imgBundles[imgIndex].imgView ?: return true
@@ -536,4 +541,18 @@ private fun ParsedGif.sortAndDeduplicateFrames() {
 private fun Rect.reset(): Rect {
     set(0, 0, 0, 0)
     return this
+}
+
+private fun View.isDescendantOf(that: View): Boolean {
+    if (this === that) {
+        return true
+    }
+    var currParent = parent
+    while (currParent != null) {
+        if (currParent === that) {
+            return true
+        }
+        currParent = currParent.parent
+    }
+    return false
 }
