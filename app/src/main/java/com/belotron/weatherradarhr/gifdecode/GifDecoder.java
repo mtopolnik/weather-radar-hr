@@ -137,11 +137,14 @@ public class GifDecoder {
     }
 
     public GifDecoder decodeFrame(int index) {
+        if (index < 0) {
+            throw new GifDecodeException("Asked to decode frame " + index);
+        }
+        if (index >= parsedGif.getFrameCount()) {
+            throw new GifDecodeException("Asked to decode frame " + index + ", but frame count is " +
+                    parsedGif.getFrameCount());
+        }
         try {
-            if (index >= parsedGif.getFrameCount()) {
-                throw new GifDecodeException("Asked to decode frame " + index + ", but frame count is " +
-                        parsedGif.getFrameCount());
-            }
             GifFrame currentFrame = parsedGif.frames.get(index);
             int previousIndex = index - 1;
             GifFrame previousFrame = previousIndex >= 0 ? parsedGif.frames.get(previousIndex) : null;
