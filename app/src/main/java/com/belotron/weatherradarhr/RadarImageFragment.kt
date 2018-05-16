@@ -179,6 +179,8 @@ class RadarImageFragment : Fragment() {
     private var vGroupFullScreen: ViewGroup? = null
     private var lastReloadedTimestamp = 0L
     private var wasFastResume = false
+    // Serves to avoid IllegalStateException in DialogFragment.show()
+    private var possibleStateLoss = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
@@ -305,6 +307,7 @@ class RadarImageFragment : Fragment() {
         val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         info { "RadarImageFragment.onResume" }
         super.onResume()
+        possibleStateLoss = false
         activity.sharedPrefs.also {
             lastReloadedTimestamp = it.lastReloadedTimestamp
             if (it.lastPausedTimestamp < aWhileAgo && ds.isInFullScreen) {
@@ -327,6 +330,7 @@ class RadarImageFragment : Fragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.recordSavingTime()
+        possibleStateLoss = true
     }
 
     override fun onDestroyView() {
@@ -348,6 +352,11 @@ class RadarImageFragment : Fragment() {
             setLastPausedTimestamp(System.currentTimeMillis())
         }
         adView?.pause()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        possibleStateLoss = true
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -421,7 +430,9 @@ class RadarImageFragment : Fragment() {
             }
             fullScreenBundle.bitmap = null
             updateFullScreenVisibility()
-            activity.maybeAskToRate()
+            if (!possibleStateLoss) {
+                activity.maybeAskToRate()
+            }
         }
     }
 
