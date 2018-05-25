@@ -262,7 +262,11 @@ class RadarImageFragment : Fragment() {
                 scrollView.offsetDescendantRectToMyCoords(textView, rect.reset())
                 val focusY = scrollView.scrollY + focusY
                 val imgIndex = if (focusY <= rect.top) 0 else 1
-                val imgView = ds.imgBundles[imgIndex].imgView ?: return true
+                val imgView = ds
+                        .imgBundles[imgIndex]
+                        .takeIf { it.status == SHOWING }
+                        ?.imgView
+                        ?: return true
                 scrollView.offsetDescendantRectToMyCoords(imgView, rect.reset())
                 imgView.also {
                     enterFullScreen(imgIndex, it, focusX - rect.left, focusY - rect.top)
