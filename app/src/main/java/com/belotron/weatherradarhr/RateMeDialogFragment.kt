@@ -28,12 +28,6 @@ private const val KEY_TIMESTAMP_FIRST_USE = "timestamp_first_use"
 private const val KEY_USE_COUNT_WHEN_PROMPTED = "use_count_when_prompted"
 private const val KEY_TIMESTAMP_WHEN_PROMPTED = "timestamp_prompted"
 
-fun Context.clearRatemeState() {
-    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
-        clear()
-    }
-}
-
 fun Activity.rateMeRecordUsage() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     prefs.applyUpdate {
@@ -45,6 +39,28 @@ fun Activity.rateMeRecordUsage() {
             info { "Recording new usage, count: $it" }
         }
     }
+}
+
+
+fun Activity.openAppRating() {
+    val appId = packageName
+    val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$appId"))
+    packageManager.queryIntentActivities(rateIntent, 0)
+            .map { it.activityInfo }
+            .find { it.applicationInfo.packageName == "com.android.vending" }
+            ?.also {
+                // Play Store app is installed, use it to rate our app
+                rateIntent.component = ComponentName(it.applicationInfo.packageName, it.name)
+                rateIntent.addFlags(
+                        // don't open Play Store in the stack of our activity
+                        FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                                // make sure Play Store opens our app page, whatever it was doing before
+                                or FLAG_ACTIVITY_CLEAR_TOP)
+                startActivity(rateIntent)
+            }
+    // Play Store app not installed, open in web browser
+            ?: startActivity(Intent(ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=$appId")))
 }
 
 fun Activity.maybeAskToRate() {
@@ -83,7 +99,7 @@ class RateMeDialogFragment : DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
-                openAppRating()
+                activity.openAppRating()
                 dismiss()
                 dontShowAgain()
             }
@@ -111,25 +127,10 @@ class RateMeDialogFragment : DialogFragment() {
             putBoolean(KEY_DONT_SHOW_AGAIN, true)
         }
     }
+}
 
-    private fun openAppRating() {
-        val appId = activity.packageName
-        val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$appId"))
-        activity.packageManager.queryIntentActivities(rateIntent, 0)
-                .map { it.activityInfo }
-                .find { it.applicationInfo.packageName == "com.android.vending" }
-                ?.also {
-                    // Play Store app is installed, use it to rate our app
-                    rateIntent.component = ComponentName(it.applicationInfo.packageName, it.name)
-                    rateIntent.addFlags(
-                            // don't open Play Store in the stack of our activity
-                            FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                            // make sure Play Store opens our app page, whatever it was doing before
-                            or FLAG_ACTIVITY_CLEAR_TOP)
-                    startActivity(rateIntent)
-                }
-                // Play Store app not installed, open in web browser
-                ?: startActivity(Intent(ACTION_VIEW,
-                        Uri.parse("https://play.google.com/store/apps/details?id=$appId")))
+fun Context.clearRatemeState() {
+    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
+        clear()
     }
 }

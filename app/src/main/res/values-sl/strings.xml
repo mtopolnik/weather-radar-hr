@@ -7,6 +7,7 @@
     <string name="widget_hr">Radar DHMZ</string>
     <string name="help">Pomoč in nasveti</string>
     <string name="about">O aplikaciji</string>
+    <string name="rateme_menu_item">Oceni v trgovini Play</string>
     <string name="ads_disabled">Oglasi izključeni</string>
     <string name="settings">Nastavitve</string>
     <string name="refresh">Osveži</string>
@@ -27,6 +28,7 @@
         \n\nRadarska slika SLO © Agencija Republike Slovenije za okolje
         \n\nRadarska slika HR © Državni hidrometeorološki zavod
         \n\nAvtor ikone aplikacije: Emilija Kalajžić
+        \n\nSlovenščina: Sergej Zei
     </string>
     <string name="help_text">
         Z dvojnim dotikom posamezne animacije se ta prikaže na celotnem zaslonu.
