@@ -386,6 +386,7 @@ class RadarImageFragment : Fragment() {
                 updateAdVisibility()
                 switchActionBarVisible()
             }
+            R.id.rate_me -> activity.openAppRating()
 //            R.id.clear_rateme -> activity.clearRatemeState()
         }
         return true
@@ -511,7 +512,7 @@ class RadarImageFragment : Fragment() {
         }
     }
 
-    private fun switchActionBarVisible() = activity.switchActionBarVisible()
+    private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
 }
 
 private suspend fun ParsedGif.assignTimestamps(context: Context, desc: ImgDescriptor) {
