@@ -19,7 +19,4 @@
     <item android:id="@+id/rate_me"
           android:title="@string/rateme_menu_item"
     />
-    <!--<item android:id="@+id/clear_rateme"-->
-          <!--android:title="Clear Rate Me Data"-->
-    <!--/>-->
 </menu>

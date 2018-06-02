@@ -4,12 +4,14 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DialogFragment
-import android.app.FragmentManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
-import android.content.Intent.*
+import android.content.Intent.ACTION_VIEW
+import android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+import android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.DAY_IN_MILLIS
@@ -29,24 +31,11 @@ private const val KEY_TIMESTAMP_FIRST_USE = "timestamp_first_use"
 private const val KEY_USE_COUNT_WHEN_PROMPTED = "use_count_when_prompted"
 private const val KEY_TIMESTAMP_WHEN_PROMPTED = "timestamp_prompted"
 
-fun Activity.updateUsageCount() {
-    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-    prefs.applyUpdate {
-        prefs.getLong(KEY_TIMESTAMP_FIRST_USE, 0).takeIf { it == 0L } ?.also {
-            putLong(KEY_TIMESTAMP_FIRST_USE, System.currentTimeMillis())
-        }
-        (1 + prefs.getLong(KEY_USE_COUNT, 0)).also {
-            putLong(KEY_USE_COUNT, it)
-            info { "Recording new usage, count: $it" }
-        }
-    }
-}
-
 fun Activity.openRateMeDialog() {
     RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
 }
 
-fun Activity.openAppRating() {
+fun Context.openAppRating() {
     val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
     packageManager.queryIntentActivities(rateIntent, 0)
             .map { it.activityInfo }
@@ -64,6 +53,19 @@ fun Activity.openAppRating() {
             // Play Store app not installed, open in web browser
             ?: startActivity(Intent(ACTION_VIEW,
                     Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
+}
+
+fun Context.recordAppUsage() {
+    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+    prefs.applyUpdate {
+        prefs.getLong(KEY_TIMESTAMP_FIRST_USE, 0).takeIf { it == 0L } ?.also {
+            putLong(KEY_TIMESTAMP_FIRST_USE, System.currentTimeMillis())
+        }
+        (1 + prefs.getLong(KEY_USE_COUNT, 0)).also {
+            putLong(KEY_USE_COUNT, it)
+            info { "Recording new usage, count: $it" }
+        }
+    }
 }
 
 fun Activity.maybeAskToRate() {
@@ -128,11 +130,5 @@ class RateMeDialogFragment : DialogFragment() {
         activity.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
             putBoolean(KEY_DONT_SHOW_AGAIN, true)
         }
-    }
-}
-
-fun Context.clearRatemeState() {
-    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
-        clear()
     }
 }

@@ -387,7 +387,6 @@ class RadarImageFragment : Fragment() {
                 switchActionBarVisible()
             }
             R.id.rate_me -> activity.openAppRating()
-//            R.id.clear_rateme -> activity.clearRatemeState()
         }
         return true
     }
