@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DialogFragment
+import android.app.FragmentManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
@@ -28,7 +29,7 @@ private const val KEY_TIMESTAMP_FIRST_USE = "timestamp_first_use"
 private const val KEY_USE_COUNT_WHEN_PROMPTED = "use_count_when_prompted"
 private const val KEY_TIMESTAMP_WHEN_PROMPTED = "timestamp_prompted"
 
-fun Activity.rateMeRecordUsage() {
+fun Activity.updateUsageCount() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     prefs.applyUpdate {
         prefs.getLong(KEY_TIMESTAMP_FIRST_USE, 0).takeIf { it == 0L } ?.also {
@@ -41,10 +42,12 @@ fun Activity.rateMeRecordUsage() {
     }
 }
 
+fun Activity.openRateMeDialog() {
+    RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
+}
 
 fun Activity.openAppRating() {
-    val appId = packageName
-    val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$appId"))
+    val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
     packageManager.queryIntentActivities(rateIntent, 0)
             .map { it.activityInfo }
             .find { it.applicationInfo.packageName == "com.android.vending" }
@@ -54,18 +57,17 @@ fun Activity.openAppRating() {
                 rateIntent.addFlags(
                         // don't open Play Store in the stack of our activity
                         FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                                // make sure Play Store opens our app page, whatever it was doing before
-                                or FLAG_ACTIVITY_CLEAR_TOP)
+                        // make sure Play Store opens our app page, whatever it was doing before
+                        or FLAG_ACTIVITY_CLEAR_TOP)
                 startActivity(rateIntent)
             }
-    // Play Store app not installed, open in web browser
+            // Play Store app not installed, open in web browser
             ?: startActivity(Intent(ACTION_VIEW,
-                    Uri.parse("https://play.google.com/store/apps/details?id=$appId")))
+                    Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
 }
 
 fun Activity.maybeAskToRate() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-    val fragmentManager = fragmentManager
     val dayInMillis = DAY_IN_MILLIS
     prefs.applyUpdate {
         val useCount = prefs.getLong(KEY_USE_COUNT, 0)
@@ -91,7 +93,7 @@ fun Activity.maybeAskToRate() {
         putLong(KEY_TIMESTAMP_WHEN_PROMPTED, now)
         putLong(KEY_USE_COUNT_WHEN_PROMPTED, useCount)
         info { "Ask to rate" }
-        RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
+        openRateMeDialog()
     }
 }
 
@@ -100,18 +102,18 @@ class RateMeDialogFragment : DialogFragment() {
         val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
                 activity.openAppRating()
-                dismiss()
+                dismissAllowingStateLoss()
                 dontShowAgain()
             }
             findViewById<Button>(R.id.rateme_later).setOnClickListener {
-                dismiss()
+                dismissAllowingStateLoss()
             }
             findViewById<Button>(R.id.rateme_already_did).setOnClickListener {
-                dismiss()
+                dismissAllowingStateLoss()
                 dontShowAgain()
             }
             findViewById<Button>(R.id.rateme_no).setOnClickListener {
-                dismiss()
+                dismissAllowingStateLoss()
                 dontShowAgain()
             }
         }
