@@ -256,7 +256,6 @@ class RadarImageFragment : Fragment() {
                 }
                 val textView = ds.imgBundles[1].textView ?: return true
                 if (!textView.isDescendantOf(scrollView)) {
-                    // can happen if the event is processed late, after textView was already recreated
                     return true
                 }
                 scrollView.offsetDescendantRectToMyCoords(textView, rect.reset())
@@ -267,11 +266,14 @@ class RadarImageFragment : Fragment() {
                         .takeIf { it.status == SHOWING }
                         ?.imgView
                         ?: return true
+                if (!imgView.isDescendantOf(scrollView)) {
+                    return true
+                }
                 scrollView.offsetDescendantRectToMyCoords(imgView, rect.reset())
                 imgView.also {
                     enterFullScreen(imgIndex, it, focusX - rect.left, focusY - rect.top)
                 }
-                true
+                return true
             }
         }
         ScaleGestureDetector(activity, sl).also {
@@ -562,12 +564,12 @@ private fun View.isDescendantOf(that: View): Boolean {
     if (this === that) {
         return true
     }
-    var currParent = parent
+    var currParent: View? = parent as? View
     while (currParent != null) {
         if (currParent === that) {
             return true
         }
-        currParent = currParent.parent
+        currParent = currParent.parent as? View
     }
     return false
 }
