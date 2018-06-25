@@ -45,6 +45,8 @@ import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.CoroutineScope
+import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.async
 import java.util.TreeSet
 
@@ -165,6 +167,18 @@ class DisplayState {
     var indexOfImgInFullScreen: Int? = null
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
     val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
+
+    private var masterJob = Job()
+
+    fun start(block: suspend CoroutineScope.() -> Unit) {
+        com.belotron.weatherradarhr.start(masterJob, block)
+    }
+
+    fun destroy() {
+        imgBundles.forEach { it.destroyViews() }
+        masterJob.cancel()
+        masterJob = Job()
+    }
 }
 
 class RadarImageFragment : Fragment() {
@@ -342,7 +356,7 @@ class RadarImageFragment : Fragment() {
     override fun onDestroyView() {
         info { "RadarImageFragment.onDestroyView" }
         super.onDestroyView()
-        ds.imgBundles.forEach { it.destroyViews() }
+        ds.destroy()
         fullScreenBundle.destroyViews()
         stashedImgBundle.destroyViews()
         adView?.destroy()
@@ -383,7 +397,7 @@ class RadarImageFragment : Fragment() {
                 startActivity(Intent(activity, SettingsActivity::class.java))
             }
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
-            R.id.about -> start {
+            R.id.about -> ds.start {
                 showAboutDialogFragment(activity)
                 updateAdVisibility()
                 switchActionBarVisible()
@@ -406,7 +420,7 @@ class RadarImageFragment : Fragment() {
             updateFullScreenVisibility()
             animationLooper.resume(activity)
             seekBar?.visibility = INVISIBLE
-            start {
+            ds.start {
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitBitmapMeasured()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
@@ -419,7 +433,7 @@ class RadarImageFragment : Fragment() {
     fun exitFullScreen() {
         val index = ds.indexOfImgInFullScreen ?: return
         ds.indexOfImgInFullScreen = null
-        start {
+        ds.start {
             val bundleInTransition = ds.imgBundles[index]
             if (bundleInTransition.status == SHOWING) {
                 fullScreenBundle.seekBar?.startAnimateExit()
@@ -477,7 +491,7 @@ class RadarImageFragment : Fragment() {
         val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
         for (desc in imgDescs) {
             val bundle = ds.imgBundles[desc.index]
-            start {
+            ds.start {
                 try {
                     val (lastModified, parsedGif) = try {
                         fetchUrl(context, desc.url, fetchPolicy)

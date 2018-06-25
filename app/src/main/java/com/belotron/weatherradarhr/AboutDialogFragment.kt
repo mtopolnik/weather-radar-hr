@@ -5,7 +5,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DialogFragment
-import android.content.Context
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.LayoutInflater
@@ -15,13 +14,13 @@ import android.view.View.VISIBLE
 import android.widget.TextView
 import com.belotron.weatherradarhr.Side.*
 import com.google.android.gms.ads.MobileAds
+import kotlinx.coroutines.experimental.suspendCancellableCoroutine
 import kotlin.coroutines.experimental.Continuation
-import kotlin.coroutines.experimental.suspendCoroutine
 
 const val TAG_ABOUT = "dialog_about"
 
 suspend fun showAboutDialogFragment(activity: Activity) {
-    suspendCoroutine<Unit> { cont ->
+    suspendCancellableCoroutine<Unit> { cont ->
         AboutDialogFragment().apply {
             continuation = cont
             retainInstance = true

@@ -86,7 +86,7 @@ class AnimationLooper(
     }
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-        if (fromUser) start {
+        if (fromUser) ds.start {
             animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
         }
     }

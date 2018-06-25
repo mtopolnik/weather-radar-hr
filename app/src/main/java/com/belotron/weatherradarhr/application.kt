@@ -27,6 +27,8 @@ import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
+import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.NonCancellable
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.launch
@@ -48,7 +50,8 @@ val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-r
 
 lateinit var appContext: Context
 
-fun start(block: suspend CoroutineScope.() -> Unit) = launch(UI, start = UNDISPATCHED, block = block)
+fun start(rootJob: Job = NonCancellable, block: suspend CoroutineScope.() -> Unit) =
+        launch(rootJob + UI, start = UNDISPATCHED, block = block)
 
 class MyApplication : Application() {
     override fun onCreate() {

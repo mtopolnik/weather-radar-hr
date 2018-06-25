@@ -46,7 +46,6 @@ import kotlinx.coroutines.experimental.CancellationException
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.suspendCancellableCoroutine
-import kotlin.coroutines.experimental.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -592,7 +591,7 @@ private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): I
 }
 
 private suspend fun ValueAnimator.run() {
-    suspendCoroutine<Unit> { cont ->
+    suspendCancellableCoroutine<Unit> { cont ->
         addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(a: Animator) {
                 cont.resume(Unit)
