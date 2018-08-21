@@ -4,7 +4,6 @@ apply plugin: 'kotlin-android-extensions'
 
 android {
     compileSdkVersion 27
-    buildToolsVersion "27.0.3"
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
@@ -42,8 +41,5 @@ dependencies {
 repositories {
     mavenCentral()
 }
-kotlin {
-    experimental {
-        coroutines "enable"
-    }
-}
+
+kotlin.experimental.coroutines "enable"
