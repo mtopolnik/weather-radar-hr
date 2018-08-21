@@ -89,7 +89,7 @@ fun Context.startFetchWidgetImages() {
     val appContext = applicationContext
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
-        if (wCtx.isWidgetInUse()) {
+        if (wCtx.isWidgetInUse) {
             start {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
@@ -116,7 +116,7 @@ class RefreshImageService : JobService() {
             val wDesc = widgetDescriptors[wDescIndex]
             info { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
-            return if (wCtx.isWidgetInUse()) {
+            return if (wCtx.isWidgetInUse) {
                 start {
                     val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                     jobFinished(params, lastModified == null)
@@ -148,7 +148,7 @@ class UpdateAgeService : JobService() {
             val wDesc = widgetDescriptors[wDescIndex]
             info { "UpdateAgeService: ${wDesc.name}" }
             with (WidgetContext(applicationContext, wDesc)) {
-                if (isWidgetInUse()) {
+                if (isWidgetInUse) {
                     updateRemoteViews(readImgAndTimestamp())
                 } else {
                     cancelUpdateAge()
@@ -171,9 +171,9 @@ private class WidgetContext (
         private val context: Context,
         private val wDesc: WidgetDescriptor
 ) {
-    fun providerName() = ComponentName(context, wDesc.providerClass)
+    val providerName = ComponentName(context, wDesc.providerClass)
 
-    fun isWidgetInUse() = context.appWidgetManager.getAppWidgetIds(providerName()).isNotEmpty()
+    val isWidgetInUse get() = context.appWidgetManager.getAppWidgetIds(providerName).isNotEmpty()
 
     fun onUpdateWidget() {
         warn { "onUpdate ${wDesc.name}" }
@@ -235,7 +235,7 @@ private class WidgetContext (
                 setRedText(context.resources.getString(R.string.img_unavailable))
             }
         }
-        context.appWidgetManager.updateAppWidget(WidgetContext(context, wDesc).providerName(), remoteViews)
+        context.appWidgetManager.updateAppWidget(WidgetContext(context, wDesc).providerName, remoteViews)
         info { "Updated Remote Views" }
     }
 
