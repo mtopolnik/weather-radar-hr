@@ -26,8 +26,6 @@ import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import java.io.IOException
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -43,6 +41,7 @@ private const val LRADAR_CROP_Y_TOP = 40
 private const val KRADAR_CROP_X_RIGHT = 480
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
+@Suppress("MoveLambdaOutsideParentheses")
 private val widgetDescriptors = arrayOf(
         WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
                 LradarWidgetProvider::class.java,
@@ -131,7 +130,8 @@ class RefreshImageService : JobService() {
             }
         } catch (e: Throwable) {
             error(e) { "Error in RefreshImageService" }
-            throw e.toParcelableException()
+            jobFinished(params, true)
+            return false
         }
     }
 
@@ -157,7 +157,7 @@ class UpdateAgeService : JobService() {
             return false
         } catch (e: Throwable) {
             error(e) { "error in UpdateAgeService" }
-            throw e.toParcelableException()
+            return false
         }
     }
 
@@ -331,10 +331,4 @@ private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long)
 private fun hourRelativeCurrentTime() : Long {
     val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
     return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
-}
-
-private fun Throwable.toParcelableException(): IllegalStateException {
-    val sw = StringWriter()
-    PrintWriter(sw).use { printStackTrace(it) }
-    return IllegalStateException("${javaClass.name}: ${message}\n$sw")
 }
