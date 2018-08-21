@@ -50,8 +50,8 @@ val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-r
 
 lateinit var appContext: Context
 
-fun start(rootJob: Job = NonCancellable, block: suspend CoroutineScope.() -> Unit) =
-        launch(rootJob + UI, start = UNDISPATCHED, block = block)
+fun start(parent: Job? = null, block: suspend CoroutineScope.() -> Unit) =
+        launch(UI, parent = parent, start = UNDISPATCHED, block = block)
 
 class MyApplication : Application() {
     override fun onCreate() {
