@@ -1,11 +1,11 @@
 package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
-import android.app.DialogFragment
 import android.os.Bundle
+import android.support.v4.app.DialogFragment
+import android.support.v4.app.FragmentActivity
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -19,12 +19,12 @@ import kotlin.coroutines.experimental.Continuation
 
 const val TAG_ABOUT = "dialog_about"
 
-suspend fun showAboutDialogFragment(activity: Activity) {
+suspend fun showAboutDialogFragment(activity: FragmentActivity) {
     suspendCancellableCoroutine<Unit> { cont ->
         AboutDialogFragment().apply {
             continuation = cont
             retainInstance = true
-        }.show(activity.fragmentManager, TAG_ABOUT)
+        }.show(activity.supportFragmentManager, TAG_ABOUT)
     }
 }
 
@@ -32,7 +32,9 @@ class AboutDialogFragment : DialogFragment() {
 
     var continuation: Continuation<Unit>? = null
 
+    @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val activity = activity!!
         val rootView = LayoutInflater.from(activity).inflate(R.layout.about, null)
         val version =
                 try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }

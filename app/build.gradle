@@ -31,6 +31,8 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:0.22.5"
     implementation "com.android.support:support-core-ui:$android_support_version"
     implementation "com.android.support:support-v13:$android_support_version"
+    implementation "com.android.support:support-fragment:$android_support_version"
+    implementation "com.android.support:preference-v7:$android_support_version"
     implementation 'com.google.android.gms:play-services-ads:12.0.1'
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:2.18.0'

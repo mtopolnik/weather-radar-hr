@@ -1,14 +1,12 @@
 package com.belotron.weatherradarhr
 
-import android.app.Fragment
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
-import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
-import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
+import android.support.v4.app.Fragment
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
@@ -35,7 +33,6 @@ import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
 import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
-import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.belotron.weatherradarhr.gifdecode.Allocator
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
@@ -77,90 +74,6 @@ class ImgDescriptor(
 ) {
     val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
     val filename = url.substringAfterLast('/')
-}
-
-class ImageBundle {
-    var textView: TextView? = null; private set
-    var imgView: ImageView? = null; private set
-    var seekBar: ThumbSeekBar? = null; private set
-    private var viewGroup: ViewGroup? = null
-    private var brokenImgView: ImageView? = null
-    private var progressBar: ProgressBar? = null
-
-    var animationProgress: Int = 0
-
-    var status = UNKNOWN
-        set(value) {
-            field = value
-            progressBar?.setVisible(value == LOADING)
-            viewGroup?.setVisible(value == SHOWING)
-            brokenImgView?.setVisible(value == BROKEN)
-            if (value != SHOWING) {
-                textView?.text = ""
-            }
-        }
-
-    var text: CharSequence
-        get() = textView!!.text
-        set(value) { textView!!.text = value }
-
-    var bitmap: Bitmap?
-        get() = imgView!!.drawable?.let { it as BitmapDrawable }?.bitmap
-        set(value) { imgView!!.setImageBitmap(value) }
-
-    fun updateFrom(that: ImageBundle) {
-        this.text = that.text
-        this.bitmap = that.bitmap
-        this.status = that.status
-        this.animationProgress = that.animationProgress
-    }
-
-    fun copyTo(that: ImageBundle) {
-        that.viewGroup = this.viewGroup!!
-        that.textView = this.textView!!
-        that.imgView = this.imgView!!
-        that.seekBar = this.seekBar
-        that.brokenImgView = this.brokenImgView!!
-        that.progressBar = this.progressBar!!
-        that.status = this.status
-        that.animationProgress = this.animationProgress
-    }
-
-    fun clear() {
-        destroyViews()
-        status = HIDDEN
-    }
-
-    fun destroyViews() {
-        this.viewGroup = null
-        this.textView = null
-        this.imgView = null
-        this.seekBar = null
-        this.brokenImgView = null
-        this.progressBar = null
-    }
-
-    fun restoreViews(
-            viewGroup: ViewGroup,
-            textView: TextView,
-            imgView: ImageView,
-            seekBar: ThumbSeekBar?,
-            brokenImgView: ImageView,
-            progressBar: ProgressBar
-    ) {
-        this.viewGroup = viewGroup
-        this.textView = textView
-        this.imgView = imgView
-        this.seekBar = seekBar
-        seekBar?.progress = animationProgress
-        this.brokenImgView = brokenImgView
-        this.progressBar = progressBar
-        this.status = this.status // reapplies the status to view visibility
-    }
-
-    enum class Status {
-        UNKNOWN, HIDDEN, LOADING, BROKEN, SHOWING
-    }
 }
 
 class DisplayState {
@@ -328,6 +241,7 @@ class RadarImageFragment : Fragment() {
         info { "RadarImageFragment.onResume" }
         super.onResume()
         possibleStateLoss = false
+        val activity = activity!!
         activity.sharedPrefs.also {
             lastReloadedTimestamp = it.lastReloadedTimestamp
             if (it.lastPausedTimestamp < aWhileAgo && ds.isInFullScreen) {
@@ -367,7 +281,7 @@ class RadarImageFragment : Fragment() {
         super.onPause()
         wasFastResume = false
         animationLooper.stop()
-        activity.sharedPrefs.applyUpdate {
+        activity!!.sharedPrefs.applyUpdate {
             setLastReloadedTimestamp(lastReloadedTimestamp)
             setLastPausedTimestamp(System.currentTimeMillis())
         }
@@ -387,13 +301,14 @@ class RadarImageFragment : Fragment() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         info { "RadarImageFragment.onOptionsItemSelected" }
+        val activity = activity!!
         when (item.itemId) {
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
                 activity.startFetchWidgetImages()
             }
             R.id.settings -> {
-                activity.actionBar.hide()
+                activity.actionBar?.hide()
                 startActivity(Intent(activity, SettingsActivity::class.java))
             }
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
@@ -451,7 +366,7 @@ class RadarImageFragment : Fragment() {
             fullScreenBundle.bitmap = null
             updateFullScreenVisibility()
             if (!possibleStateLoss) {
-                activity.maybeAskToRate()
+                activity!!.maybeAskToRate()
             }
         }
     }
@@ -473,7 +388,7 @@ class RadarImageFragment : Fragment() {
 
     private fun updateAdVisibility() {
         val adView = adView ?: return
-        val adsEnabled = activity.adsEnabled
+        val adsEnabled = activity!!.adsEnabled
         adView.setVisible(adsEnabled)
         if (adsEnabled) {
             adView.loadAd(adRequest())
@@ -518,7 +433,7 @@ class RadarImageFragment : Fragment() {
                         resume(context, rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
-                    context.actionBar.hide()
+                    context.actionBar?.hide()
                 } catch (t: Throwable) {
                     error(t) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN

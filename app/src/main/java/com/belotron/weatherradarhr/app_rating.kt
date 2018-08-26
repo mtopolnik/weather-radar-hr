@@ -1,9 +1,8 @@
 package com.belotron.weatherradarhr
 
-import android.app.Activity
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
-import android.app.DialogFragment
 import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
@@ -14,6 +13,8 @@ import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
 import android.net.Uri
 import android.os.Bundle
+import android.support.v4.app.DialogFragment
+import android.support.v4.app.FragmentActivity
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.view.LayoutInflater
 import android.widget.Button
@@ -31,8 +32,8 @@ private const val KEY_TIMESTAMP_FIRST_USE = "timestamp_first_use"
 private const val KEY_USE_COUNT_WHEN_PROMPTED = "use_count_when_prompted"
 private const val KEY_TIMESTAMP_WHEN_PROMPTED = "timestamp_prompted"
 
-fun Activity.openRateMeDialog() {
-    RateMeDialogFragment().show(fragmentManager, TAG_RATE_ME)
+fun FragmentActivity.openRateMeDialog() {
+    RateMeDialogFragment().show(supportFragmentManager, TAG_RATE_ME)
 }
 
 fun Context.openAppRating() {
@@ -68,7 +69,7 @@ fun Context.recordAppUsage() {
     }
 }
 
-fun Activity.maybeAskToRate() {
+fun FragmentActivity.maybeAskToRate() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     val dayInMillis = DAY_IN_MILLIS
     prefs.applyUpdate {
@@ -100,7 +101,9 @@ fun Activity.maybeAskToRate() {
 }
 
 class RateMeDialogFragment : DialogFragment() {
+    @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val activity = activity!!
         val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
                 activity.openAppRating()
@@ -127,7 +130,7 @@ class RateMeDialogFragment : DialogFragment() {
     }
 
     private fun dontShowAgain() {
-        activity.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
+        activity!!.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
             putBoolean(KEY_DONT_SHOW_AGAIN, true)
         }
     }
