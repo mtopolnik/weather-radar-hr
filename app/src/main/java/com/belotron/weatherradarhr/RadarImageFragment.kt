@@ -435,7 +435,7 @@ class RadarImageFragment : Fragment() {
                     bundle.status = SHOWING
                     context.actionBar?.hide()
                 } catch (t: Throwable) {
-                    error(t) { "Failed to load animated GIF ${desc.filename}" }
+                    severe(t) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN
                 }
             }
@@ -468,7 +468,7 @@ private fun Context.decodeAndAssignTimestamp(
             }
         }
     } catch (e: GifDecodeException) {
-        error { "Animated GIF decoding error" }
+        severe { "Animated GIF decoding error" }
         invalidateCache(desc.url)
         throw e
     }

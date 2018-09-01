@@ -4,33 +4,33 @@ import android.util.Log
 
 const val LOGTAG = "WeatherRadar"
 
-inline fun debug(arg: () -> String) {
+inline fun debug(lazyMessage: () -> String) {
     if (BuildConfig.DEBUG && Log.isLoggable(LOGTAG, Log.DEBUG)) {
-        Log.d(LOGTAG, arg())
+        Log.d(LOGTAG, lazyMessage())
     }
 }
 
-inline fun info(arg: () -> String) {
+inline fun info(lazyMessage: () -> String) {
     if (Log.isLoggable(LOGTAG, Log.INFO)) {
-        Log.i(LOGTAG, arg())
+        Log.i(LOGTAG, lazyMessage())
     }
 }
 
-inline fun warn(arg: () -> String) {
+inline fun warn(lazyMessage: () -> String) {
     if (Log.isLoggable(LOGTAG, Log.WARN)) {
-        Log.w(LOGTAG, arg())
+        Log.w(LOGTAG, lazyMessage())
     }
 }
 
-fun error(exception: Throwable, arg: () -> String) {
+fun severe(exception: Throwable, lazyMessage: () -> String) {
     if (Log.isLoggable(LOGTAG, Log.ERROR)) {
-        Log.e(LOGTAG, arg(), exception)
+        Log.e(LOGTAG, lazyMessage(), exception)
     }
 }
 
-fun error(arg: () -> String) {
+fun severe(lazyMessage: () -> String) {
     if (Log.isLoggable(LOGTAG, Log.ERROR)) {
-        Log.e(LOGTAG, arg())
+        Log.e(LOGTAG, lazyMessage())
     }
 }
 

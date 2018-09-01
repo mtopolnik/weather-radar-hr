@@ -46,7 +46,7 @@ suspend fun fetchUrl(
                 return@withContext it
             }
         } catch (e: Exception) {
-            error(e) { "Error loading cached image for $url" }
+            severe(e) { "Error loading cached image for $url" }
         }
     }
     var conn: HttpURLConnection? = null
@@ -71,7 +71,7 @@ suspend fun fetchUrl(
         if (t is HttpErrorResponse) {
             logErrorResponse(conn!!, url)
         } else {
-            error(t) { "Error fetching $url" }
+            severe(t) { "Error fetching $url" }
         }
         throw ImageFetchException(
                 if (fetchPolicy == ONLY_IF_NEW) null
@@ -108,7 +108,7 @@ private fun handleSuccessResponse(conn: HttpURLConnection, context: Context): Pa
         }
         Pair(parseHourRelativeModTime(lastModifiedStr), parsedGif)
     } catch (t: Throwable) {
-        error(t) { "Failed to handle a successful image response for $url" }
+        severe(t) { "Failed to handle a successful image response for $url" }
         throw t
     }
 }
@@ -124,10 +124,10 @@ private fun fetchContentAndUpdateCache(
 
 fun Context.invalidateCache(url: String) {
     synchronized (threadPool) {
-        error { "Invalidating cache for $url" }
+        severe { "Invalidating cache for $url" }
         val cacheFile = cacheFile(this, url)
         if (!cacheFile.delete()) {
-            error { "Failed to delete a broken cached image for $url"}
+            severe { "Failed to delete a broken cached image for $url"}
             // At least write a stale last-modified date to prevent retry loops
             cacheFile.dataOut().use { cachedOut ->
                 cachedOut.writeUTF(DEFAULT_LAST_MODIFIED)
@@ -149,7 +149,7 @@ private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: 
                 cachedOut.write(responseBody)
             }
         } catch (e: IOException) {
-            error(e) {"Failed to write cached image to $cacheFile"}
+            severe(e) {"Failed to write cached image to $cacheFile"}
         }
     }
 }
@@ -163,7 +163,7 @@ private fun ByteArray.parseOrInvalidateGif(context: Context, url: String): Parse
     try {
         return parseGif()
     } catch (e: GifDecodeException) {
-        error { "GIF parsing error" }
+        severe { "GIF parsing error" }
         context.invalidateCache(url)
         throw e
     }

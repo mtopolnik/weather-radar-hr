@@ -129,7 +129,7 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            error(e) { "Error in RefreshImageService" }
+            severe(e) { "Error in RefreshImageService" }
             jobFinished(params, true)
             return false
         }
@@ -156,7 +156,7 @@ class UpdateAgeService : JobService() {
             }
             return false
         } catch (e: Throwable) {
-            error(e) { "error in UpdateAgeService" }
+            severe(e) { "error in UpdateAgeService" }
             return false
         }
     }
@@ -208,7 +208,7 @@ private class WidgetContext (
                 }
             }
         } catch (t: Throwable) {
-            error(t) { "Failed to refresh widget ${wDesc.imgFilename()}" }
+            severe(t) { "Failed to refresh widget ${wDesc.imgFilename()}" }
         }
         return null
     }
@@ -217,7 +217,7 @@ private class WidgetContext (
         try {
             return wDesc.toTimestampedBitmap(parsedGif.toBitmap(), isOffline)
         } catch (e: GifDecodeException) {
-            error { "GIF decoding error" }
+            severe { "GIF decoding error" }
             context.invalidateCache(url)
             throw e
         }
