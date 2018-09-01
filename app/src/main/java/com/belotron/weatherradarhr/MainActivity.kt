@@ -1,7 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import android.preference.PreferenceManager
+import android.support.v7.preference.PreferenceManager
 import android.support.v4.app.FragmentActivity
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import com.google.android.gms.ads.AdRequest
