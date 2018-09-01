@@ -2,20 +2,23 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import android.content.res.TypedArray
-import android.preference.Preference
+import android.support.v7.preference.Preference
+import android.support.v7.preference.PreferenceViewHolder
+import android.support.v7.preference.R.id.icon_frame
 import android.util.AttributeSet
-import android.view.View
+import android.view.LayoutInflater
+import android.view.View.GONE
 import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
-import android.view.LayoutInflater
 
 private const val NS_BELOTRON = "http://belotron.com"
 
-class SeekBarPreference constructor(context: Context, attrs: AttributeSet)
-    : Preference(context, attrs), OnSeekBarChangeListener {
-
+class SeekBarPreference
+constructor(context: Context, attrs: AttributeSet)
+    : Preference(context, attrs), OnSeekBarChangeListener
+{
     private lateinit var summaryView: TextView
 
     private var summary: String = super.getSummary()?.toString() ?: ""
@@ -37,29 +40,29 @@ class SeekBarPreference constructor(context: Context, attrs: AttributeSet)
             notifyChanged()
         }
 
-    override fun onSetInitialValue(restoreValue: Boolean, defaultValue: Any?) {
-        value = if (restoreValue)
+    override fun onSetInitialValue(defaultValue: Any?) {
+        value = if (defaultValue == null)
             getPersistedInt(value) else
             defaultValue as Int? ?: 0
     }
 
-    override fun onCreateView(parent: ViewGroup?): View {
-        val ret = super.onCreateView(parent)
-        val summary = ret.findViewById<View?>(android.R.id.summary) ?: return ret
-        val summaryParent = summary.parent as? ViewGroup ?: return ret
+    override fun onBindViewHolder(holder: PreferenceViewHolder) {
+        super.onBindViewHolder(holder)
+        holder.findViewById(icon_frame)?.visibility = GONE
+        fun findSeekBar() = holder.findViewById(R.id.pref_seekbar) as SeekBar?
+        if (findSeekBar() != null) {
+            return
+        }
+        val summary = holder.findViewById(android.R.id.summary) ?: return
+        val summaryParent = summary.parent as? ViewGroup ?: return
         val layoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
         layoutInflater.inflate(R.layout.preference_seekbar, summaryParent)
-        return ret
-    }
-
-    override fun onBindView(view: View) {
-        super.onBindView(view)
-        view.findViewById<SeekBar>(R.id.pref_seekbar).also {
+        findSeekBar()!!.also {
             it.max = max - min
             it.progress = value - min
             it.setOnSeekBarChangeListener(this)
         }
-        summaryView = view.findViewById(android.R.id.summary)
+        summaryView = holder.findViewById(android.R.id.summary) as TextView
     }
 
     override fun onGetDefaultValue(a: TypedArray, index: Int): Any {
