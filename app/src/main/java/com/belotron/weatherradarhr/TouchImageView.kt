@@ -43,8 +43,11 @@ import com.belotron.weatherradarhr.State.NONE
 import com.belotron.weatherradarhr.State.ZOOM
 import kotlinx.coroutines.experimental.CancellableContinuation
 import kotlinx.coroutines.experimental.CancellationException
+import kotlinx.coroutines.experimental.Dispatchers
+import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.android.Main
+import kotlinx.coroutines.experimental.android.awaitFrame
 import kotlinx.coroutines.experimental.suspendCancellableCoroutine
 import kotlin.math.max
 import kotlin.math.min
@@ -164,13 +167,13 @@ class TouchImageView : ImageView {
         if (bitmapMeasured) {
             bitmapMeasuredContinuation?.apply {
                 bitmapMeasuredContinuation = null
-                UI.resumeUndispatched(Unit)
+                Dispatchers.Main.resumeUndispatched(Unit)
             }
         }
         super.onDraw(canvas)
     }
 
-    override fun onSaveInstanceState(): Parcelable {
+    override fun onSaveInstanceState(): Parcelable? {
         if (!bitmapMeasured) {
             return super.onSaveInstanceState()
         }
@@ -330,7 +333,7 @@ class TouchImageView : ImageView {
         val oldFling = flingJob
         val context = context
         oldFling?.cancel()
-        flingJob = start {
+        flingJob = GlobalScope.start {
             withState(FLING) {
                 loadMatrix()
                 val (minTransX, minTransY, maxTransX, maxTransY) = transBounds(currentZoom, false, rectF)
@@ -347,7 +350,7 @@ class TouchImageView : ImageView {
                     m[MTRANS_X] = scroller.currX.toFloat()
                     m[MTRANS_Y] = scroller.currY.toFloat()
                     applyMatrix()
-                    UI.awaitFrame()
+                    awaitFrame()
                 }
             }
         }

@@ -10,6 +10,7 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.experimental.CoroutineDispatcher
+import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.delay
@@ -61,7 +62,7 @@ class AnimationLooper(
             newFreezeTimeMillis?.also { _ -> it.freezeTimeMillis = newFreezeTimeMillis }
         }
         var oldLoopingJob = loopingJob
-        loopingJob = start {
+        loopingJob = GlobalScope.start {
             oldLoopingJob?.join()
             oldLoopingJob = null
             while (true) {
@@ -127,7 +128,7 @@ class GifAnimator(
         val frameCount = gifDecoder.frameCount
         val startFrameIndex = if (isFullRange) 0 else frameCount - imgDesc.framesToKeep
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
-        return start {
+        return GlobalScope.start {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
             (currFrameIndex until frameCount).forEach { i ->

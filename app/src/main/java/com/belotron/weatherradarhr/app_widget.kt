@@ -25,6 +25,7 @@ import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import kotlinx.coroutines.experimental.GlobalScope
 import java.io.IOException
 import java.util.Calendar
 import java.util.TimeZone
@@ -89,7 +90,7 @@ fun Context.startFetchWidgetImages() {
     widgetDescriptors.forEach { wDesc ->
         val wCtx = WidgetContext(appContext, wDesc)
         if (wCtx.isWidgetInUse) {
-            start {
+            GlobalScope.start {
                 wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
             }
         }
@@ -116,7 +117,7 @@ class RefreshImageService : JobService() {
             info { "RefreshImageService: ${wDesc.name}" }
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse) {
-                start {
+                GlobalScope.start {
                     val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                     jobFinished(params, lastModified == null)
                     if (lastModified != null) {
@@ -178,7 +179,7 @@ private class WidgetContext (
     fun onUpdateWidget() {
         warn { "onUpdate ${wDesc.name}" }
         updateRemoteViews(null)
-        start {
+        GlobalScope.start {
             val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
             scheduleWidgetUpdate(
                     if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)

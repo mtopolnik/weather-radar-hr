@@ -43,9 +43,14 @@ import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.CoroutineScope
+import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
+import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.android.Main
 import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
 import java.util.TreeSet
+import kotlin.coroutines.experimental.CoroutineContext
 
 
 private const val ANIMATION_COVERS_MINUTES = 100
@@ -76,16 +81,16 @@ class ImgDescriptor(
     val filename = url.substringAfterLast('/')
 }
 
-class DisplayState {
+class DisplayState : CoroutineScope {
     var indexOfImgInFullScreen: Int? = null
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
     val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
 
     private var masterJob = Job()
 
-    fun start(block: suspend CoroutineScope.() -> Unit) {
-        com.belotron.weatherradarhr.start(masterJob, block)
-    }
+    override val coroutineContext: CoroutineContext get() = Dispatchers.Main + masterJob
+
+    fun start(block: suspend CoroutineScope.() -> Unit) = this.launch(start = UNDISPATCHED, block = block)
 
     fun destroy() {
         imgBundles.forEach { it.destroyViews() }
