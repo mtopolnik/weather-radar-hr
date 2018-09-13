@@ -22,6 +22,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.concurrent.TimeUnit.SECONDS
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import android.text.format.DateFormat as AndroidDateFormat
@@ -126,7 +127,7 @@ class GifAnimator(
 
     fun animate(isFullRange: Boolean): Job? {
         val frameCount = gifDecoder.frameCount
-        val startFrameIndex = if (isFullRange) 0 else frameCount - imgDesc.framesToKeep
+        val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - imgDesc.framesToKeep)
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return GlobalScope.start {
             updateAgeText()
@@ -229,5 +230,8 @@ class GifAnimator(
             (animationProgress / 100f * (gifDecoder.frameCount - startFrameIndex - 1) + startFrameIndex)
                     .roundToInt()
 
-    private fun toProgress(frameIndex: Int) = 100 * frameIndex / (gifDecoder.frameCount - 1)
+    private fun toProgress(frameIndex: Int) = gifDecoder.frameCount.let { frameCount ->
+        if (frameCount == 1) 100
+        else 100 * frameIndex / (frameCount - 1)
+    }
 }
