@@ -194,7 +194,7 @@ private fun cachedDataIn(context: Context, url: String) = cacheFile(context, url
 
 private fun cacheFile(context: Context, url: String): File {
     val fname = filenameCharsToAvoidRegex.replace(url, FILENAME_SUBSTITUTE_CHAR)
-    val file = context.file("$HTTP_CACHE_DIR/$fname")
+    val file = context.fileInCache("$HTTP_CACHE_DIR/$fname")
     if (file.isDirectory) {
         file.delete()
     }

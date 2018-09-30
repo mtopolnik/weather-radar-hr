@@ -39,7 +39,7 @@ object LradarOcr {
             minute = readNumber(pixels, 14, 15))
 
     private fun readNumber(pixels: Pixels, vararg indices : Int): Int =
-            indices.fold(0, { acc, ind -> 10 * acc + readDigit(pixels, ind) })
+            indices.fold(0) { acc, ind -> 10 * acc + readDigit(pixels, ind) }
 
     private fun readDigit(pixels: Pixels, pos : Int) =
         (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitPixelses[it], 0) } ?: ocrFailed()
@@ -88,13 +88,13 @@ object KradarOcr {
     }
 
     private fun readTimeNumber(pixels: Pixels, vararg xs : Int): Int =
-        xs.fold(0, { acc, x -> 10 * acc + readTimeDigit(pixels, x) })
+        xs.fold(0) { acc, x -> 10 * acc + readTimeDigit(pixels, x) }
 
     private fun readTimeDigit(pixels: Pixels, x : Int) =
             (0..9).find { stripeEqual(pixels, x, 143, timeDigitPixelses[it], 3) } ?: ocrFailed()
 
     private fun readDateNumber(pixels: Pixels, vararg indices : Int): Int =
-            indices.fold(0, { acc, i -> 10 * acc + readDateDigit(pixels, i) })
+            indices.fold(0) { acc, i -> 10 * acc + readDateDigit(pixels, i) }
 
     private fun readDateDigit(pixels: Pixels, pos: Int): Int {
         val imgX = 486 + 10 * pos

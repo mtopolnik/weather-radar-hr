@@ -137,7 +137,7 @@ fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleV
     setTextViewText(invisibleViewId, "")
 }
 
-fun Context.file(name: String) = File(cacheDir, name)
+fun Context.fileInCache(name: String) = File(cacheDir, name)
 
 fun Activity.switchActionBarVisible() {
     with(actionBar!!) {
@@ -168,7 +168,6 @@ private fun ParsedGif.decodeFrame0(): GifDecoder = GifDecoder(BitmapFreelists(),
 fun ParsedGif.toBitmap(): Bitmap = decodeFrame0().toBitmap()
 
 fun ParsedGif.toPixels(): Pixels = decodeFrame0().toPixels()
-
 
 fun Bitmap.asPixels() = BitmapPixels(this)
 

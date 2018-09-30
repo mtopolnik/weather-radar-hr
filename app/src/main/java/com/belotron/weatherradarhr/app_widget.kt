@@ -76,11 +76,7 @@ private data class WidgetDescriptor(
     fun index() = widgetDescriptors.indexOf(this)
     fun refreshImageJobId() = REFRESH_IMAGE_JOB_ID_BASE + index()
     fun updateAgeJobId() = UPDATE_AGE_JOB_ID_BASE + index()
-    fun toExtras() : PersistableBundle {
-        val b = PersistableBundle()
-        b.putInt(EXTRA_WIDGET_DESC_INDEX, index())
-        return b
-    }
+    fun toExtras() = PersistableBundle().apply { putInt(EXTRA_WIDGET_DESC_INDEX, index()) }
 }
 
 private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
@@ -228,10 +224,10 @@ private class WidgetContext (
         val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
         with(remoteViews) {
             setOnClickPendingIntent(R.id.img_view_widget, intentLaunchMainActivity(context))
-            if (tsBitmap != null) tsBitmap.also {
+            tsBitmap?.also {
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)
-            } else {
+            } ?: run {
                 setImageViewResource(R.id.img_view_widget, wDesc.previewResourceId)
                 setRedText(context.resources.getString(R.string.img_unavailable))
             }
@@ -268,7 +264,7 @@ private class WidgetContext (
     }
 
     fun readImgAndTimestamp() : TimestampedBitmap? {
-        val file = context.file(wDesc.timestampFilename())
+        val file = context.fileInCache(wDesc.timestampFilename())
         return try {
             file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
         } catch (e : Exception) {
@@ -278,13 +274,13 @@ private class WidgetContext (
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {
         val fname = wDesc.timestampFilename()
-        val growingFile = context.file("$fname.growing")
+        val growingFile = context.fileInCache("$fname.growing")
         growingFile.dataOut().use {
             it.writeLong(tsBitmap.timestamp)
             it.writeBoolean(tsBitmap.isOffline)
             tsBitmap.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
-        if (!growingFile.renameTo(context.file(fname))) {
+        if (!growingFile.renameTo(context.fileInCache(fname))) {
             throw IOException("Couldn't rename $growingFile")
         }
     }
