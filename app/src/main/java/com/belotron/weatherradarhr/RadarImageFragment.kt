@@ -41,7 +41,6 @@ import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.google.android.gms.ads.AdView
-import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Dispatchers
@@ -412,6 +411,7 @@ class RadarImageFragment : Fragment() {
         for (desc in imgDescs) {
             val bundle = ds.imgBundles[desc.index]
             ds.start {
+                val coroScope = this
                 try {
                     val (lastModified, parsedGif) = try {
                         fetchUrl(context, desc.url, fetchPolicy)
@@ -424,7 +424,7 @@ class RadarImageFragment : Fragment() {
                     }
                     lastReloadedTimestamp = System.currentTimeMillis()
                     parsedGif.apply {
-                        assignTimestamps(context, desc)
+                        assignTimestamps(coroScope, context, desc)
                         sortAndDeduplicateFrames()
                         with (frames) {
                             while (size > desc.framesToKeep) {
@@ -450,11 +450,11 @@ class RadarImageFragment : Fragment() {
     private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
 }
 
-private suspend fun ParsedGif.assignTimestamps(context: Context, desc: ImgDescriptor) {
+private suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Context, desc: ImgDescriptor) {
     val parsedGif = this
     BitmapFreelists().also { allocator ->
         (0 until frameCount).map { frameIndex ->
-            async(CommonPool) {
+            coroScope.async(Dispatchers.Default) {
                 context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
             }
         }.forEachIndexed { i, it ->
