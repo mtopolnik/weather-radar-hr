@@ -309,20 +309,19 @@ class RadarImageFragment : Fragment() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         info { "RadarImageFragment.onOptionsItemSelected" }
         val activity = activity!!
+        var shouldHideActionBar = true
         when (item.itemId) {
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
                 startFetchWidgetImages()
             }
             R.id.settings -> {
-                activity.actionBar?.hide()
                 startActivity(Intent(activity, SettingsActivity::class.java))
             }
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
             R.id.about -> ds.start {
                 showAboutDialogFragment(activity)
                 updateAdVisibility()
-                switchActionBarVisible()
             }
             R.id.rate_me -> activity.openAppRating()
             R.id.widget_log_enabled -> (!item.isChecked).also { newState ->
@@ -334,7 +333,9 @@ class RadarImageFragment : Fragment() {
             }
             R.id.show_widget_log -> startActivity(Intent(activity, ViewLogActivity::class.java))
             R.id.clear_widget_log -> clearPrivateLog()
+            else -> shouldHideActionBar = false
         }
+        if (shouldHideActionBar) activity.actionBar?.hide()
         return true
     }
 
