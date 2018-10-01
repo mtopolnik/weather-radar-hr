@@ -19,13 +19,13 @@ import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.formatElapsedTime
 import android.widget.RemoteViews
+import com.belotron.weatherradarhr.CcOption.*
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.experimental.GlobalScope
 import java.io.IOException
 import java.util.Calendar
 import java.util.TimeZone
@@ -71,23 +71,23 @@ private data class WidgetDescriptor(
         val previewResourceId: Int,
         val toTimestampedBitmap: (Bitmap, Boolean) -> TimestampedBitmap
 ) {
-    fun imgFilename() = url.substringAfterLast('/')
-    fun timestampFilename() = imgFilename() + ".timestamp"
-    fun index() = widgetDescriptors.indexOf(this)
-    fun refreshImageJobId() = REFRESH_IMAGE_JOB_ID_BASE + index()
-    fun updateAgeJobId() = UPDATE_AGE_JOB_ID_BASE + index()
-    fun toExtras() = PersistableBundle().apply { putInt(EXTRA_WIDGET_DESC_INDEX, index()) }
+    val imgFilename get() = url.substringAfterLast('/')
+    val timestampFilename get() = "$imgFilename.timestamp"
+    val index get() = widgetDescriptors.indexOf(this)
+    val refreshImageJobId get() = REFRESH_IMAGE_JOB_ID_BASE + index
+    val updateAgeJobId get() = UPDATE_AGE_JOB_ID_BASE + index
+    fun toExtras() = PersistableBundle().apply { putInt(EXTRA_WIDGET_DESC_INDEX, index) }
 }
 
 private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
 
-fun Context.startFetchWidgetImages() {
-    val appContext = applicationContext
+fun startFetchWidgetImages() {
     widgetDescriptors.forEach { wDesc ->
-        val wCtx = WidgetContext(appContext, wDesc)
-        if (wCtx.isWidgetInUse) {
-            GlobalScope.start {
-                wCtx.fetchImageAndUpdateWidget(onlyIfNew = false)
+        WidgetContext(appContext, wDesc).apply {
+            if (isWidgetInUse) {
+                appCoroScope.start {
+                    fetchImageAndUpdateWidget(onlyIfNew = false)
+                }
             }
         }
     }
@@ -107,17 +107,21 @@ class KradarWidgetProvider : AppWidgetProvider() {
 
 class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
+        val widgetName = params.widgetName
+        info(CC_PRIVATE) { "RefreshImageService: start job for $widgetName" }
         try {
-            val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
-            val wDesc = widgetDescriptors[wDescIndex]
-            info { "RefreshImageService: ${wDesc.name}" }
+            val wDesc = params.widgetDescriptor
             val wCtx = WidgetContext(applicationContext, wDesc)
             return if (wCtx.isWidgetInUse) {
-                GlobalScope.start {
-                    val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
-                    jobFinished(params, lastModified == null)
-                    if (lastModified != null) {
-                        wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                appCoroScope.start {
+                    try {
+                        val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
+                        jobFinished(params, lastModified == null)
+                        if (lastModified != null) {
+                            wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                        }
+                    } catch (t: Throwable) {
+                        severe(CC_PRIVATE, t) { "Error in RefreshImageService coroutine for $widgetName" }
                     }
                 }
                 true
@@ -126,24 +130,23 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            severe(e) { "Error in RefreshImageService" }
+            severe(CC_PRIVATE, e) { "Error in RefreshImageService for $widgetName" }
             jobFinished(params, true)
             return false
         }
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        info { "RefreshImageService stop job" }
+        info(CC_PRIVATE) { "RefreshImageService: stop job for ${params.widgetName}" }
         return true
     }
 }
 
 class UpdateAgeService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
+        info { "UpdateAgeService: ${params.widgetName}" }
         try {
-            val wDescIndex = params.extras[EXTRA_WIDGET_DESC_INDEX] as Int
-            val wDesc = widgetDescriptors[wDescIndex]
-            info { "UpdateAgeService: ${wDesc.name}" }
+            val wDesc = params.widgetDescriptor
             with (WidgetContext(applicationContext, wDesc)) {
                 if (isWidgetInUse) {
                     updateRemoteViews(readImgAndTimestamp())
@@ -151,15 +154,14 @@ class UpdateAgeService : JobService() {
                     cancelUpdateAge()
                 }
             }
-            return false
         } catch (e: Throwable) {
-            severe(e) { "error in UpdateAgeService" }
-            return false
+            severe(e) { "Error in UpdateAgeService for ${params.widgetName}" }
         }
+        return false
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        info { "UpdateAgeService stop job" }
+        info { "UpdateAgeService: stop job for ${params.widgetName}" }
         return true
     }
 }
@@ -173,16 +175,24 @@ private class WidgetContext (
     val isWidgetInUse get() = context.appWidgetManager.getAppWidgetIds(providerName).isNotEmpty()
 
     fun onUpdateWidget() {
-        warn { "onUpdate ${wDesc.name}" }
-        updateRemoteViews(null)
-        GlobalScope.start {
-            val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
-            scheduleWidgetUpdate(
-                    if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)
-                    else JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS
-            )
+        info(CC_PRIVATE) { "onUpdateWidget ${wDesc.name}" }
+        try {
+            updateRemoteViews(null)
+            appCoroScope.start {
+                try {
+                    val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
+                    scheduleWidgetUpdate(
+                            if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)
+                            else JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS
+                    )
+                } catch (t: Throwable) {
+                    severe(CC_PRIVATE, t) { "onUpdateWidget ${wDesc.name} coroutine failed" }
+                }
+            }
+            scheduleUpdateAge()
+        } catch (t: Throwable) {
+            severe(CC_PRIVATE, t) { "onUpdateWidget ${wDesc.name} failed" }
         }
-        scheduleUpdateAge()
     }
 
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
@@ -201,11 +211,11 @@ private class WidgetContext (
                 if (e.cached != null) {
                     updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
                 } else if (!onlyIfNew) {
-                    warn { "Failed to fetch ${wDesc.imgFilename()}" }
+                    warn(CC_PRIVATE) { "Failed to fetch ${wDesc.imgFilename}" }
                 }
             }
         } catch (t: Throwable) {
-            severe(t) { "Failed to refresh widget ${wDesc.imgFilename()}" }
+            severe(CC_PRIVATE, t) { "Failed to refresh widget ${wDesc.name}" }
         }
         return null
     }
@@ -214,7 +224,7 @@ private class WidgetContext (
         try {
             return wDesc.toTimestampedBitmap(parsedGif.toBitmap(), isOffline)
         } catch (e: GifDecodeException) {
-            severe { "GIF decoding error" }
+            severe(CC_PRIVATE) { "GIF decoding error for $name" }
             context.invalidateCache(url)
             throw e
         }
@@ -233,12 +243,12 @@ private class WidgetContext (
             }
         }
         context.appWidgetManager.updateAppWidget(WidgetContext(context, wDesc).providerName, remoteViews)
-        info { "Updated Remote Views" }
+        info { "Updated Remote Views for ${wDesc.name}" }
     }
 
     fun scheduleWidgetUpdate(latencyMillis: Long) {
         val resultCode = context.jobScheduler.schedule(
-                JobInfo.Builder(wDesc.refreshImageJobId(),
+                JobInfo.Builder(wDesc.refreshImageJobId,
                         ComponentName(context, RefreshImageService::class.java))
                         .setExtras(wDesc.toExtras())
                         .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
@@ -246,25 +256,25 @@ private class WidgetContext (
                         .setOverrideDeadline(HOUR_IN_MILLIS)
                         .build())
         val latencyStr = formatElapsedTime(MILLISECONDS.toSeconds(latencyMillis))
-        reportScheduleResult("refresh radar image after $latencyStr", resultCode)
+        reportScheduleResult("refresh image for ${wDesc.name} after $latencyStr", resultCode)
     }
 
     fun cancelUpdateAge() {
-        info { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
-        context.jobScheduler.cancel(wDesc.updateAgeJobId())
+        info(CC_PRIVATE) { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
+        context.jobScheduler.cancel(wDesc.updateAgeJobId)
     }
 
     private fun scheduleUpdateAge() {
         val resultCode = context.jobScheduler.schedule(
-                JobInfo.Builder(wDesc.updateAgeJobId(), ComponentName(context, UpdateAgeService::class.java))
+                JobInfo.Builder(wDesc.updateAgeJobId, ComponentName(context, UpdateAgeService::class.java))
                         .setExtras(wDesc.toExtras())
                         .setPeriodic(UPDATE_AGE_PERIOD_MINUTES * MINUTE_IN_MILLIS)
                         .build())
-        reportScheduleResult("update age every minute", resultCode)
+        reportScheduleResult("update age of ${wDesc.name} every minute", resultCode)
     }
 
     fun readImgAndTimestamp() : TimestampedBitmap? {
-        val file = context.fileInCache(wDesc.timestampFilename())
+        val file = context.fileInCache(wDesc.timestampFilename)
         return try {
             file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
         } catch (e : Exception) {
@@ -273,7 +283,7 @@ private class WidgetContext (
     }
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {
-        val fname = wDesc.timestampFilename()
+        val fname = wDesc.timestampFilename
         val growingFile = context.fileInCache("$fname.growing")
         growingFile.dataOut().use {
             it.writeLong(tsBitmap.timestamp)
@@ -285,6 +295,11 @@ private class WidgetContext (
         }
     }
 }
+
+private val JobParameters.widgetDescriptor: WidgetDescriptor
+    get() = widgetDescriptors[extras[EXTRA_WIDGET_DESC_INDEX] as Int]
+
+private val JobParameters.widgetName get() = runOrNull { widgetDescriptor.name } ?: ""
 
 private val Context.jobScheduler get() = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
 
@@ -301,9 +316,15 @@ private fun intentLaunchMainActivity(context: Context): PendingIntent {
 
 private fun reportScheduleResult(task: String, resultCode: Int) {
     when (resultCode) {
-        JobScheduler.RESULT_SUCCESS -> info { "Scheduled to $task" }
-        JobScheduler.RESULT_FAILURE -> error("Failed to schedule to $task")
-        else -> throw AssertionError("Unknown scheduler result code $resultCode")
+        JobScheduler.RESULT_SUCCESS -> {
+            info(CC_PRIVATE) { "Scheduled to $task" }
+        }
+        JobScheduler.RESULT_FAILURE -> {
+            severe(CC_PRIVATE) { "Failed to schedule to $task" }
+        }
+        else -> {
+            severe(CC_PRIVATE) { "Unknown scheduler result code $resultCode" }
+        }
     }
 }
 
@@ -314,8 +335,8 @@ private fun reportScheduleResult(task: String, resultCode: Int) {
  * @param lastModified last modified time in seconds past full hour
  */
 private fun millisToNextUpdate(lastModified : Long, updateIntervalMinutes: Long) : Long {
-    require(updateIntervalMinutes in 0 until 60, { "updateInterval out of range: $updateIntervalMinutes" })
-    require(lastModified in 0 until SECS_IN_HOUR, { "lastModified out of range: $lastModified" })
+    require(updateIntervalMinutes in 0 until 60) { "updateInterval out of range: $updateIntervalMinutes" }
+    require(lastModified in 0 until SECS_IN_HOUR) { "lastModified out of range: $lastModified" }
 
     val now = hourRelativeCurrentTime()
     val modifiedSecondsAgo = if (now >= lastModified) now - lastModified

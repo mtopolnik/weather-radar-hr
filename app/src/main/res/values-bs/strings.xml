@@ -13,6 +13,12 @@
     <string name="refresh">Osvježi</string>
     <string name="animation_rate">Brzina animacije</string>
     <string name="freeze_time">Pauza prije ponavljanja</string>
+    <string name="widget_log">Dijagnostički dnevnik za App Widget</string>
+    <string name="widget_log_enabled">Uključeno</string>
+    <string name="show_widget_log">Prikaži</string>
+    <string name="clear_widget_log">Obriši</string>
+    <string name="oops_dont_clear_widget_log">Ups</string>
+    <string name="yes_clear_widget_log">Da, briši!</string>
     <string name="rateme_title">Ocijeni aplikaciju</string>
     <string name="rateme_question">
         Ako ti je korisna naša aplikacija, mnogo bi nam značilo da ju ocijeniš.

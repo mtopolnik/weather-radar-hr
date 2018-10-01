@@ -29,6 +29,10 @@
                   android:label="@string/help"
                   android:parentActivityName=".MainActivity">
         </activity>
+        <activity android:name=".ViewLogActivity"
+                  android:label="@string/widget_log"
+                  android:parentActivityName=".MainActivity">
+        </activity>
 
         <receiver android:name=".LradarWidgetProvider"
                   android:label="@string/widget_slo">

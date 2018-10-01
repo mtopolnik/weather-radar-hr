@@ -27,6 +27,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import com.belotron.weatherradarhr.CcOption.*
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
@@ -49,7 +50,6 @@ import kotlinx.coroutines.experimental.android.Main
 import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.launch
 import java.util.TreeSet
-import kotlin.coroutines.experimental.CoroutineContext
 
 
 private const val ANIMATION_COVERS_MINUTES = 100
@@ -85,17 +85,18 @@ class DisplayState : CoroutineScope {
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
     val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
 
-    private var masterJob = Job()
-
-    override val coroutineContext: CoroutineContext get() = Dispatchers.Main + masterJob
+    override var coroutineContext = newCoroCtx()
+        private set
 
     fun start(block: suspend CoroutineScope.() -> Unit) = this.launch(start = UNDISPATCHED, block = block)
 
     fun destroy() {
         imgBundles.forEach { it.destroyViews() }
-        masterJob.cancel()
-        masterJob = Job()
+        coroutineContext[Job]!!.cancel()
+        coroutineContext = newCoroCtx()
     }
+
+    private fun newCoroCtx() = Dispatchers.Main + Job()
 }
 
 class RadarImageFragment : Fragment() {
@@ -133,6 +134,7 @@ class RadarImageFragment : Fragment() {
                 viewGroup = rootView.findViewById(R.id.vg_radar_zoomed),
                 textView = rootView.findViewById(R.id.text_radar_zoomed),
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_radar_zoomed).apply {
+                    coroScope = ds
                     setOnDoubleTapListener(object: SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
@@ -261,7 +263,7 @@ class RadarImageFragment : Fragment() {
         } else {
             info { "Reloading animations" }
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
-            activity.startFetchWidgetImages()
+            startFetchWidgetImages()
         }
         adView?.resume()
     }
@@ -300,6 +302,7 @@ class RadarImageFragment : Fragment() {
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         info { "RadarImageFragment.onCreateOptionsMenu" }
         inflater.inflate(R.menu.main_menu, menu)
+        menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
         super.onCreateOptionsMenu(menu, inflater)
     }
 
@@ -309,7 +312,7 @@ class RadarImageFragment : Fragment() {
         when (item.itemId) {
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
-                activity.startFetchWidgetImages()
+                startFetchWidgetImages()
             }
             R.id.settings -> {
                 activity.actionBar?.hide()
@@ -322,6 +325,15 @@ class RadarImageFragment : Fragment() {
                 switchActionBarVisible()
             }
             R.id.rate_me -> activity.openAppRating()
+            R.id.widget_log_enabled -> (!item.isChecked).also { newState ->
+                if (!newState) info(CC_PRIVATE) { "Log disabled" }
+                privateLogEnabled = newState
+                if (newState) info(CC_PRIVATE) { "\n\nLog enabled" }
+                item.isChecked = newState
+                activity.sharedPrefs.applyUpdate { setWidgetLogEnabled(newState) }
+            }
+            R.id.show_widget_log -> startActivity(Intent(activity, ViewLogActivity::class.java))
+            R.id.clear_widget_log -> clearPrivateLog()
         }
         return true
     }

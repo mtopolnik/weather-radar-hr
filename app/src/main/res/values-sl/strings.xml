@@ -12,6 +12,12 @@
     <string name="settings">Nastavitve</string>
     <string name="refresh">Osveži</string>
     <string name="animation_rate">Hitrost animacije</string>
+    <string name="widget_log">Diagnostični dnevnik za App Widget</string>
+    <string name="widget_log_enabled">Vklopljeno</string>
+    <string name="show_widget_log">Prikaži</string>
+    <string name="clear_widget_log">Izbriši</string>
+    <string name="oops_dont_clear_widget_log">Ups</string>
+    <string name="yes_clear_widget_log">Da, briši!</string>
     <string name="freeze_time">Premor med ponovitvijo</string>
     <string name="rateme_title">Ocenite aplikacijo</string>
     <string name="rateme_question">

@@ -43,8 +43,8 @@ import com.belotron.weatherradarhr.State.NONE
 import com.belotron.weatherradarhr.State.ZOOM
 import kotlinx.coroutines.experimental.CancellableContinuation
 import kotlinx.coroutines.experimental.CancellationException
+import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.Main
 import kotlinx.coroutines.experimental.android.awaitFrame
@@ -73,7 +73,11 @@ private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
 
-class TouchImageView : ImageView {
+class TouchImageView
+@JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
+    : ImageView(context, attrs, defStyle) {
+
+    lateinit var coroScope: CoroutineScope
 
     private val overdrag = resources.getDimensionPixelOffset(R.dimen.fullscreen_allowed_overdrag)
     private val bottomMargin = resources.getDimensionPixelOffset(R.dimen.fullscreen_bottom_margin)
@@ -119,11 +123,7 @@ class TouchImageView : ImageView {
     private var userTouchListener: View.OnTouchListener? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
-    constructor(context: Context) : this(context, null, 0)
-
-    constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
-
-    constructor(context: Context, attrs: AttributeSet?, defStyle: Int) : super(context, attrs, defStyle) {
+    init {
         isClickable = true
         scaleDetector = ScaleGestureDetector(context, ScaleListener())
         gestureDetector = GestureDetector(context, GestureListener())
@@ -202,8 +202,8 @@ class TouchImageView : ImageView {
     }
 
     /**
-     * startImgX,Y say where on the screen should the image be at the start of
-     * zoom animation.
+     * startImgX,Y say where on the screen the image should be at the start of
+     * the zoom animation.
      * bitmapX,Y are the coordinates of the double-tap event in bitmap's
      * coordinate system.
      */
@@ -333,7 +333,7 @@ class TouchImageView : ImageView {
         val oldFling = flingJob
         val context = context
         oldFling?.cancel()
-        flingJob = GlobalScope.start {
+        flingJob = coroScope.start {
             withState(FLING) {
                 loadMatrix()
                 val (minTransX, minTransY, maxTransX, maxTransY) = transBounds(currentZoom, false, rectF)

@@ -28,6 +28,7 @@ import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Dispatchers
+import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.android.Main
 import kotlinx.coroutines.experimental.asCoroutineDispatcher
 import kotlinx.coroutines.experimental.launch
@@ -36,9 +37,12 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.FileWriter
+import java.io.PrintWriter
 import java.text.DateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.HOURS
+import kotlin.coroutines.experimental.CoroutineContext
 import android.text.format.DateFormat as AndroidDateFormat
 
 const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
@@ -48,14 +52,19 @@ private const val KEY_SAVED_AT = "instance-state-saved-at"
 val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-radar-pool") }.asCoroutineDispatcher()
 
 lateinit var appContext: Context
+lateinit var appCoroScope: CoroutineScope
 
-fun CoroutineScope.start(block: suspend CoroutineScope.() -> Unit) =
-        this.launch(Dispatchers.Main, start = UNDISPATCHED, block = block)
+fun CoroutineScope.start(block: suspend CoroutineScope.() -> Unit) = this.launch(start = UNDISPATCHED, block = block)
 
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         appContext = this
+        val masterJob = Job()
+        appCoroScope = object : CoroutineScope {
+            override val coroutineContext get() = Dispatchers.Main + masterJob
+        }
+        privateLogEnabled = sharedPrefs.widgetLogEnabled
     }
 }
 
@@ -149,8 +158,8 @@ fun Activity.switchActionBarVisible() {
     }
 }
 
-val Context.dateFormat get() = AndroidDateFormat.getDateFormat(this)
-val Context.timeFormat get() = AndroidDateFormat.getTimeFormat(this)
+val Context.dateFormat get() = AndroidDateFormat.getDateFormat(this)!!
+val Context.timeFormat get() = AndroidDateFormat.getTimeFormat(this)!!
 
 fun Bundle.recordSavingTime() = putLong(KEY_SAVED_AT, System.currentTimeMillis())
 
@@ -160,6 +169,8 @@ val Bundle.savedStateRecently: Boolean
 fun File.dataIn() = DataInputStream(FileInputStream(this))
 
 fun File.dataOut() = DataOutputStream(FileOutputStream(this))
+
+fun File.writer(append: Boolean = true) = PrintWriter(FileWriter(this, append))
 
 fun ByteArray.parseGif() = GifParser.parse(this)
 

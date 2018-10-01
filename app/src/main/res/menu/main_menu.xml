@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+      xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/refresh"
           android:title="@string/refresh"
           android:icon="@drawable/ic_refresh_white_24dp"
-          android:showAsAction="ifRoom"
-    />
+          app:showAsAction="ifRoom"/>
     <item android:id="@+id/settings"
           android:title="@string/settings"
           android:icon="@drawable/ic_settings_white_24dp"
-          android:showAsAction="ifRoom"
-    />
+          app:showAsAction="ifRoom"/>
     <item android:id="@+id/help"
           android:title="@string/help"
     />
@@ -19,4 +18,23 @@
     <item android:id="@+id/rate_me"
           android:title="@string/rateme_menu_item"
     />
+    <item android:title="@string/widget_log">
+        <menu>
+            <item android:id="@+id/widget_log_enabled"
+                  android:title="@string/widget_log_enabled"
+                  android:checkable="true"
+            />
+            <item android:id="@+id/show_widget_log"
+                  android:title="@string/show_widget_log"
+            />
+            <item android:title="@string/clear_widget_log">
+                <menu>
+                    <item android:id="@+id/clear_widget_log"
+                          android:title="@string/yes_clear_widget_log"
+                    />
+                    <item android:title="@string/oops_dont_clear_widget_log"/>
+                </menu>
+            </item>
+        </menu>
+    </item>
 </menu>
