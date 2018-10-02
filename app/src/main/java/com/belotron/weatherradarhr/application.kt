@@ -9,6 +9,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.os.Bundle
 import android.support.v4.content.ContextCompat.getColor
+import android.support.v7.app.AppCompatActivity
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.SECOND_IN_MILLIS
@@ -42,7 +43,6 @@ import java.io.PrintWriter
 import java.text.DateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.HOURS
-import kotlin.coroutines.experimental.CoroutineContext
 import android.text.format.DateFormat as AndroidDateFormat
 
 const val ADMOB_ID = "ca-app-pub-9052382507824326~6124779019"
@@ -149,7 +149,7 @@ fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleV
 fun Context.fileInCache(name: String) = File(cacheDir, name)
 
 fun Activity.switchActionBarVisible() {
-    with(actionBar!!) {
+    with((this as AppCompatActivity).supportActionBar!!) {
         if (isShowing) {
             hide()
         } else {

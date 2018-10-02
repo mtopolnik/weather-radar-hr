@@ -7,6 +7,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
 import android.support.v4.app.Fragment
+import android.support.v7.app.AppCompatActivity
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
@@ -308,7 +309,7 @@ class RadarImageFragment : Fragment() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         info { "RadarImageFragment.onOptionsItemSelected" }
-        val activity = activity!!
+        val activity = activity as AppCompatActivity
         var shouldHideActionBar = true
         when (item.itemId) {
             R.id.refresh -> {
@@ -335,7 +336,7 @@ class RadarImageFragment : Fragment() {
             R.id.clear_widget_log -> clearPrivateLog()
             else -> shouldHideActionBar = false
         }
-        if (shouldHideActionBar) activity.actionBar?.hide()
+        if (shouldHideActionBar) activity.supportActionBar?.hide()
         return true
     }
 
@@ -413,7 +414,7 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
-        val context = activity ?: return
+        val context = activity as AppCompatActivity? ?: return
         animationLooper.stop()
         imgDescs.map { ds.imgBundles[it.index] }.forEach {
             it.status = LOADING
@@ -451,7 +452,7 @@ class RadarImageFragment : Fragment() {
                         resume(context, rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
-                    context.actionBar?.hide()
+                    context.supportActionBar?.hide()
                 } catch (t: Throwable) {
                     severe(t) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN

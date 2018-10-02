@@ -1,8 +1,8 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
+import android.support.v7.app.AppCompatActivity
 import android.support.v7.preference.PreferenceManager
-import android.support.v4.app.FragmentActivity
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
@@ -11,7 +11,7 @@ private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
 
 fun adRequest(): AdRequest = AdRequest.Builder().build()
 
-class MainActivity : FragmentActivity()  {
+class MainActivity : AppCompatActivity()  {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,14 +37,14 @@ class MainActivity : FragmentActivity()  {
         info { "MainActivity.onSaveInstanceState" }
         super.onSaveInstanceState(outState)
         outState.recordSavingTime()
-        outState.putBoolean(KEY_ACTIONBAR_VISIBLE, actionBar!!.isShowing)
+        outState.putBoolean(KEY_ACTIONBAR_VISIBLE, supportActionBar!!.isShowing)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         info { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
         if (savedInstanceState.savedStateRecently && !savedInstanceState.getBoolean(KEY_ACTIONBAR_VISIBLE)) {
-            actionBar!!.hide()
+            supportActionBar!!.hide()
         }
     }
 

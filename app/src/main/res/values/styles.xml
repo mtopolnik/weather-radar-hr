@@ -1,17 +1,16 @@
-<resources>
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault">
-        <item name="android:colorPrimary">@color/primary</item>
-        <item name="android:colorPrimaryDark">@color/primary</item>
-        <item name="android:actionBarStyle">@style/MyActionBar</item>
+    <style name="AppTheme" parent="@style/Theme.AppCompat">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary</item>
+        <item name="actionBarStyle">@style/MyActionBar</item>
     </style>
 
-    <style name="MyActionBar" parent="@android:style/Widget.DeviceDefault.ActionBar">
-        <item name="android:displayOptions">showTitle</item>
-        <item name="android:background">@color/primary</item>
+    <style name="MyActionBar" parent="@style/Widget.AppCompat.ActionBar">
+        <item name="background">@color/primary</item>
+        <item name="displayOptions">showTitle</item>
     </style>
-    <style name="RatemeDialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
+    <style name="RatemeDialogTheme" parent="@style/Theme.AppCompat.Dialog.Alert">
         <item name="android:background">@color/primary</item>
     </style>
     <style name="Rateme.Button.Large" parent="@android:style/ThemeOverlay">
