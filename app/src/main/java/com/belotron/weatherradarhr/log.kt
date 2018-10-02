@@ -1,17 +1,22 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.CcOption.NO_CC
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.text.SimpleDateFormat
 
 var privateLogEnabled = false
 
 const val LOGTAG = "WeatherRadar"
 
 private val logFile get() = File(appContext.noBackupFilesDir, "app-widget-log.txt")
+
+@SuppressLint("SimpleDateFormat")
+private val timeFormat = SimpleDateFormat("MM-dd HH:mm:ss")
 
 enum class CcOption { CC_PRIVATE, NO_CC }
 
@@ -82,7 +87,7 @@ fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
         ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
     } ?: ""
     logFile.writer().use {
-        it.println("${appContext.dateFormat.format(now)} ${appContext.timeFormat.format(now)} $msg$stacktrace")
+        it.println("${timeFormat.format(now)} $msg$stacktrace")
     }
 }
 
@@ -90,8 +95,7 @@ fun viewPrivateLog() = logFile.takeIf { it.exists() }?.readText() ?: "The log is
 
 fun clearPrivateLog() {
     val now = System.currentTimeMillis()
-    val ctx = appContext
     logFile.writer(false).use {
-        it.println("${ctx.dateFormat.format(now)} ${ctx.timeFormat.format(now)} Log cleared")
+        it.println("${timeFormat.format(now)} Log cleared")
     }
 }

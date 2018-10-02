@@ -108,7 +108,8 @@ class KradarWidgetProvider : AppWidgetProvider() {
 class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val widgetName = params.widgetName
-        info(CC_PRIVATE) { "RefreshImageService: start job for $widgetName" }
+        val logHead = "RefreshImage $widgetName"
+        info(CC_PRIVATE) { "$logHead: start job" }
         try {
             val wDesc = params.widgetDescriptor
             val wCtx = WidgetContext(applicationContext, wDesc)
@@ -118,10 +119,13 @@ class RefreshImageService : JobService() {
                         val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                         jobFinished(params, lastModified == null)
                         if (lastModified != null) {
+                            info(CC_PRIVATE) { "$logHead: success" }
                             wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                        } else {
+                            info(CC_PRIVATE) { "$logHead: no new image" }
                         }
                     } catch (t: Throwable) {
-                        severe(CC_PRIVATE, t) { "Error in RefreshImageService coroutine for $widgetName" }
+                        severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
                     }
                 }
                 true
@@ -130,21 +134,22 @@ class RefreshImageService : JobService() {
                 false
             }
         } catch (e: Throwable) {
-            severe(CC_PRIVATE, e) { "Error in RefreshImageService for $widgetName" }
+            severe(CC_PRIVATE, e) { "$logHead: error on main thread" }
             jobFinished(params, true)
             return false
         }
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        info(CC_PRIVATE) { "RefreshImageService: stop job for ${params.widgetName}" }
+        info(CC_PRIVATE) { "RefreshImage ${params.widgetName}: stop job" }
         return true
     }
 }
 
 class UpdateAgeService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
-        info { "UpdateAgeService: ${params.widgetName}" }
+        val logHead = "UpdateAge ${params.widgetName}"
+        info { "$logHead: start job" }
         try {
             val wDesc = params.widgetDescriptor
             with (WidgetContext(applicationContext, wDesc)) {
@@ -155,13 +160,13 @@ class UpdateAgeService : JobService() {
                 }
             }
         } catch (e: Throwable) {
-            severe(e) { "Error in UpdateAgeService for ${params.widgetName}" }
+            severe(e) { "$logHead: error" }
         }
         return false
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        info { "UpdateAgeService: stop job for ${params.widgetName}" }
+        info { "UpdateAge ${params.widgetName}: stop job" }
         return true
     }
 }
@@ -175,23 +180,27 @@ private class WidgetContext (
     val isWidgetInUse get() = context.appWidgetManager.getAppWidgetIds(providerName).isNotEmpty()
 
     fun onUpdateWidget() {
-        info(CC_PRIVATE) { "onUpdateWidget ${wDesc.name}" }
+        val logHead = "onUpdateWidget ${wDesc.name}"
+        info(CC_PRIVATE) { "$logHead: initial image fetch" }
         try {
             updateRemoteViews(null)
             appCoroScope.start {
                 try {
                     val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
-                    scheduleWidgetUpdate(
-                            if (lastModified != null) millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes)
-                            else JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS
-                    )
+                    if (lastModified != null) {
+                        info(CC_PRIVATE) { "$logHead: success" }
+                        scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                    } else {
+                        info(CC_PRIVATE) { "$logHead: failed, scheduling to retry" }
+                        scheduleWidgetUpdate(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
+                    }
                 } catch (t: Throwable) {
-                    severe(CC_PRIVATE, t) { "onUpdateWidget ${wDesc.name} coroutine failed" }
+                    severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
                 }
             }
             scheduleUpdateAge()
         } catch (t: Throwable) {
-            severe(CC_PRIVATE, t) { "onUpdateWidget ${wDesc.name} failed" }
+            severe(CC_PRIVATE, t) { "$logHead: error on main thread" }
         }
     }
 
