@@ -183,6 +183,9 @@ private class WidgetContext (
         val logHead = "onUpdateWidget ${wDesc.name}"
         info(CC_PRIVATE) { "$logHead: initial image fetch" }
         try {
+            // Provisionally schedule the refresh job in case OS kills our process
+            // before we get the network result
+            scheduleWidgetUpdate(RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
             updateRemoteViews(null)
             appCoroScope.start {
                 try {
