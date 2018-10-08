@@ -28,7 +28,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
-import com.belotron.weatherradarhr.CcOption.*
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
@@ -42,7 +42,6 @@ import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
-import com.google.android.gms.ads.AdView
 import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.experimental.Dispatchers
@@ -107,7 +106,6 @@ class RadarImageFragment : Fragment() {
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(ds)
     private var rootView: View? = null
-    private val adView get() = rootView?.findViewById<AdView>(R.id.adView)
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
     private var lastReloadedTimestamp = 0L
@@ -228,7 +226,6 @@ class RadarImageFragment : Fragment() {
         }
         setupFullScreenBundle()
         updateFullScreenVisibility()
-        updateAdVisibility()
         return rootView
     }
 
@@ -266,7 +263,6 @@ class RadarImageFragment : Fragment() {
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
             startFetchWidgetImages()
         }
-        adView?.resume()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -280,7 +276,6 @@ class RadarImageFragment : Fragment() {
         ds.destroy()
         fullScreenBundle.destroyViews()
         stashedImgBundle.destroyViews()
-        adView?.destroy()
     }
 
     override fun onPause() {
@@ -292,7 +287,6 @@ class RadarImageFragment : Fragment() {
             setLastReloadedTimestamp(lastReloadedTimestamp)
             setLastPausedTimestamp(System.currentTimeMillis())
         }
-        adView?.pause()
     }
 
     override fun onStop() {
@@ -322,7 +316,6 @@ class RadarImageFragment : Fragment() {
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
             R.id.about -> ds.start {
                 showAboutDialogFragment(activity)
-                updateAdVisibility()
             }
             R.id.rate_me -> activity.openAppRating()
             R.id.widget_log_enabled -> (!item.isChecked).also { newState ->
@@ -401,15 +394,6 @@ class RadarImageFragment : Fragment() {
         with(fullScreenBundle) {
             updateFrom(target)
             copyTo(target)
-        }
-    }
-
-    private fun updateAdVisibility() {
-        val adView = adView ?: return
-        val adsEnabled = activity!!.adsEnabled
-        adView.setVisible(adsEnabled)
-        if (adsEnabled) {
-            adView.loadAd(adRequest())
         }
     }
 

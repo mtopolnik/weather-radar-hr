@@ -2,7 +2,6 @@ package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Context.*
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import java.lang.Math.max
@@ -17,10 +16,6 @@ const val DEFAULT_ANIMATION_RATE = 85
 const val DEFAULT_FREEZE_TIME = 1500
 
 val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
-
-val Context.adControlPrefs: SharedPreferences get() = getSharedPreferences("ad_control", MODE_PRIVATE)
-
-val Context.adsEnabled: Boolean get() = adControlPrefs.getBoolean(KEY_ADS_ENABLED, true)
 
 val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 

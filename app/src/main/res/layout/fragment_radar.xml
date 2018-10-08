@@ -115,15 +115,6 @@
                 />
             </LinearLayout>
         </com.belotron.weatherradarhr.MyScrollView>
-        <com.google.android.gms.ads.AdView
-                xmlns:ads="http://schemas.android.com/apk/res-auto"
-                android:id="@+id/adView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|left"
-                ads:adSize="BANNER"
-                ads:adUnitId="@string/adunit_id">
-        </com.google.android.gms.ads.AdView>
     </FrameLayout>
     <LinearLayout
             android:id="@+id/radar_zoomed"

@@ -6,14 +6,8 @@ import android.app.Dialog
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
 import android.support.v4.app.FragmentActivity
-import android.view.GestureDetector
 import android.view.LayoutInflater
-import android.view.MotionEvent
-import android.view.View
-import android.view.View.VISIBLE
 import android.widget.TextView
-import com.belotron.weatherradarhr.Side.*
-import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.experimental.suspendCancellableCoroutine
 import kotlin.coroutines.experimental.Continuation
 
@@ -42,11 +36,6 @@ class AboutDialogFragment : DialogFragment() {
         val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
             text = getString(R.string.about_text, version)
         }
-        if (!activity.adsEnabled) {
-            rootView.findViewById<TextView>(R.id.about_text_ads_disabled).visibility = VISIBLE
-        }
-        val gd = GestureDetector(activity, EasterEggDetector(rootView))
-        textView.setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
         return AlertDialog.Builder(activity)
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
@@ -63,41 +52,3 @@ class AboutDialogFragment : DialogFragment() {
         super.onDestroyView()
     }
 }
-
-private class EasterEggDetector(
-        private val view: View
-) : GestureDetector.SimpleOnGestureListener() {
-    private val sequence = listOf(L, R, R, L, L, L, R, R, R, R)
-    private var indexInSequence = 0
-
-    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-        val middle = view.width / 2
-        val tapSide = if (e.x < middle) L else R
-        info { "Tap side: $tapSide" }
-        if (tapSide == sequence[indexInSequence]) {
-            indexInSequence++
-            if (indexInSequence == sequence.size) {
-                indexInSequence = 0
-                invertAdsEnabled()
-                info { "Easter egg!" }
-            }
-        } else {
-            indexInSequence = 0
-        }
-        return true
-    }
-
-    @SuppressLint("CommitPrefEdits")
-    private fun invertAdsEnabled() {
-        val enableAds = !view.context.adsEnabled
-        view.context.adControlPrefs.commitUpdate {
-            putBoolean(KEY_ADS_ENABLED, enableAds)
-        }
-        view.findViewById<View>(R.id.about_text_ads_disabled).setVisible(!enableAds)
-        if (enableAds) {
-            MobileAds.initialize(view.context, ADMOB_ID)
-        }
-    }
-}
-
-private enum class Side { L, R }
