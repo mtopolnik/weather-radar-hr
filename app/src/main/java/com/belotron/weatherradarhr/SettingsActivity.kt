@@ -1,8 +1,8 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import android.support.v4.app.FragmentActivity
-import android.support.v7.preference.PreferenceFragmentCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.preference.PreferenceFragmentCompat
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 
 class SettingsActivity : FragmentActivity() {

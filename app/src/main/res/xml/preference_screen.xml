@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.v7.preference.PreferenceScreen
+<androidx.preference.PreferenceScreen
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:belotron="http://belotron.com">
     <com.belotron.weatherradarhr.SeekBarPreference
@@ -18,4 +18,4 @@
             belotron:min="100"
             belotron:max="6000"
     />
-</android.support.v7.preference.PreferenceScreen>
+</androidx.preference.PreferenceScreen>

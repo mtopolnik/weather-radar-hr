@@ -8,8 +8,8 @@ import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import android.os.Bundle
-import android.support.v4.content.ContextCompat.getColor
-import android.support.v7.app.AppCompatActivity
+import androidx.core.content.ContextCompat.getColor
+import androidx.appcompat.app.AppCompatActivity
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.SECOND_IN_MILLIS

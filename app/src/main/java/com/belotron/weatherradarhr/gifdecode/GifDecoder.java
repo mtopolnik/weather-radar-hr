@@ -25,10 +25,10 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
-import android.support.annotation.ColorInt;
-import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.ColorInt;
+import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.belotron.weatherradarhr.LogKt;
 
 import java.lang.annotation.Retention;

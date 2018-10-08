@@ -1,7 +1,7 @@
 package com.belotron.weatherradarhr.gifdecode;
 
 import android.graphics.Bitmap;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 /**
  * An interface that can be used to provide reused {@link android.graphics.Bitmap}s to avoid GCs

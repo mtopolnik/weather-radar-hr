@@ -3,7 +3,7 @@ package com.belotron.weatherradarhr
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import android.preference.PreferenceManager
+import androidx.preference.PreferenceManager
 import java.lang.Math.max
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"

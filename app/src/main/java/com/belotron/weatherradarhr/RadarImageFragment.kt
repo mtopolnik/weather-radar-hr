@@ -6,8 +6,8 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
-import android.support.v4.app.Fragment
-import android.support.v7.app.AppCompatActivity
+import androidx.fragment.app.Fragment
+import androidx.appcompat.app.AppCompatActivity
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener

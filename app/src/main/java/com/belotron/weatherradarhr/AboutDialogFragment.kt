@@ -4,8 +4,8 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.os.Bundle
-import android.support.v4.app.DialogFragment
-import android.support.v4.app.FragmentActivity
+import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.FragmentActivity
 import android.view.LayoutInflater
 import android.widget.TextView
 import kotlinx.coroutines.experimental.suspendCancellableCoroutine
@@ -33,7 +33,7 @@ class AboutDialogFragment : DialogFragment() {
         val version =
                 try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }
                 catch (e: Exception) { null } ?: "??"
-        val textView = rootView.findViewById<TextView>(R.id.about_text_view).apply {
+        rootView.findViewById<TextView>(R.id.about_text_view).apply {
             text = getString(R.string.about_text, version)
         }
         return AlertDialog.Builder(activity)
