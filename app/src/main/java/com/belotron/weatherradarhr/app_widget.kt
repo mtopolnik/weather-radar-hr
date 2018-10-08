@@ -113,6 +113,7 @@ class RefreshImageService : JobService() {
         try {
             val wDesc = params.widgetDescriptor
             val wCtx = WidgetContext(applicationContext, wDesc)
+            wCtx.scheduleJustInCase()
             return if (wCtx.isWidgetInUse) {
                 appCoroScope.start {
                     try {
@@ -183,9 +184,7 @@ private class WidgetContext (
         val logHead = "onUpdateWidget ${wDesc.name}"
         info(CC_PRIVATE) { "$logHead: initial image fetch" }
         try {
-            // Provisionally schedule the refresh job in case OS kills our process
-            // before we get the network result
-            scheduleWidgetUpdate(RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
+            scheduleJustInCase()
             updateRemoteViews(null)
             appCoroScope.start {
                 try {
@@ -230,6 +229,12 @@ private class WidgetContext (
             severe(CC_PRIVATE, t) { "Failed to refresh widget ${wDesc.name}" }
         }
         return null
+    }
+
+    // Provisionally schedules the refresh job in case OS kills our process
+    // before we get the network result
+    fun scheduleJustInCase() {
+        scheduleWidgetUpdate(RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
     }
 
     private fun WidgetDescriptor.timestampedBitmapFrom(parsedGif: ParsedGif, isOffline: Boolean): TimestampedBitmap {
