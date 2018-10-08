@@ -82,15 +82,18 @@ private data class WidgetDescriptor(
 private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
 
 fun startFetchWidgetImages() {
-    widgetDescriptors.forEach { wDesc ->
-        WidgetContext(appContext, wDesc).apply {
-            if (isWidgetInUse) {
+    widgetDescriptors
+            .map { WidgetContext(appContext, it) }
+            .filter { it.isWidgetInUse }
+            .forEach { wCtx -> wCtx.apply {
                 appCoroScope.start {
                     fetchImageAndUpdateWidget(onlyIfNew = false)
                 }
-            }
-        }
-    }
+                if (appContext.jobScheduler.allPendingJobs.none { it.id == wDesc.refreshImageJobId }) {
+                    info(CC_PRIVATE) { "startFetchWidgetImages ${wDesc.name}: refresh not scheduled, fixing" }
+                    scheduleJustInCase()
+                }
+            } }
 }
 
 class LradarWidgetProvider : AppWidgetProvider() {
@@ -174,7 +177,7 @@ class UpdateAgeService : JobService() {
 
 private class WidgetContext (
         private val context: Context,
-        private val wDesc: WidgetDescriptor
+        val wDesc: WidgetDescriptor
 ) {
     val providerName = ComponentName(context, wDesc.providerClass)
 
