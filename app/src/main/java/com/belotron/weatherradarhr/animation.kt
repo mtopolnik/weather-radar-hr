@@ -9,11 +9,11 @@ import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.experimental.CoroutineDispatcher
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.asCoroutineDispatcher
-import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.withContext
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadFactory

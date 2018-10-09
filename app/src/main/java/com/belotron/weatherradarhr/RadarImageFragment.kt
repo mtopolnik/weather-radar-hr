@@ -6,8 +6,6 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
-import androidx.fragment.app.Fragment
-import androidx.appcompat.app.AppCompatActivity
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
@@ -28,6 +26,8 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -42,13 +42,12 @@ import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import com.belotron.weatherradarhr.gifdecode.Pixels
-import kotlinx.coroutines.experimental.CoroutineScope
-import kotlinx.coroutines.experimental.CoroutineStart.UNDISPATCHED
-import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.android.Main
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import java.util.TreeSet
 
 

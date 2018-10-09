@@ -8,8 +8,9 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentActivity
 import android.view.LayoutInflater
 import android.widget.TextView
-import kotlinx.coroutines.experimental.suspendCancellableCoroutine
-import kotlin.coroutines.experimental.Continuation
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
 
 const val TAG_ABOUT = "dialog_about"
 

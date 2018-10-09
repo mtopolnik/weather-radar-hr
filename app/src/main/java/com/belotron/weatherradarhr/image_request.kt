@@ -7,7 +7,7 @@ import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.gifdecode.GifDecodeException
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.experimental.withContext
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.lang.Long.parseLong
