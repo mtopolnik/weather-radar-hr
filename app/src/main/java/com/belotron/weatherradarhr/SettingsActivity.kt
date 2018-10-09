@@ -1,11 +1,11 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import androidx.fragment.app.FragmentActivity
-import androidx.preference.PreferenceFragmentCompat
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceFragmentCompat
 
-class SettingsActivity : FragmentActivity() {
+class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN)
