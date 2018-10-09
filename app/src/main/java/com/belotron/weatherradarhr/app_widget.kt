@@ -276,7 +276,7 @@ private class WidgetContext (
                         .setOverrideDeadline(HOUR_IN_MILLIS)
                         .build())
         val latencyStr = formatElapsedTime(MILLISECONDS.toSeconds(latencyMillis))
-        reportScheduleResult("refresh image for ${wDesc.name} after $latencyStr", resultCode)
+        reportScheduleResult("refresh image for ${wDesc.name} after $latencyStr minutes:seconds", resultCode)
     }
 
     fun cancelUpdateAge() {
