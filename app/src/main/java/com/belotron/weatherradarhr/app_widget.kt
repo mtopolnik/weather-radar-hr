@@ -290,7 +290,7 @@ private class WidgetContext (
                         .setExtras(wDesc.toExtras())
                         .setPeriodic(UPDATE_AGE_PERIOD_MINUTES * MINUTE_IN_MILLIS)
                         .build())
-        reportScheduleResult("update age of ${wDesc.name} every minute", resultCode)
+        reportScheduleResult("update age of ${wDesc.name} every three minutes", resultCode)
     }
 
     fun readImgAndTimestamp() : TimestampedBitmap? {
