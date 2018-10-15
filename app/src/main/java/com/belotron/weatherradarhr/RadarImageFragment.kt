@@ -46,6 +46,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.util.TreeSet
@@ -95,7 +96,7 @@ class DisplayState : CoroutineScope {
         coroutineContext = newCoroCtx()
     }
 
-    private fun newCoroCtx() = Dispatchers.Main + Job()
+    private fun newCoroCtx() = Dispatchers.Main + SupervisorJob()
 }
 
 class RadarImageFragment : Fragment() {
