@@ -16,6 +16,7 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIE
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
+@SuppressWarnings("MagicNumber")
 public class GifParser {
     private static final String TAG = "GifParser";
 
@@ -44,7 +45,7 @@ public class GifParser {
     /**
      * Mask (bits 4-2) to extract Disposal Method of the current frame.
      *
-     * @see GifFrame.GifDisposalMethod possible values
+     * See {@code GifFrame.GifDisposalMethod} for possible values
      */
     private static final int GCE_MASK_DISPOSAL_METHOD = 0b00011100;
     /**
@@ -146,7 +147,7 @@ public class GifParser {
         parser.readContents();
         ParsedGif parsedGif = parser.parsedGif;
         if (parsedGif.getFrameCount() == 0) {
-            throw new GifDecodeException("The GIF contains zero images");
+            throw new ImgDecodeException("The GIF contains zero images");
         }
         return parsedGif;
     }
@@ -160,7 +161,7 @@ public class GifParser {
             id.append((char) read());
         }
         if (!id.toString().startsWith("GIF")) {
-            throw new GifDecodeException("Image data doesn't start with 'GIF'");
+            throw new ImgDecodeException("Image data doesn't start with 'GIF'");
         }
         readLSD();
         if (parsedGif.gctFlag) {
@@ -224,7 +225,7 @@ public class GifParser {
             }
             return tab;
         } catch (BufferUnderflowException e) {
-            throw new GifDecodeException("Format error while redaing color table", e);
+            throw new ImgDecodeException("Format error while redaing color table", e);
         }
     }
 
@@ -284,7 +285,7 @@ public class GifParser {
                 // Bad byte, but keep going and see what happens
                 case 0x00:
                 default:
-                    throw new GifDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
+                    throw new ImgDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
             }
         }
     }
@@ -385,7 +386,6 @@ public class GifParser {
         } while (blockSize > 0);
     }
 
-
     /**
      * Skips LZW image data for a single frame to advance buffer.
      */
@@ -412,6 +412,25 @@ public class GifParser {
         } while (blockSize > 0);
     }
 
+    private void printAsciiData() {
+        StringBuilder comment = new StringBuilder();
+        int blockSize;
+        boolean endReached = false;
+        do {
+            blockSize = read();
+            if (rawData.position() + blockSize >= rawData.limit()) {
+                blockSize = rawData.limit() - rawData.position();
+                endReached = true;
+            }
+            for (int i = 0; i < blockSize; i++) {
+                comment.append((char) rawData.get());
+            }
+        } while (blockSize > 0 || endReached);
+        if (comment.length() > 0) {
+            System.out.println("Comment: " + comment);
+        }
+    }
+
     /**
      * Reads next variable length block from input.
      */
@@ -427,7 +446,7 @@ public class GifParser {
                     n += count;
                 }
             } catch (Exception e) {
-                throw new GifDecodeException(
+                throw new ImgDecodeException(
                         "Error reading block, n = " + n + " count = " + count + " blockSize = " + blockSize, e);
             }
         }
@@ -440,7 +459,7 @@ public class GifParser {
         try {
             return rawData.get() & MASK_INT_LOWEST_BYTE;
         } catch (BufferUnderflowException e) {
-            throw new GifDecodeException("GIF parse error", e);
+            throw new ImgDecodeException("GIF parse error", e);
         }
     }
 

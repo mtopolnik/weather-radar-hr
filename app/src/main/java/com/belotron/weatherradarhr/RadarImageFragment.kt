@@ -37,7 +37,7 @@ import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.Allocator
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifDecodeException
+import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
@@ -47,16 +47,18 @@ import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.util.TreeSet
+import java.util.concurrent.Executors
 
 
 private const val ANIMATION_COVERS_MINUTES = 100
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
 val imgDescs = arrayOf(
-        ImgDescriptor(0, "HR", "http://vrijeme.hr/kradar-anim.gif", 15,
+        ImgDescriptor(0, "HR", "http://vrijeme.hr/kompozit-anim.gif", 15,
                 R.id.vg_kradar, R.id.text_kradar, R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
                 KradarOcr::ocrKradarTimestamp),
         ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 10,
@@ -412,9 +414,9 @@ class RadarImageFragment : Fragment() {
                 val coroScope = this
                 try {
                     val (lastModified, parsedGif) = try {
-                        fetchUrl(context, desc.url, fetchPolicy)
+                        context.fetchGif(desc.url, fetchPolicy)
                     } catch (e: ImageFetchException) {
-                        Pair(0L, e.cached)
+                        Pair(0L, e.cached as ParsedGif?)
                     }
                     if (parsedGif == null) {
                         bundle.status = BROKEN
@@ -448,11 +450,13 @@ class RadarImageFragment : Fragment() {
     private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
 }
 
+private val singleThread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
 private suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Context, desc: ImgDescriptor) {
     val parsedGif = this
     BitmapFreelists().also { allocator ->
         (0 until frameCount).map { frameIndex ->
-            coroScope.async(Dispatchers.Default) {
+            coroScope.async(singleThread) {
                 context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
             }
         }.forEachIndexed { i, it ->
@@ -470,7 +474,7 @@ private fun Context.decodeAndAssignTimestamp(
                 decoder.dispose()
             }
         }
-    } catch (e: GifDecodeException) {
+    } catch (e: ImgDecodeException) {
         severe { "Animated GIF decoding error" }
         invalidateCache(desc.url)
         throw e

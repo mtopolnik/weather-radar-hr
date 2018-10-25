@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import com.belotron.weatherradarhr.gifdecode.Pixels
+import com.belotron.weatherradarhr.gifdecode.pixelDiff
 import java.util.Calendar
 import java.util.Calendar.DAY_OF_MONTH
 import java.util.Calendar.HOUR_OF_DAY
@@ -11,6 +12,7 @@ import java.util.Calendar.MONTH
 import java.util.Calendar.SECOND
 import java.util.Calendar.YEAR
 import java.util.TimeZone
+import java.util.TimeZone.getTimeZone
 
 object LradarOcr {
 
@@ -20,7 +22,7 @@ object LradarOcr {
         initDigitPixelses()
         val dt = ocrDateTime(pixels)
         debug { "ARSO OCRed date/time: $dt" }
-        return dt.toTimestamp()
+        return dt.toTimestamp(getTimeZone("UTC"))
     }
 
     fun ocrLradarTimestamp(bitmap: Bitmap) = ocrLradarTimestamp(bitmap.asPixels())
@@ -38,83 +40,95 @@ object LradarOcr {
             hour = readNumber(pixels, 11, 12),
             minute = readNumber(pixels, 14, 15))
 
-    private fun readNumber(pixels: Pixels, vararg indices : Int): Int =
+    private fun readNumber(pixels: Pixels, vararg indices: Int): Int =
             indices.fold(0) { acc, ind -> 10 * acc + readDigit(pixels, ind) }
 
-    private fun readDigit(pixels: Pixels, pos : Int) =
-        (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitPixelses[it], 0) } ?: ocrFailed()
+    private fun readDigit(pixels: Pixels, pos: Int) =
+            (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitPixelses[it], 0) } ?: ocrFailed()
 }
 
 object KradarOcr {
-    private var dateDigitPixelses: List<Pixels> = emptyList()
-    private var timeDigitPixelses: List<Pixels> = emptyList()
+    private var digitPixelses: List<Pixels> = emptyList()
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
         val dt = ocrDateTime(pixels)
         debug { "DHMZ OCRed date/time: $dt" }
-        return dt.toTimestamp()
+        return dt.toTimestamp(getTimeZone("Europe/Zagreb"))
     }
 
     fun ocrKradarTimestamp(bitmap: Bitmap) = ocrKradarTimestamp(bitmap.asPixels())
 
     private fun initDigitPixelses() {
-        if (dateDigitPixelses.isEmpty()) {
-            dateDigitPixelses = appContext.loadDigits("kradar/date")
-        }
-        if (timeDigitPixelses.isEmpty()) {
-            timeDigitPixelses = appContext.loadDigits("kradar/time")
+        if (digitPixelses.isEmpty()) {
+            digitPixelses = appContext.loadDigits("kradar")
         }
     }
 
-    private fun ocrDateTime(pixels: Pixels): DateTime {
-        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-
-        // Remember that dt.month is 1-based, but now.get(MONTH) is 0-based!
-
-        val dt = DateTime(
-                year = readDateNumber(pixels, 7, 8, 9, 10),
-                month = now.get(MONTH) + 1, //readDateString(bitmap, 3, 4, 5),
-                day = readDateNumber(pixels, 0, 1),
-                hour = readTimeNumber(pixels, 486, 504),
-                minute = readTimeNumber(pixels, 532, 550),
-                second = readTimeNumber(pixels, 578, 596)
-        )
-        return when {
-            dt.year < now.get(YEAR) -> DateTime(dt, month = 12)
-            dt.day > now.get(DAY_OF_MONTH) -> DateTime(dt, month = dt.month - 1)
-            else -> dt
+    private fun ocrDateTime(img: Pixels): DateTime {
+        var x = 108
+        val digits = IntArray(12) { 0 }
+        var digitIndex = 0
+        while (x < 230) {
+            val digit = (0..9).find { isMatch(img, x, digitPixelses[it]) }
+            if (digit != null) {
+                digits[digitIndex++] = digit
+                x += 7
+            } else {
+                x++
+            }
+        }
+        info { "KRadar OCRed digits: ${digits.contentToString()}" }
+        return digits.run {
+            DateTime(
+                    year = digitsToInt(0..3),
+                    month = digitsToInt(4..5),
+                    day = digitsToInt(6..7),
+                    hour = digitsToInt(8..9),
+                    minute = digitsToInt(10..11))
         }
     }
 
-    private fun readTimeNumber(pixels: Pixels, vararg xs : Int): Int =
-        xs.fold(0) { acc, x -> 10 * acc + readTimeDigit(pixels, x) }
-
-    private fun readTimeDigit(pixels: Pixels, x : Int) =
-            (0..9).find { stripeEqual(pixels, x, 143, timeDigitPixelses[it], 3) } ?: ocrFailed()
-
-    private fun readDateNumber(pixels: Pixels, vararg indices : Int): Int =
-            indices.fold(0) { acc, i -> 10 * acc + readDateDigit(pixels, i) }
-
-    private fun readDateDigit(pixels: Pixels, pos: Int): Int {
-        val imgX = 486 + 10 * pos
-        val imgY = 168
-        return when {
-            (0 until 13).all { rectY -> pixels.get(imgX + 1, imgY + rectY) != -1 } -> 0 // blank space
-            else -> (0..9).find { stripeEqual(pixels, imgX, imgY, dateDigitPixelses[it], 1) } ?: ocrFailed()
+    private fun isMatch(img: Pixels, imgX: Int, template: Pixels): Boolean {
+        val imgY = 2
+        var totalDiff = 0
+        (0 until template.height).forEach { y ->
+            (0 until template.width).forEach { x ->
+                totalDiff += pixelDiff(img[imgX + x, imgY + y], template[x, y])
+                if (totalDiff > 2000) {
+                    return false
+                }
+            }
         }
+        return true
     }
+
+    private fun IntArray.digitsToInt(range: IntRange) = range.fold(0) { acc, i -> 10 * acc + this[i] }
 }
 
-private fun stripeData(img: Pixels, imgX: Int, imgY: Int, rectHeight: Int, rectX: Int): List<Int> =
-        (0 until rectHeight).map { rectY -> img.get(imgX + rectX, imgY + rectY) }
+private fun asciiArt(img: Pixels, left: Int, top: Int, template: Pixels): String {
+    val width = template.width
+    val height = template.height
+    val b = StringBuilder((2 * width + 2) * height)
+    (0 until height).forEach { y ->
+        (0 until width).forEach { x ->
+            b.append(img.asciiPixel(left + x, top + y))
+        }
+        b.append("  ")
+        (0 until width).forEach { x ->
+            b.append(template.asciiPixel(x, y))
+        }
+        b.append('\n')
+    }
+    return b.toString()
+}
 
 /**
  * Returns true if the vertical stripe of `rect` at `rectX` is equal to
  * the vertical stripe in `img` at `(imgX + rectX, imgY)`
  */
 private fun stripeEqual(img: Pixels, imgX: Int, imgY: Int, rect: Pixels, rectX: Int) =
-    (0 until rect.height).all { rectY -> img.get(imgX + rectX, imgY + rectY) == rect.get(rectX, rectY) }
+        (0 until rect.height).all { rectY -> img.get(imgX + rectX, imgY + rectY) == rect.get(rectX, rectY) }
 
 private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
 
@@ -137,8 +151,8 @@ class DateTime(
     val minute: Int = minute ?: copyFrom?.minute ?: throw missingVal("minute")
     val second: Int = second ?: copyFrom?.second ?: 0
 
-    fun toTimestamp() : Long {
-        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    fun toTimestamp(tz: TimeZone): Long {
+        val cal = Calendar.getInstance(tz)
         cal.timeInMillis = 0
         cal.set(YEAR, year)
         cal.set(MONTH, month - 1)

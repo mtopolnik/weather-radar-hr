@@ -4,12 +4,11 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import android.os.Bundle
-import androidx.core.content.ContextCompat.getColor
-import androidx.appcompat.app.AppCompatActivity
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.SECOND_IN_MILLIS
@@ -20,6 +19,8 @@ import android.view.View.VISIBLE
 import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat.getColor
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
@@ -30,7 +31,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.android.Main
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import java.io.DataInputStream
@@ -171,6 +171,8 @@ fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 fun File.writer(append: Boolean = true) = PrintWriter(FileWriter(this, append))
 
 fun ByteArray.parseGif() = GifParser.parse(this)
+
+fun ByteArray.pngToBitmap() = BitmapFactory.decodeByteArray(this, 0, size)!!
 
 private fun ParsedGif.decodeFrame0(): GifDecoder = GifDecoder(BitmapFreelists(), this).decodeFrame(0)
 

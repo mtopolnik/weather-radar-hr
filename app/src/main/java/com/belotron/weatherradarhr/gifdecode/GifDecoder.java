@@ -26,14 +26,9 @@ package com.belotron.weatherradarhr.gifdecode;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import androidx.annotation.ColorInt;
-import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.belotron.weatherradarhr.LogKt;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -138,10 +133,10 @@ public class GifDecoder {
 
     public GifDecoder decodeFrame(int index) {
         if (index < 0) {
-            throw new GifDecodeException("Asked to decode frame " + index);
+            throw new ImgDecodeException("Asked to decode frame " + index);
         }
         if (index >= parsedGif.getFrameCount()) {
-            throw new GifDecodeException("Asked to decode frame " + index + ", but frame count is " +
+            throw new ImgDecodeException("Asked to decode frame " + index + ", but frame count is " +
                     parsedGif.getFrameCount());
         }
         try {
@@ -153,7 +148,7 @@ public class GifDecoder {
             act = currentFrame.lct != null ? currentFrame.lct : parsedGif.gct;
             if (act == null) {
                 // No color table defined.
-                throw new GifDecodeException("No valid color table found for frame #" + index);
+                throw new ImgDecodeException("No valid color table found for frame #" + index);
             }
 
             // Reset the transparent pixel in the color table
@@ -167,10 +162,10 @@ public class GifDecoder {
             }
             setPixels(currentFrame, previousFrame);
             return this;
-        } catch (GifDecodeException e) {
+        } catch (ImgDecodeException e) {
             throw e;
         } catch (Throwable t) {
-            throw new GifDecodeException(t);
+            throw new ImgDecodeException(t);
         }
     }
 
@@ -180,7 +175,7 @@ public class GifDecoder {
      */
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
-            throw new GifDecodeException(
+            throw new ImgDecodeException(
                     "The animated GIF contains a frame with the Restore To Previous frame disposal method" +
                             " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
         }

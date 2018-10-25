@@ -24,8 +24,7 @@ import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
-import com.belotron.weatherradarhr.gifdecode.GifDecodeException
-import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import java.io.IOException
 import java.util.Calendar
 import java.util.TimeZone
@@ -53,7 +52,7 @@ private val widgetDescriptors = arrayOf(
                             isOffline,
                             createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
-        WidgetDescriptor("KRadar", "http://vrijeme.hr/kradar.gif", 15,
+        WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 15,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
                 { bitmap, isOffline ->
@@ -212,21 +211,25 @@ private class WidgetContext (
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
             try {
-                val (lastModified, parsedGif) = fetchUrl(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
-                if (parsedGif == null) {
+                val (lastModified, bitmap) = context.fetchPng(wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
+                if (bitmap == null) {
                     // This may happen only with `onlyIfNew == true`
                     return null
                 }
-                val tsBitmap = wDesc.timestampedBitmapFrom(parsedGif, false)
+                val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
                 writeImgAndTimestamp(tsBitmap)
                 updateRemoteViews(tsBitmap)
                 return lastModified
             } catch (e: ImageFetchException) {
                 if (e.cached != null) {
-                    updateRemoteViews(wDesc.timestampedBitmapFrom(e.cached, true))
+                    updateRemoteViews(wDesc.toTimestampedBitmap(e.cached as Bitmap, true))
                 } else if (!onlyIfNew) {
                     warn(CC_PRIVATE) { "Failed to fetch ${wDesc.imgFilename}" }
                 }
+            } catch (e: ImgDecodeException) {
+                severe(CC_PRIVATE) { "Image decoding error for ${wDesc.name}" }
+                context.invalidateCache(wDesc.url)
+                throw e
             }
         } catch (t: Throwable) {
             severe(CC_PRIVATE, t) { "Failed to refresh widget ${wDesc.name}" }
@@ -240,20 +243,10 @@ private class WidgetContext (
         scheduleWidgetUpdate(RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
     }
 
-    private fun WidgetDescriptor.timestampedBitmapFrom(parsedGif: ParsedGif, isOffline: Boolean): TimestampedBitmap {
-        try {
-            return wDesc.toTimestampedBitmap(parsedGif.toBitmap(), isOffline)
-        } catch (e: GifDecodeException) {
-            severe(CC_PRIVATE) { "GIF decoding error for $name" }
-            context.invalidateCache(url)
-            throw e
-        }
-    }
-
     fun updateRemoteViews(tsBitmap: TimestampedBitmap?) {
         val remoteViews = RemoteViews(context.packageName, R.layout.app_widget)
         with(remoteViews) {
-            setOnClickPendingIntent(R.id.img_view_widget, intentLaunchMainActivity(context))
+            setOnClickPendingIntent(R.id.img_view_widget, context.intentLaunchMainActivity())
             tsBitmap?.also {
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)
@@ -325,13 +318,13 @@ private val Context.jobScheduler get() = getSystemService(Context.JOB_SCHEDULER_
 
 private val Context.appWidgetManager get() = AppWidgetManager.getInstance(this)
 
-private fun intentLaunchMainActivity(context: Context): PendingIntent {
+private fun Context.intentLaunchMainActivity(): PendingIntent {
     val launchIntent = with(Intent(ACTION_MAIN)) {
         addCategory(Intent.CATEGORY_LAUNCHER)
-        component = ComponentName(context.packageName, MainActivity::class.java.name)
+        component = ComponentName(packageName, MainActivity::class.java.name)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return PendingIntent.getActivity(context, 0, launchIntent, 0)
+    return PendingIntent.getActivity(this, 0, launchIntent, 0)
 }
 
 private fun reportScheduleResult(task: String, resultCode: Int) {
