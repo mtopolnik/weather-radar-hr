@@ -7,16 +7,12 @@ import kotlin.math.min
 private const val ASCII_GREYSCALE = "@%#*+=-:. "
 private const val MAX_PIXEL_VALUE = (3 * 0xff)
 
-fun pixelValue(argb: Int): Int {
+fun decodeRgbaToGrey(argb: Int): Int {
     val byteMask = 0xff
     val leftR = argb and byteMask
     val leftG = argb shr 8 and byteMask
     val leftB = argb shr 16 and byteMask
     return leftR + leftG + leftB
-}
-
-fun pixelDiff(left: Int, right: Int): Int {
-    return abs(pixelValue(left) - pixelValue(right))
 }
 
 interface Pixels {
@@ -27,7 +23,7 @@ interface Pixels {
     fun asciiPixel(x: Int, y: Int): Char {
         return ASCII_GREYSCALE[
                 min(ASCII_GREYSCALE.length - 1,
-                        pixelValue(this[x, y]) * ASCII_GREYSCALE.length / MAX_PIXEL_VALUE)
+                        decodeRgbaToGrey(this[x, y]) * ASCII_GREYSCALE.length / MAX_PIXEL_VALUE)
         ]
     }
 }
@@ -38,6 +34,8 @@ class IntArrayPixels(
 ) : Pixels {
     override val height = pixels.size / width
     override operator fun get(x: Int, y: Int) = pixels[width * y + x]
+
+    val decodeToGreyscale get() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
 }
 
 class BitmapPixels(

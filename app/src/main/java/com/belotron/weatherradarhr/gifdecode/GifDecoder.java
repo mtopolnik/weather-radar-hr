@@ -28,6 +28,7 @@ import android.graphics.Bitmap.Config;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -123,7 +124,8 @@ public class GifDecoder {
         return result;
     }
 
-    public Pixels toPixels() {
+    @NotNull
+    public IntArrayPixels toPixels() {
         return new IntArrayPixels(outPixels.clone(), parsedGif.width);
     }
 

@@ -178,7 +178,7 @@ private fun ParsedGif.decodeFrame0(): GifDecoder = GifDecoder(BitmapFreelists(),
 
 fun ParsedGif.toBitmap(): Bitmap = decodeFrame0().toBitmap()
 
-fun ParsedGif.toPixels(): Pixels = decodeFrame0().toPixels()
+fun ParsedGif.toPixels() = decodeFrame0().toPixels()
 
 fun Bitmap.asPixels() = BitmapPixels(this)
 

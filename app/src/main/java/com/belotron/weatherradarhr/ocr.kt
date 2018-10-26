@@ -2,8 +2,9 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.belotron.weatherradarhr.gifdecode.IntArrayPixels
 import com.belotron.weatherradarhr.gifdecode.Pixels
-import com.belotron.weatherradarhr.gifdecode.pixelDiff
+import com.belotron.weatherradarhr.gifdecode.decodeRgbaToGrey
 import java.util.Calendar
 import java.util.Calendar.DAY_OF_MONTH
 import java.util.Calendar.HOUR_OF_DAY
@@ -13,10 +14,11 @@ import java.util.Calendar.SECOND
 import java.util.Calendar.YEAR
 import java.util.TimeZone
 import java.util.TimeZone.getTimeZone
+import kotlin.math.abs
 
 object LradarOcr {
 
-    private var digitPixelses: List<Pixels> = emptyList()
+    private var digitTemplates: List<Pixels> = emptyList()
 
     fun ocrLradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -28,8 +30,8 @@ object LradarOcr {
     fun ocrLradarTimestamp(bitmap: Bitmap) = ocrLradarTimestamp(bitmap.asPixels())
 
     private fun initDigitPixelses() {
-        if (digitPixelses.isEmpty()) {
-            digitPixelses = appContext.loadDigits("lradar")
+        if (digitTemplates.isEmpty()) {
+            digitTemplates = appContext.loadDigits("lradar")
         }
     }
 
@@ -44,11 +46,11 @@ object LradarOcr {
             indices.fold(0) { acc, ind -> 10 * acc + readDigit(pixels, ind) }
 
     private fun readDigit(pixels: Pixels, pos: Int) =
-            (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitPixelses[it], 0) } ?: ocrFailed()
+            (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitTemplates[it], 0) } ?: ocrFailed()
 }
 
 object KradarOcr {
-    private var digitPixelses: List<Pixels> = emptyList()
+    private var digitTemplates: List<IntArrayPixels> = emptyList()
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -60,8 +62,9 @@ object KradarOcr {
     fun ocrKradarTimestamp(bitmap: Bitmap) = ocrKradarTimestamp(bitmap.asPixels())
 
     private fun initDigitPixelses() {
-        if (digitPixelses.isEmpty()) {
-            digitPixelses = appContext.loadDigits("kradar")
+        if (digitTemplates.isEmpty()) {
+            digitTemplates = appContext.loadDigits("kradar")
+            digitTemplates.forEach { it.decodeToGreyscale }
         }
     }
 
@@ -70,7 +73,7 @@ object KradarOcr {
         val digits = IntArray(12) { 0 }
         var digitIndex = 0
         while (x < 230) {
-            val digit = (0..9).find { isMatch(img, x, digitPixelses[it]) }
+            val digit = (0..9).find { isMatch(img, x, digitTemplates[it]) }
             if (digit != null) {
                 digits[digitIndex++] = digit
                 x += 7
@@ -94,7 +97,7 @@ object KradarOcr {
         var totalDiff = 0
         (0 until template.height).forEach { y ->
             (0 until template.width).forEach { x ->
-                totalDiff += pixelDiff(img[imgX + x, imgY + y], template[x, y])
+                totalDiff += abs(decodeRgbaToGrey(img[imgX + x, imgY + y]) - template[x, y])
                 if (totalDiff > 2000) {
                     return false
                 }
