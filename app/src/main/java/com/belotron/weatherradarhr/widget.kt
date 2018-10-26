@@ -38,7 +38,7 @@ private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
 private const val LRADAR_CROP_Y_TOP = 40
-private const val KRADAR_CROP_X_RIGHT = 480
+private const val KRADAR_CROP_Y_HEIGHT = 480
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 @Suppress("MoveLambdaOutsideParentheses")
@@ -59,7 +59,7 @@ private val widgetDescriptors = arrayOf(
                     TimestampedBitmap(
                             ocrKradarTimestamp(bitmap),
                             isOffline,
-                            createBitmap(bitmap, 0, 0, KRADAR_CROP_X_RIGHT, bitmap.height)) })
+                            createBitmap(bitmap, 0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
 )
 
 private data class WidgetDescriptor(
