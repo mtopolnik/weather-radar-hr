@@ -450,13 +450,11 @@ class RadarImageFragment : Fragment() {
     private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
 }
 
-private val singleThread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-
 private suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Context, desc: ImgDescriptor) {
     val parsedGif = this
     BitmapFreelists().also { allocator ->
         (0 until frameCount).map { frameIndex ->
-            coroScope.async(singleThread) {
+            coroScope.async(Dispatchers.Default) {
                 context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
             }
         }.forEachIndexed { i, it ->
