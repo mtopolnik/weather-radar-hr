@@ -19,7 +19,7 @@ import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.text.format.DateUtils.formatElapsedTime
 import android.widget.RemoteViews
-import com.belotron.weatherradarhr.CcOption.*
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
@@ -40,6 +40,7 @@ private const val UPDATE_AGE_JOB_ID_BASE = 700723272
 private const val LRADAR_CROP_Y_TOP = 40
 private const val KRADAR_CROP_Y_HEIGHT = 480
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
+private const val EXTRA_BACKOFF_LATENCY = "backoffLatency"
 
 @Suppress("MoveLambdaOutsideParentheses")
 private val widgetDescriptors = arrayOf(
@@ -52,7 +53,7 @@ private val widgetDescriptors = arrayOf(
                             isOffline,
                             createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
-        WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 15,
+        WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 10,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
                 { bitmap, isOffline ->
@@ -75,7 +76,10 @@ private data class WidgetDescriptor(
     val index get() = widgetDescriptors.indexOf(this)
     val refreshImageJobId get() = REFRESH_IMAGE_JOB_ID_BASE + index
     val updateAgeJobId get() = UPDATE_AGE_JOB_ID_BASE + index
-    fun toExtras() = PersistableBundle().apply { putInt(EXTRA_WIDGET_DESC_INDEX, index) }
+    fun toExtras(backoffLatency: Long) = PersistableBundle().apply {
+        putInt(EXTRA_WIDGET_DESC_INDEX, index)
+        putLong(EXTRA_BACKOFF_LATENCY, backoffLatency)
+    }
 }
 
 private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
@@ -110,21 +114,23 @@ class KradarWidgetProvider : AppWidgetProvider() {
 class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val widgetName = params.widgetName
+        val backoffLatency = params.extras.backoffLatency
         val logHead = "RefreshImage $widgetName"
         info(CC_PRIVATE) { "$logHead: start job" }
         try {
             val wDesc = params.widgetDescriptor
             val wCtx = WidgetContext(applicationContext, wDesc)
-            wCtx.scheduleJustInCase()
             return if (wCtx.isWidgetInUse) {
+                wCtx.scheduleJustInCase()
                 appCoroScope.start {
                     try {
                         val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                         jobFinished(params, lastModified == null)
                         if (lastModified != null) {
                             info(CC_PRIVATE) { "$logHead: success" }
-                            wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                            wCtx.scheduleWidgetUpdate(true, millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
                         } else {
+                            wCtx.scheduleWidgetUpdate(false, backoffLatency)
                             info(CC_PRIVATE) { "$logHead: no new image" }
                         }
                     } catch (t: Throwable) {
@@ -193,10 +199,10 @@ private class WidgetContext (
                     val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
                     if (lastModified != null) {
                         info(CC_PRIVATE) { "$logHead: success" }
-                        scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
+                        scheduleWidgetUpdate(true, millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
                     } else {
                         info(CC_PRIVATE) { "$logHead: failed, scheduling to retry" }
-                        scheduleWidgetUpdate(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
+                        scheduleWidgetUpdate(false, JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
                     }
                 } catch (t: Throwable) {
                     severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
@@ -240,7 +246,7 @@ private class WidgetContext (
     // Provisionally schedules the refresh job in case OS kills our process
     // before we get the network result
     fun scheduleJustInCase() {
-        scheduleWidgetUpdate(RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
+        scheduleWidgetUpdate(true, RETRY_PERIOD_MINUTES * MINUTE_IN_MILLIS)
     }
 
     fun updateRemoteViews(tsBitmap: TimestampedBitmap?) {
@@ -259,28 +265,30 @@ private class WidgetContext (
         info { "Updated Remote Views for ${wDesc.name}" }
     }
 
-    fun scheduleWidgetUpdate(latencyMillis: Long) {
-        val resultCode = context.jobScheduler.schedule(
-                JobInfo.Builder(wDesc.refreshImageJobId,
-                        ComponentName(context, RefreshImageService::class.java))
-                        .setExtras(wDesc.toExtras())
-                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                        .setMinimumLatency(latencyMillis)
-                        .setOverrideDeadline(HOUR_IN_MILLIS)
-                        .build())
+    fun scheduleWidgetUpdate(success: Boolean, latencyMillis: Long) {
+        val jobInfo = JobInfo.Builder(wDesc.refreshImageJobId, ComponentName(context, RefreshImageService::class.java))
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            .setMinimumLatency(latencyMillis)
+            .setOverrideDeadline(HOUR_IN_MILLIS)
+            .setExtras(wDesc.toExtras(if (success) JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS else 2 * latencyMillis))
+            .build()
+        val resultCode = context.jobScheduler.schedule(jobInfo)
         val latencyStr = formatElapsedTime(MILLISECONDS.toSeconds(latencyMillis))
         reportScheduleResult("refresh image for ${wDesc.name} after $latencyStr minutes:seconds", resultCode)
     }
 
     fun cancelUpdateAge() {
         info(CC_PRIVATE) { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
-        context.jobScheduler.cancel(wDesc.updateAgeJobId)
+        with(context.jobScheduler) {
+            cancel(wDesc.updateAgeJobId)
+            cancel(wDesc.refreshImageJobId)
+        }
     }
 
     private fun scheduleUpdateAge() {
         val resultCode = context.jobScheduler.schedule(
                 JobInfo.Builder(wDesc.updateAgeJobId, ComponentName(context, UpdateAgeService::class.java))
-                        .setExtras(wDesc.toExtras())
+                        .setExtras(wDesc.toExtras(0L))
                         .setPeriodic(UPDATE_AGE_PERIOD_MINUTES * MINUTE_IN_MILLIS)
                         .build())
         reportScheduleResult("update age of ${wDesc.name} every three minutes", resultCode)
@@ -313,6 +321,9 @@ private val JobParameters.widgetDescriptor: WidgetDescriptor
     get() = widgetDescriptors[extras[EXTRA_WIDGET_DESC_INDEX] as Int]
 
 private val JobParameters.widgetName get() = runOrNull { widgetDescriptor.name } ?: ""
+
+private val PersistableBundle.backoffLatency: Long get() =
+    this[EXTRA_BACKOFF_LATENCY] as Long? ?: JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS
 
 private val Context.jobScheduler get() = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
 
