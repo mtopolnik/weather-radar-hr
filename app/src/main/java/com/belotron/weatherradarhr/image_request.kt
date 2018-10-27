@@ -3,7 +3,6 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -12,6 +11,7 @@ import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.lang.Integer.parseInt
 import java.lang.Long.parseLong
 import java.net.HttpURLConnection
 import java.net.URL
@@ -36,7 +36,7 @@ class ImageFetchException(val cached : Any?) : Exception()
 suspend fun Context.fetchGif(url: String, fetchPolicy: FetchPolicy): Pair<Long, ParsedGif?> =
         fetchImg(url, fetchPolicy, ByteArray::parseGif)
 
-suspend fun Context.fetchPng(url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
+suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
 
 /**
@@ -80,7 +80,7 @@ class Exchange<out T>(
                 fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                     Pair(0L, null)
                 else -> { // responseCode == 304, fetch from cache
-                    info(CC_PRIVATE) { "Not Modified since $ifModifiedSince: $url" }
+                    info { "Not Modified since $ifModifiedSince: $url" }
                     loadCachedResult ?: context.fetchImg(url, UP_TO_DATE, decode)
                 }
             }
@@ -103,7 +103,7 @@ class Exchange<out T>(
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
         val fetchedLastModified = lastModifiedStr.parseLastModified()
         val responseBody = lazy { inputStream.use { it.readBytes() } }
-        info(CC_PRIVATE) { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
+        info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
             val cachedIn = runOrNull { cachedDataIn(url.toExternalForm()) }
             val parsedGif = if (cachedIn == null) {
@@ -166,7 +166,7 @@ class Exchange<out T>(
     private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
         val groups = lastModifiedRegex.matchEntire(lastModifiedStr)?.groupValues
                 ?: throw NumberFormatException("Failed to parse Last-Modified header: '$lastModifiedStr'")
-        return 60 * parseLong(groups[1]) + parseLong(groups[2])
+        return 60L * parseInt(groups[1]) + parseInt(groups[2])
     }
 
     private fun String.parseLastModified() = lastModifiedDateFormat.parse(this).time

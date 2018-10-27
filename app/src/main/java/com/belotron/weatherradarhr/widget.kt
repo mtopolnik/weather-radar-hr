@@ -51,7 +51,7 @@ private val widgetDescriptors = arrayOf(
                     TimestampedBitmap(
                             ocrLradarTimestamp(bitmap),
                             isOffline,
-                            createBitmap(bitmap, 0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
+                            bitmap.crop(0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
         WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 10,
                 KradarWidgetProvider::class.java,
@@ -60,8 +60,10 @@ private val widgetDescriptors = arrayOf(
                     TimestampedBitmap(
                             ocrKradarTimestamp(bitmap),
                             isOffline,
-                            createBitmap(bitmap, 0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
+                            bitmap.crop(0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
 )
+
+private fun Bitmap.crop(x: Int, y: Int, width: Int, height: Int) = createBitmap(this, x, y, width, height)
 
 private data class WidgetDescriptor(
         val name: String,
@@ -127,7 +129,8 @@ class RefreshImageService : JobService() {
                         val lastModified = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                         jobFinished(params, lastModified == null)
                         if (lastModified != null) {
-                            info(CC_PRIVATE) { "$logHead: success" }
+                            val mmss = formatElapsedTime(MILLISECONDS.toSeconds(lastModified))
+                            info(CC_PRIVATE) { "$logHead: success, last modified $mmss" }
                             wCtx.scheduleWidgetUpdate(true, millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
                         } else {
                             wCtx.scheduleWidgetUpdate(false, backoffLatency)
@@ -217,7 +220,7 @@ private class WidgetContext (
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
             try {
-                val (lastModified, bitmap) = context.fetchPng(wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
+                val (lastModified, bitmap) = context.fetchBitmap(wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
                 if (bitmap == null) {
                     // This may happen only with `onlyIfNew == true`
                     return null
