@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
@@ -79,7 +80,7 @@ class Exchange<out T>(
                 fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                     Pair(0L, null)
                 else -> { // responseCode == 304, fetch from cache
-                    info { "Not Modified since $ifModifiedSince: $url" }
+                    info(CC_PRIVATE) { "Not Modified since $ifModifiedSince: $url" }
                     loadCachedResult ?: context.fetchImg(url, UP_TO_DATE, decode)
                 }
             }
@@ -102,7 +103,7 @@ class Exchange<out T>(
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
         val fetchedLastModified = lastModifiedStr.parseLastModified()
         val responseBody = lazy { inputStream.use { it.readBytes() } }
-        info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
+        info(CC_PRIVATE) { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
             val cachedIn = runOrNull { cachedDataIn(url.toExternalForm()) }
             val parsedGif = if (cachedIn == null) {
