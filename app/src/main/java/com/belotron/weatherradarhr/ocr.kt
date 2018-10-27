@@ -22,9 +22,10 @@ object LradarOcr {
 
     fun ocrLradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
-        val dt = ocrDateTime(pixels)
-        debug { "ARSO OCRed date/time: $dt" }
-        return dt.toTimestamp(getTimeZone("UTC"))
+        with(ocrDateTime(pixels)) {
+            debug { "ARSO OCRed date/time: $this" }
+            return toTimestamp
+        }
     }
 
     fun ocrLradarTimestamp(bitmap: Bitmap) = ocrLradarTimestamp(bitmap.asPixels())
@@ -40,7 +41,8 @@ object LradarOcr {
             month = readNumber(pixels, 5, 6),
             day = readNumber(pixels, 8, 9),
             hour = readNumber(pixels, 11, 12),
-            minute = readNumber(pixels, 14, 15))
+            minute = readNumber(pixels, 14, 15),
+            tz = getTimeZone("UTC"))
 
     private fun readNumber(pixels: Pixels, vararg indices: Int): Int =
             indices.fold(0) { acc, ind -> 10 * acc + readDigit(pixels, ind) }
@@ -54,9 +56,10 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
-        val dt = ocrDateTime(pixels)
-        debug { "DHMZ OCRed date/time: $dt" }
-        return dt.toTimestamp(getTimeZone("Europe/Zagreb"))
+        with(ocrDateTime(pixels)) {
+            debug { "DHMZ OCRed date/time: $this" }
+            return toTimestamp
+        }
     }
 
     fun ocrKradarTimestamp(bitmap: Bitmap) = ocrKradarTimestamp(bitmap.asPixels())
@@ -81,14 +84,15 @@ object KradarOcr {
                 x++
             }
         }
-        info { "KRadar OCRed digits: ${digits.contentToString()}" }
         return digits.run {
             DateTime(
                     year = digitsToInt(0..3),
                     month = digitsToInt(4..5),
                     day = digitsToInt(6..7),
                     hour = digitsToInt(8..9),
-                    minute = digitsToInt(10..11))
+                    minute = digitsToInt(10..11),
+                    tz = getTimeZone("Europe/Zagreb")
+            )
         }
     }
 
@@ -145,7 +149,8 @@ class DateTime(
         day: Int? = null,
         hour: Int? = null,
         minute: Int? = null,
-        second: Int? = null
+        second: Int? = null,
+        private val tz: TimeZone
 ) {
     val year: Int = year ?: copyFrom?.year ?: throw missingVal("year")
     val month: Int = month ?: copyFrom?.month ?: throw missingVal("month")
@@ -154,7 +159,7 @@ class DateTime(
     val minute: Int = minute ?: copyFrom?.minute ?: throw missingVal("minute")
     val second: Int = second ?: copyFrom?.second ?: 0
 
-    fun toTimestamp(tz: TimeZone): Long {
+    val toTimestamp: Long get() {
         val cal = Calendar.getInstance(tz)
         cal.timeInMillis = 0
         cal.set(YEAR, year)
@@ -168,8 +173,8 @@ class DateTime(
 
     private fun missingVal(field: String) = IllegalArgumentException("$field missing")
 
-    override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d UTC".format(
-            year, month, day, hour, minute, second)
+    override fun toString(): String = "%4d-%02d-%02d %02d:%02d:%02d %s".format(
+            year, month, day, hour, minute, second, tz)
 }
 
 private fun ocrFailed(): Int {
