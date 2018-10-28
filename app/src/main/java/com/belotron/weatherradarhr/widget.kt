@@ -91,8 +91,12 @@ fun startFetchWidgetImages() {
             .map { WidgetContext(appContext, it) }
             .filter { it.isWidgetInUse && !it.wDesc.refreshJobRunning }
             .forEach { wCtx -> wCtx.apply {
+                val logHead = "startFetchWidgetImages ${wDesc.name}"
+                info(CC_PRIVATE) { logHead }
                 appCoroScope.launch {
-                    fetchImageAndUpdateWidget(onlyIfNew = false)
+                    fetchImageAndUpdateWidget(onlyIfNew = false).also { lastModified_mmss ->
+                        logFetchResult(logHead, lastModified_mmss)
+                    }
                 }
                 ensureWidgetRefreshScheduled()
             } }
@@ -123,12 +127,9 @@ class RefreshImageService : JobService() {
                     try {
                         val lastModified_mmss = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
                         jobFinished(params, lastModified_mmss == null)
+                        logFetchResult(logHead, lastModified_mmss)
                         if (lastModified_mmss != null) {
-                            info(CC_PRIVATE) {
-                                "$logHead: success, last modified ${formatElapsedTime(lastModified_mmss)}" }
                             wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified_mmss, wDesc.updatePeriodMinutes))
-                        } else {
-                            info(CC_PRIVATE) { "$logHead: no new image" }
                         }
                     } catch (t: Throwable) {
                         severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
@@ -213,19 +214,21 @@ private class WidgetContext (
         }
     }
 
+    // Returns the Last-Modified timestamp's mm:ss part in seconds
     suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
         try {
             try {
-                val (lastModifiedMmSs, bitmap) =
+                val (lastModified_mmss, bitmap) =
                         context.fetchBitmap(wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
                 if (bitmap == null) {
                     // This may happen only with `onlyIfNew == true`
                     return null
                 }
                 val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
+                info(CC_PRIVATE) { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
                 writeImgAndTimestamp(tsBitmap)
                 updateRemoteViews(tsBitmap)
-                return lastModifiedMmSs
+                return lastModified_mmss
             } catch (e: ImageFetchException) {
                 if (e.cached != null) {
                     updateRemoteViews(wDesc.toTimestampedBitmap(e.cached as Bitmap, true))
@@ -336,6 +339,13 @@ private fun Context.intentLaunchMainActivity(): PendingIntent {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     return PendingIntent.getActivity(this, 0, launchIntent, 0)
+}
+
+private fun logFetchResult(logHead: String, lastModified_mmss: Long?) {
+    info(CC_PRIVATE) { "$logHead: " +
+            if (lastModified_mmss != null) "success, last modified ${formatElapsedTime(lastModified_mmss)}"
+            else "no new image"
+    }
 }
 
 private fun reportScheduleResult(task: String, resultCode: Int) {
