@@ -119,7 +119,7 @@ class Exchange<out T>(
                     cachedIn.use { it.readBytes() }.parseOrInvalidateImage
                 }
             }
-            Pair(parseHourRelativeModTime(lastModifiedStr), parsedGif)
+            Pair(parseLastModified_mmss(lastModifiedStr), parsedGif)
         } catch (t: Throwable) {
             severe(t) { "Failed to handle a successful image response for $url" }
             throw t
@@ -137,7 +137,7 @@ class Exchange<out T>(
 
     private val loadCachedResult: Pair<Long, T>? = runOrNull {
         val (lastModifiedStr, imgBytes) = cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
-        Pair(parseHourRelativeModTime(lastModifiedStr), imgBytes.parseOrInvalidateImage)
+        Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage)
     }
 
     private val loadCachedImage: T? = runOrNull {
@@ -162,7 +162,7 @@ class Exchange<out T>(
         error("Failed to retrieve $url: $responseCode\n${String(responseBody, UTF_8)}")
     }
 
-    private fun parseHourRelativeModTime(lastModifiedStr: String): Long {
+    private fun parseLastModified_mmss(lastModifiedStr: String): Long {
         val groups = lastModifiedRegex.matchEntire(lastModifiedStr)?.groupValues
                 ?: throw NumberFormatException("Failed to parse Last-Modified header: '$lastModifiedStr'")
         return 60L * parseInt(groups[1]) + parseInt(groups[2])
