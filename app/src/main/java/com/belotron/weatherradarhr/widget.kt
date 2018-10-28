@@ -364,23 +364,23 @@ private fun reportScheduleResult(task: String, resultCode: Int) {
 
 /**
  * We use Last-Modified modulo one hour due to DHMZ's broken Last-Modified
- * reporting (It applies conversion from Zagreb time to GMT twice)
+ * reporting (It applies the conversion from Zagreb time to GMT twice)
  *
- * @param lastModifiedMmSs last modified time in seconds past full hour
+ * @param lastModified_mmss last modified time in seconds past full hour
  */
-private fun millisToNextUpdate(lastModifiedMmSs : Long, updateIntervalMinutes: Long) : Long {
+private fun millisToNextUpdate(lastModified_mmss : Long, updateIntervalMinutes: Long) : Long {
     require(updateIntervalMinutes in 0 until 60) { "updateInterval out of range: $updateIntervalMinutes" }
-    require(lastModifiedMmSs in 0 until SECS_IN_HOUR) { "lastModified out of range: $lastModifiedMmSs" }
+    require(lastModified_mmss in 0 until SECS_IN_HOUR) { "lastModified out of range: $lastModified_mmss" }
 
-    val now = hourRelativeCurrentTime()
-    val modifiedSecondsAgo = if (now >= lastModifiedMmSs) now - lastModifiedMmSs
-                             else (now + SECS_IN_HOUR) - lastModifiedMmSs
-    val proposedDelay = updateIntervalMinutes * SECS_IN_MINUTE - modifiedSecondsAgo
-    return SECONDS.toMillis(if (proposedDelay > 0) proposedDelay
-                            else RETRY_PERIOD_MINUTES * SECS_IN_MINUTE)
+    val now_mmss = currentTime_mmss()
+    val mmss_sinceLastModified =
+            if (now_mmss >= lastModified_mmss) now_mmss - lastModified_mmss
+            else (now_mmss + SECS_IN_HOUR) - lastModified_mmss
+    val proposedDelay = updateIntervalMinutes * SECS_IN_MINUTE - mmss_sinceLastModified
+    return SECONDS.toMillis(proposedDelay.takeIf { it > 0 } ?: RETRY_PERIOD_MINUTES * SECS_IN_MINUTE)
 }
 
-private fun hourRelativeCurrentTime() : Long {
+private fun currentTime_mmss() : Long {
     val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
     return SECS_IN_MINUTE * cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND)
 }

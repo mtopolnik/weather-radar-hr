@@ -33,6 +33,3 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.1.0-beta02'
     androidTestImplementation 'androidx.test:rules:1.1.0-beta02'
 }
-repositories {
-    mavenCentral()
-}
