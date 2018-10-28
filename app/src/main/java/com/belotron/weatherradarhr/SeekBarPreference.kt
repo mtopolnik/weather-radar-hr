@@ -2,9 +2,6 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import android.content.res.TypedArray
-import androidx.preference.Preference
-import androidx.preference.PreferenceViewHolder
-import androidx.preference.R.id.icon_frame
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View.GONE
@@ -12,6 +9,9 @@ import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
+import androidx.preference.Preference
+import androidx.preference.PreferenceViewHolder
+import androidx.preference.R.id.icon_frame
 
 private const val NS_BELOTRON = "http://belotron.com"
 

@@ -1,9 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
+import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
-import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 
 private const val KEY_ACTIONBAR_VISIBLE = "actionbar-visible"
 

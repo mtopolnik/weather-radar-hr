@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr.gifdecode
 
 import android.graphics.Bitmap
-import kotlin.math.abs
 import kotlin.math.min
 
 private const val ASCII_GREYSCALE = "@%#*+=-:. "

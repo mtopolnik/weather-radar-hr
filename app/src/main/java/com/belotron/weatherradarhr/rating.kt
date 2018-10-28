@@ -13,11 +13,11 @@ import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
 import android.net.Uri
 import android.os.Bundle
-import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.FragmentActivity
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.view.LayoutInflater
 import android.widget.Button
+import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.FragmentActivity
 
 private const val DAYS_UNTIL_PROMPT = 2
 private const val USES_UNTIL_PROMPT = 4

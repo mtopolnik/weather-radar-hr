@@ -26,7 +26,6 @@ import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers

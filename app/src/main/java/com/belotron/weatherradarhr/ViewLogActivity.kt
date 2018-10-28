@@ -1,9 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 
 class ViewLogActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
