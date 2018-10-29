@@ -158,8 +158,8 @@ class Exchange<out T>(
     private fun loadCachedLastModified(url: String) = runOrNull { cachedDataIn(url).use { it.readUTF() } }
 
     private fun HttpURLConnection.logErrorResponse() {
-        val responseBody = inputStream.use { it.readBytes() }
-        error("Failed to retrieve $url: $responseCode\n${String(responseBody, UTF_8)}")
+        val responseBody = runOrNull { '\n' + String(inputStream.use { it.readBytes() }, UTF_8) } ?: ""
+        severe { "Failed to retrieve $url: $responseCode$responseBody" }
     }
 
     private fun parseLastModified_mmss(lastModifiedStr: String): Long {
