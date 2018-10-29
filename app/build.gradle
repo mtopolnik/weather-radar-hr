@@ -8,7 +8,7 @@ android {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
         targetSdkVersion 28
-        versionCode 79
+        versionCode 80
         versionName "1.7.1"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
