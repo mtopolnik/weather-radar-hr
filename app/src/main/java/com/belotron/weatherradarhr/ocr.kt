@@ -18,7 +18,7 @@ import kotlin.math.abs
 
 object LradarOcr {
 
-    private var digitTemplates: List<Pixels> = emptyList()
+    @Volatile private var digitTemplates: List<Pixels> = emptyList()
 
     fun ocrLradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -52,7 +52,7 @@ object LradarOcr {
 }
 
 object KradarOcr {
-    private var digitTemplates: List<IntArrayPixels> = emptyList()
+    @Volatile private var digitTemplates: List<IntArrayPixels> = emptyList()
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -64,10 +64,9 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(bitmap: Bitmap) = ocrKradarTimestamp(bitmap.asPixels())
 
-    private fun initDigitPixelses() {
+    private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("kradar")
-            digitTemplates.forEach { it.decodeToGreyscale }
+            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.decodeToGreyscale } }
         }
     }
 
