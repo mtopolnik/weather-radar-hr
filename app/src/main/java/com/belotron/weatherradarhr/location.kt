@@ -1,6 +1,6 @@
 package com.belotron.weatherradarhr
 
-val lradarShape = ScreenShape(
+val lradarShape = MapShape(
         topLat = 47.40,
         botLat = 44.71,
         topLeftLon = 12.10,
@@ -13,7 +13,7 @@ val lradarShape = ScreenShape(
         botScreenY = 649
 )
 
-val kradarShape = ScreenShape(
+val kradarShape = MapShape(
         topLat = 48.06,
         botLat = 43.44,
         topLeftLon = 13.05,
@@ -26,7 +26,7 @@ val kradarShape = ScreenShape(
         botScreenY = 478
 )
 
-class ScreenShape(
+class MapShape(
         val topLat: Double,
         val botLat: Double,
         val topLeftLon: Double,
@@ -41,17 +41,23 @@ class ScreenShape(
     // zeroLon satisfies the following:
     // (zeroLon - topLeftLon) / (topRightLon - zeroLon) ==
     // (zeroLon - botLeftLon) / (botRightLon - zeroLon)
-    val zeroLon: Double = (topLeftLon * botRightLon - botLeftLon * topRightLon) /
-            (topLeftLon - botLeftLon + botRightLon - topRightLon)
-    val screenWidth: Int = rightScreenX - leftScreenX
-    val xScaleAtTop: Double = screenWidth / (topRightLon - topLeftLon)
-    val xScaleAtBot: Double = screenWidth / (botRightLon - botLeftLon)
-    val zeroScreenX: Double = 0.5 + leftScreenX + xScaleAtTop * (zeroLon - topLeftLon)
+    val zeroLon: Double
+    val xScaleAtTop: Double
+    val xScaleAtBot: Double
+    val zeroScreenX: Double
     val screenHeight: Int = botScreenY - topScreenY
 
-    fun toScreenCoords(
-            lat: Double, lon: Double
-    ): Pair<Int, Int> {
+    init {
+        val topLonWidth = topRightLon - topLeftLon
+        val botLonWidth = botRightLon - botLeftLon
+        zeroLon = (topRightLon * botLeftLon - topLeftLon * botRightLon) / (topLonWidth - botLonWidth)
+        val screenWidth: Int = rightScreenX - leftScreenX
+        xScaleAtTop = screenWidth / topLonWidth
+        zeroScreenX = 0.5 + leftScreenX + xScaleAtTop * (zeroLon - topLeftLon)
+        xScaleAtBot = screenWidth / botLonWidth
+    }
+
+    fun toImageCoords(lat: Double, lon: Double): Pair<Int, Int> {
         val normY: Double = (topLat - lat) / (topLat - botLat)
         val xScaleAtY: Double = xScaleAtTop + (xScaleAtBot - xScaleAtTop) * normY
         return Pair(
