@@ -74,7 +74,7 @@ object KradarOcr {
         var x = 108
         val digits = IntArray(12) { 0 }
         var digitIndex = 0
-        while (x < 230) {
+        while (x < 230 && digitIndex < 12) {
             val digit = (0..9).find { isMatch(img, x, digitTemplates[it]) }
             if (digit != null) {
                 digits[digitIndex++] = digit
@@ -138,7 +138,7 @@ private fun stripeEqual(img: Pixels, imgX: Int, imgY: Int, rect: Pixels, rectX: 
 
 private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
 
-private fun Context.loadDigit(path: String, digit: Int) =
+private fun Context.loadDigit(path: String, digit: Int): IntArrayPixels =
         assets.open("$path/$digit.gif").use { it.readBytes() }.parseGif().toPixels()
 
 class DateTime(
