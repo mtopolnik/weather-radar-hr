@@ -1,12 +1,12 @@
 package com.belotron.weatherradarhr
 
-import android.content.Context
+import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
-import android.text.format.DateUtils.MINUTE_IN_MILLIS
+import android.text.format.DateUtils
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.Gravity
@@ -27,6 +27,8 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
+import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -35,73 +37,32 @@ import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
 import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
-import com.belotron.weatherradarhr.gifdecode.Allocator
-import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifDecoder
-import com.belotron.weatherradarhr.gifdecode.GifFrame
-import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import com.belotron.weatherradarhr.gifdecode.Pixels
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
+import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import java.util.TreeSet
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
 
+private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
+const val REQUEST_CODE_LOCATION_PERMISSION = 13
 
-private const val ANIMATION_COVERS_MINUTES = 100
-private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
-
-val imgDescs = arrayOf(
-        ImgDescriptor(0, "HR", "http://vrijeme.hr/kompozit-anim.gif", 15,
-                R.id.vg_kradar, R.id.text_kradar, R.id.img_kradar, R.id.progress_bar_kradar, R.id.broken_img_kradar,
-                KradarOcr::ocrKradarTimestamp),
-        ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 10,
-                R.id.vg_lradar, R.id.text_lradar, R.id.img_lradar, R.id.progress_bar_lradar, R.id.broken_img_lradar,
-                LradarOcr::ocrLradarTimestamp)
-)
-
-class ImgDescriptor(
-        val index: Int,
-        val title: String,
-        val url: String,
-        val minutesPerFrame: Int,
-        val viewGroupId: Int,
-        val textViewId: Int,
-        val imgViewId: Int,
-        val progressBarId: Int,
-        val brokenImgViewId: Int,
-        val ocrTimestamp: (Pixels) -> Long
-) {
-    val framesToKeep = Math.ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
-    val filename = url.substringAfterLast('/')
-}
-
-class DisplayState : CoroutineScope {
-    var indexOfImgInFullScreen: Int? = null
-    val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
-    val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
-
-    override var coroutineContext = newCoroCtx()
-        private set
-
-    fun start(block: suspend CoroutineScope.() -> Unit) = this.launch(start = UNDISPATCHED, block = block)
-
-    fun destroy() {
-        imgBundles.forEach { it.destroyViews() }
-        coroutineContext[Job]!!.cancel()
-        coroutineContext = newCoroCtx()
-    }
-
-    private fun newCoroCtx() = Dispatchers.Main + SupervisorJob()
-}
-
-class RadarImageFragment : Fragment() {
+class RadarImageFragment : Fragment(), CoroutineScope {
 
     val ds = DisplayState()
+    private lateinit var locationClient: FusedLocationProviderClient
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(ds)
@@ -113,11 +74,14 @@ class RadarImageFragment : Fragment() {
     // Serves to avoid IllegalStateException in DialogFragment.show()
     private var possibleStateLoss = false
 
+    override val coroutineContext = SupervisorJob() + Dispatchers.Main
+
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
+        locationClient = getFusedLocationProviderClient(context!!)
     }
 
     override fun onCreateView(
@@ -134,7 +98,7 @@ class RadarImageFragment : Fragment() {
                 textView = rootView.findViewById(R.id.text_radar_zoomed),
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_radar_zoomed).apply {
                     coroScope = ds
-                    setOnDoubleTapListener(object: SimpleOnGestureListener() {
+                    setOnDoubleTapListener(object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
                     })
@@ -143,10 +107,10 @@ class RadarImageFragment : Fragment() {
                 brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
                 progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
-        with (fullScreenBundle.seekBar!!) {
+        with(fullScreenBundle.seekBar!!) {
             setOnSeekBarChangeListener(animationLooper)
             if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
-                with (layoutParams as FrameLayout.LayoutParams) {
+                with(layoutParams as FrameLayout.LayoutParams) {
                     gravity = Gravity.BOTTOM or Gravity.RIGHT
                     rightMargin = resources.getDimensionPixelOffset(R.dimen.seekbar_landscape_right_margin)
                 }
@@ -154,31 +118,41 @@ class RadarImageFragment : Fragment() {
         }
         imgDescs.forEachIndexed { i, desc ->
             val viewGroup = rootView.findViewById<ViewGroup>(desc.viewGroupId)
-            val imgView = rootView.findViewById<ImageView>(desc.imgViewId)
+            val imgView = rootView.findViewById<ImageViewWithLocation>(desc.imgViewId)
             val textView = rootView.findViewById<TextView>(desc.textViewId)
             val brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId)
             val progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId)
             ds.imgBundles[i].restoreViews(
-                viewGroup = viewGroup,
-                textView = textView.apply {
-                    GestureDetector(activity, MainViewListener(i, imgView)).also {
-                        setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                    viewGroup = viewGroup,
+                    textView = textView.apply {
+                        GestureDetector(activity, MainViewListener(i, imgView)).also {
+                            setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                        }
+                    },
+                    imgView = imgView.apply {
+                        GestureDetector(activity, MainViewListener(i, imgView)).also {
+                            setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                        }
+                    },
+                    mapShape = desc.mapShape,
+                    seekBar = null,
+                    brokenImgView = brokenImgView.apply {
+                        setOnClickListener { switchActionBarVisible() }
+                        visibility = GONE
+                    },
+                    progressBar = progressBar.apply {
+                        setOnClickListener { switchActionBarVisible() }
                     }
-                },
-                imgView = imgView.apply {
-                    GestureDetector(activity, MainViewListener(i, imgView)).also {
-                        setOnTouchListener { _, e -> it.onTouchEvent(e); true }
-                    }
-                },
-                seekBar = null,
-                brokenImgView = brokenImgView.apply {
-                    setOnClickListener { switchActionBarVisible() }
-                    visibility = GONE
-                },
-                progressBar = progressBar.apply {
-                    setOnClickListener { switchActionBarVisible() }
-                }
-        ) }
+            )
+        }
+        launch {
+            info { "receiveLocationUpdates" }
+            receiveLocationUpdates(locationClient) { location ->
+                info { "Our location: $location" }
+                fullScreenBundle.imgView!!.location = location
+                ds.imgBundles.forEach { it.imgView!!.location = location }
+            }
+        }
         val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)
         val sl = object : SimpleOnScaleGestureListener() {
             private val rect = Rect()
@@ -291,6 +265,7 @@ class RadarImageFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
+        coroutineContext[Job]!!.cancel()
         possibleStateLoss = true
     }
 
@@ -331,6 +306,67 @@ class RadarImageFragment : Fragment() {
         }
         if (shouldHideActionBar) activity.supportActionBar?.hide()
         return true
+    }
+
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode != REQUEST_CODE_LOCATION_PERMISSION) return
+        require(permissions.size == 1)
+        requestLocationPermissionContinuation?.resume(grantResults[0])
+    }
+
+    private fun receiveLocationUpdates() {
+        launch {
+            if (checkSelfPermission(context!!, ACCESS_COARSE_LOCATION) != PERMISSION_GRANTED) {
+                warn { "Our app has no permission to access coarse location" }
+                val grantResult = suspendCancellableCoroutine<Int> {
+                    requestLocationPermissionContinuation = it
+                    requestPermissions(arrayOf(ACCESS_COARSE_LOCATION), REQUEST_CODE_LOCATION_PERMISSION)
+                }
+                if (grantResult != PERMISSION_GRANTED) {
+                    warn { "Result of ResolvableApiException resolution: $grantResult" }
+                    return@launch
+                }
+            }
+
+            val locationRequest = LocationRequest().apply {
+                interval = 10_000
+                fastestInterval = 10
+                priority = PRIORITY_BALANCED_POWER_ACCURACY
+            }
+            try {
+                val settingsResponse = LocationServices.getSettingsClient(context!!)
+                        .checkLocationSettings(LocationSettingsRequest.Builder()
+                                .addLocationRequest(locationRequest).build())
+                        .await()
+                info { "Is location usable? ${settingsResponse.locationSettingsStates.isLocationUsable}" }
+            } catch (e: ResolvableApiException) {
+                warn { "ResolvableApiException for location request" }
+                val result = suspendCancellableCoroutine<Int> {
+                    requestLocationPermissionContinuation = it
+                    startIntentSenderForResult(e.resolution.intentSender, REQUEST_CODE_LOCATION_PERMISSION,
+                            null, 0, 0, 0, null)
+                }
+                if (result != PERMISSION_GRANTED) {
+                    warn { "Result of ResolvableApiException resolution: $result" }
+                    return@launch
+                }
+            }
+            locationClient.lastLocation
+            locationClient.requestLocationUpdates(locationRequest, object : LocationCallback() {
+                override fun onLocationResult(loc: LocationResult) {
+                    info { "Received location ${loc.locations[0]}" }
+                    val location = loc.locations[0]
+                    fullScreenBundle.imgView!!.location = location
+                    ds.imgBundles.forEach { it.imgView!!.location = location }
+                }
+            }, null)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != REQUEST_CODE_LOCATION_PERMISSION) return
+        requestLocationPermissionContinuation?.resume(resultCode)
     }
 
     private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {
@@ -446,62 +482,4 @@ class RadarImageFragment : Fragment() {
     }
 
     private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
-}
-
-private suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Context, desc: ImgDescriptor) {
-    val parsedGif = this
-    BitmapFreelists().also { allocator ->
-        (0 until frameCount).map { frameIndex ->
-            coroScope.async(Dispatchers.Default) {
-                context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
-            }
-        }.forEachIndexed { i, it ->
-            frames[i].timestamp = it.await()
-        }
-    }
-}
-
-private fun Context.decodeAndAssignTimestamp(
-        parsedGif: ParsedGif, frameIndex: Int, desc: ImgDescriptor, allocator: Allocator
-): Long {
-    return try {
-        GifDecoder(allocator, parsedGif).decodeFrame(frameIndex).let { decoder ->
-            desc.ocrTimestamp(decoder.asPixels()).also {
-                decoder.dispose()
-            }
-        }
-    } catch (e: ImgDecodeException) {
-        severe { "Animated GIF decoding error" }
-        invalidateCache(desc.url)
-        throw e
-    }
-}
-
-private fun ParsedGif.sortAndDeduplicateFrames() {
-    val sortedFrames = TreeSet<GifFrame>(compareBy(GifFrame::timestamp)).apply {
-        addAll(frames)
-    }
-    frames.apply {
-        clear()
-        addAll(sortedFrames)
-    }
-}
-
-private fun Rect.reset(): Rect {
-    set(0, 0, 0, 0)
-    return this
-}
-
-private fun View.isDescendantOf(that: View): Boolean {
-    if (this === that) {
-        return true
-    }
-    var currParent: View? = parent as? View
-    while (currParent != null) {
-        if (currParent === that) {
-            return true
-        }
-        currParent = currParent.parent as? View
-    }
-    return false
 }

@@ -75,8 +75,8 @@ private enum class State {
 
 class TouchImageView
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
-    : ImageView(context, attrs, defStyle) {
-
+    : ImageViewWithLocation(context, attrs, defStyle
+) {
     lateinit var coroScope: CoroutineScope
 
     private val overdrag = resources.getDimensionPixelOffset(R.dimen.fullscreen_allowed_overdrag)
@@ -84,7 +84,6 @@ class TouchImageView
     private val tolerance = resources.getDimensionPixelOffset(R.dimen.fullscreen_tolerance)
 
     // Reusable value containers
-    private val mx = Matrix()
     private val m = FloatArray(9)
     private val pointF = PointF()
     private val point = Point()
@@ -204,7 +203,7 @@ class TouchImageView
     /**
      * startImgX,Y say where on the screen the image should be at the start of
      * the zoom animation.
-     * bitmapX,Y are the coordinates of the double-tap event in bitmap's
+     * bitmapFocusX,Y are the coordinates of the double-tap event in bitmap's
      * coordinate system.
      */
     suspend fun animateZoomEnter(startImgX: Int, startImgY: Int, bitmapFocusX: Float, bitmapFocusY: Float) {

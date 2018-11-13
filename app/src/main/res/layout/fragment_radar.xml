@@ -44,7 +44,7 @@
                             android:shadowDy="2"
                             android:shadowRadius="2"
                     />
-                    <ImageView
+                    <com.belotron.weatherradarhr.ImageViewWithLocation
                             android:id="@+id/img_kradar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -89,7 +89,7 @@
                             android:shadowDy="2"
                             android:shadowRadius="2"
                     />
-                    <ImageView
+                    <com.belotron.weatherradarhr.ImageViewWithLocation
                             android:id="@+id/img_lradar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"

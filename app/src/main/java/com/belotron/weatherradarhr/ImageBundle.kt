@@ -18,7 +18,7 @@ class ImageBundle {
     }
 
     var textView: TextView? = null; private set
-    var imgView: ImageView? = null; private set
+    var imgView: ImageViewWithLocation? = null; private set
     var seekBar: ThumbSeekBar? = null; private set
     private var viewGroup: ViewGroup? = null
     private var brokenImgView: ImageView? = null
@@ -48,6 +48,7 @@ class ImageBundle {
     fun updateFrom(that: ImageBundle) {
         this.text = that.text
         this.bitmap = that.bitmap
+        this.imgView!!.mapShape = that.imgView!!.mapShape
         this.status = that.status
         this.animationProgress = that.animationProgress
     }
@@ -80,7 +81,8 @@ class ImageBundle {
     fun restoreViews(
             viewGroup: ViewGroup,
             textView: TextView,
-            imgView: ImageView,
+            imgView: ImageViewWithLocation,
+            mapShape: MapShape? = null,
             seekBar: ThumbSeekBar?,
             brokenImgView: ImageView,
             progressBar: ProgressBar
@@ -88,6 +90,7 @@ class ImageBundle {
         this.viewGroup = viewGroup
         this.textView = textView
         this.imgView = imgView
+        mapShape?.also { imgView.mapShape = it }
         this.seekBar = seekBar
         seekBar?.progress = animationProgress
         this.brokenImgView = brokenImgView
