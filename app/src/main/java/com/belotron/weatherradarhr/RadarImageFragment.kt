@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
@@ -27,8 +26,6 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
-import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -38,23 +35,13 @@ import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
-import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.tasks.await
-import kotlin.coroutines.resume
 
 private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
 const val REQUEST_CODE_LOCATION_PERMISSION = 13
@@ -145,12 +132,20 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     }
             )
         }
+        val allBundles = ds.imgBundles + fullScreenBundle
+        allBundles.map { it.imgView!! }.forEach { it.animateStrobe() }
+        receiveAzimuthUpdates(
+                azimuthChanged = { azimuth ->
+                    allBundles.map { it.imgView!! }.forEach { it.azimuth = azimuth }
+                },
+                accuracyChanged = { accuracy ->
+                    allBundles.map { it.imgView!! }.forEach { it.azimuthAccuracy = accuracy }
+                })
         launch {
             info { "receiveLocationUpdates" }
             receiveLocationUpdates(locationClient) { location ->
                 info { "Our location: $location" }
-                fullScreenBundle.imgView!!.location = location
-                ds.imgBundles.forEach { it.imgView!!.location = location }
+                allBundles.map { it.imgView!! }.forEach { it.location = location }
             }
         }
         val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)
@@ -308,65 +303,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         return true
     }
 
-
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        if (requestCode != REQUEST_CODE_LOCATION_PERMISSION) return
         require(permissions.size == 1)
-        requestLocationPermissionContinuation?.resume(grantResults[0])
-    }
-
-    private fun receiveLocationUpdates() {
-        launch {
-            if (checkSelfPermission(context!!, ACCESS_COARSE_LOCATION) != PERMISSION_GRANTED) {
-                warn { "Our app has no permission to access coarse location" }
-                val grantResult = suspendCancellableCoroutine<Int> {
-                    requestLocationPermissionContinuation = it
-                    requestPermissions(arrayOf(ACCESS_COARSE_LOCATION), REQUEST_CODE_LOCATION_PERMISSION)
-                }
-                if (grantResult != PERMISSION_GRANTED) {
-                    warn { "Result of ResolvableApiException resolution: $grantResult" }
-                    return@launch
-                }
-            }
-
-            val locationRequest = LocationRequest().apply {
-                interval = 10_000
-                fastestInterval = 10
-                priority = PRIORITY_BALANCED_POWER_ACCURACY
-            }
-            try {
-                val settingsResponse = LocationServices.getSettingsClient(context!!)
-                        .checkLocationSettings(LocationSettingsRequest.Builder()
-                                .addLocationRequest(locationRequest).build())
-                        .await()
-                info { "Is location usable? ${settingsResponse.locationSettingsStates.isLocationUsable}" }
-            } catch (e: ResolvableApiException) {
-                warn { "ResolvableApiException for location request" }
-                val result = suspendCancellableCoroutine<Int> {
-                    requestLocationPermissionContinuation = it
-                    startIntentSenderForResult(e.resolution.intentSender, REQUEST_CODE_LOCATION_PERMISSION,
-                            null, 0, 0, 0, null)
-                }
-                if (result != PERMISSION_GRANTED) {
-                    warn { "Result of ResolvableApiException resolution: $result" }
-                    return@launch
-                }
-            }
-            locationClient.lastLocation
-            locationClient.requestLocationUpdates(locationRequest, object : LocationCallback() {
-                override fun onLocationResult(loc: LocationResult) {
-                    info { "Received location ${loc.locations[0]}" }
-                    val location = loc.locations[0]
-                    fullScreenBundle.imgView!!.location = location
-                    ds.imgBundles.forEach { it.imgView!!.location = location }
-                }
-            }, null)
-        }
+        resumeReceiveLocationUpdates(requestCode, grantResults[0])
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode != REQUEST_CODE_LOCATION_PERMISSION) return
-        requestLocationPermissionContinuation?.resume(resultCode)
+        resumeReceiveLocationUpdates(requestCode, resultCode)
     }
 
     private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {

@@ -10,4 +10,7 @@
     <dimen name="seekbar_thumb_triangle_half_width">6dp</dimen>
     <dimen name="seekbar_thumb_text_offset">2dp</dimen>
     <dimen name="seekbar_landscape_right_margin">50dp</dimen>
+    <dimen name="locdot_min_size">3dp</dimen>
+    <dimen name="locdot_strobe_min_size">50dp</dimen>
+    <dimen name="locdot_compass_min_size">9dp</dimen>
 </resources>

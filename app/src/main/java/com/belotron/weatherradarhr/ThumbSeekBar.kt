@@ -25,17 +25,17 @@ class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, at
     // position after enter/exit animation
     private var anchorY = 0f
 
-    private val thumbHeight = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_height).toFloat()
-    private val boxBorder = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_box_border).toFloat()
-    private val triangleHalfWidth = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_triangle_half_width).toFloat()
-    private val textOffset = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_text_offset).toFloat()
-    private val rectCornerRadius = resources.getDimensionPixelOffset(R.dimen.seekbar_thumb_box_corner_radius).toFloat()
+    private val thumbHeight = resources.getDimension(R.dimen.seekbar_thumb_height)
+    private val boxBorder = resources.getDimension(R.dimen.seekbar_thumb_box_border)
+    private val triangleHalfWidth = resources.getDimension(R.dimen.seekbar_thumb_triangle_half_width)
+    private val textOffset = resources.getDimension(R.dimen.seekbar_thumb_text_offset)
+    private val rectCornerRadius = resources.getDimension(R.dimen.seekbar_thumb_box_corner_radius)
     private val textBounds = Rect()
     private val textRect = RectF()
     private val trianglePath = Path()
     private val textPaint = TextPaint().apply {
         color = resources.getColor(R.color.seekbar_thumb_text)
-        textSize = resources.getDimensionPixelSize(R.dimen.seekbar_thumb_text_size).toFloat()
+        textSize = resources.getDimension(R.dimen.seekbar_thumb_text_size)
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.LEFT
     }

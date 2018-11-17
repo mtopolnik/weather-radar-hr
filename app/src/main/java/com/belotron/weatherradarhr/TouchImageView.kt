@@ -84,10 +84,8 @@ class TouchImageView
     private val tolerance = resources.getDimensionPixelOffset(R.dimen.fullscreen_tolerance)
 
     // Reusable value containers
-    private val m = FloatArray(9)
     private val pointF = PointF()
     private val point = Point()
-    private val rectF = RectF()
 
     private var state = NONE
         set(value) {

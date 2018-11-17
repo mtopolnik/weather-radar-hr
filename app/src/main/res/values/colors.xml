@@ -10,4 +10,7 @@
     <color name="seekbar_thumb_text">#66eeff</color>
     <color name="rateme_button_large">#c6a035</color>
     <color name="rateme_button_small">#00806a</color>
+    <color name="locdot">#ff3333</color>
+    <color name="locdot_strobe">#88ff3333</color>
+    <color name="locdot_compass">#ff3333</color>
 </resources>

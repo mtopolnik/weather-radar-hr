@@ -1,10 +1,18 @@
 package com.belotron.weatherradarhr
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
+import android.app.Activity
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.Sensor.*
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -15,6 +23,8 @@ import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+
 
 val lradarShape = MapShape(
         topLat = 47.40,
@@ -81,9 +91,23 @@ class MapShape(
     }
 }
 
-var requestLocationPermissionContinuation: Continuation<Int>? = null
-    set(value) { field = field ?: value }
-    get() = field?.also { field = null }
+private var nextRequestCode = 0; get() = ++field
+private var contRequestCode = 0
+private var continuation: Continuation<Int>? = null
+
+private fun prepareToSuspend(newContinuation: Continuation<Int>): Int {
+    contRequestCode = nextRequestCode
+    continuation = newContinuation
+    return contRequestCode
+}
+
+fun resumeReceiveLocationUpdates(requestCode: Int, result: Int) {
+    continuation?.takeIf { requestCode == contRequestCode }?.also {
+        continuation = null
+        contRequestCode = 0
+        it.resume(result)
+    }
+}
 
 suspend fun Fragment.receiveLocationUpdates(
         locationClient: FusedLocationProviderClient,
@@ -91,17 +115,16 @@ suspend fun Fragment.receiveLocationUpdates(
 ) {
     if (checkSelfPermission(context!!, ACCESS_COARSE_LOCATION) != PERMISSION_GRANTED) {
         warn { "Our app has no permission to access coarse location" }
-        val grantResult = suspendCancellableCoroutine<Int> {
-            requestLocationPermissionContinuation = it
-            requestPermissions(arrayOf(ACCESS_COARSE_LOCATION), REQUEST_CODE_LOCATION_PERMISSION)
-        }
-        if (grantResult != PERMISSION_GRANTED) {
-            warn { "Result of requestPermissions: $grantResult" }
-            return
+        requestCoarseLocationPermission().also { grantResult ->
+            if (grantResult != PERMISSION_GRANTED) {
+                warn { "Result of requestPermissions: $grantResult" }
+                return
+            }
+            info { "User has granted us the coarse location permission" }
         }
     }
     val locationRequest = LocationRequest().apply {
-        interval = 10_000
+        interval = 1000
         fastestInterval = 10
         priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
     }
@@ -112,20 +135,61 @@ suspend fun Fragment.receiveLocationUpdates(
                 .await()
     } catch (e: ResolvableApiException) {
         warn { "ResolvableApiException for location request" }
-        val result = suspendCancellableCoroutine<Int> {
-            requestLocationPermissionContinuation = it
-            startIntentSenderForResult(e.resolution.intentSender, REQUEST_CODE_LOCATION_PERMISSION,
-                    null, 0, 0, 0, null)
-        }
-        if (result != -1) {
-            warn { "Result of ResolvableApiException resolution: $result" }
-            return
+        resolve(e).also { result ->
+            if (result != Activity.RESULT_OK) {
+                warn { "ResolvableApiException resolution failed with code $result" }
+                return
+            }
+            info { "ResolvableApiException is now resolved" }
         }
     }
-    locationClient.lastLocation.await()?.also { callback(it) }
+    info(CC_PRIVATE) { "getLastLocation()" }
+    locationClient.lastLocation.await()?.also {
+        info(CC_PRIVATE) { "Got response from getLastLocation()" }
+        callback(it)
+    } ?: warn(CC_PRIVATE) { "getLastLocation() returned null" }
+    info(CC_PRIVATE) { "After getLastLocation()" }
     locationClient.requestLocationUpdates(locationRequest,
             object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
             },
             null)
+}
+
+private suspend fun Fragment.requestCoarseLocationPermission(): Int = suspendCancellableCoroutine {
+    requestPermissions(arrayOf(ACCESS_COARSE_LOCATION), prepareToSuspend(it))
+}
+
+private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCancellableCoroutine {
+    startIntentSenderForResult(e.resolution.intentSender, prepareToSuspend(it), null, 0, 0, 0, null)
+}
+
+fun Fragment.receiveAzimuthUpdates(
+        azimuthChanged: (Float) -> Unit,
+        accuracyChanged: (Int) -> Unit
+) {
+    val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    val sensor: Sensor? = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR)
+    sensorManager.registerListener(OrientationListener(azimuthChanged, accuracyChanged), sensor, 10_000)
+}
+
+private class OrientationListener(
+        private val azimuthChanged: (Float) -> Unit,
+        private val accuracyChanged: (Int) -> Unit
+) : SensorEventListener {
+    private val rotationMatrix = FloatArray(16) { i -> if (i % 4 == 0) 1f else 0f }
+    private var orientation = FloatArray(3)
+
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type != TYPE_ROTATION_VECTOR) return
+        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+        SensorManager.getOrientation(rotationMatrix, orientation)
+        azimuthChanged(orientation[0])
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
+        if (sensor.type == TYPE_ROTATION_VECTOR) {
+            accuracyChanged(accuracy)
+        }
+    }
 }
