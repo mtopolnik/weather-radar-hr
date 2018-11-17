@@ -173,16 +173,20 @@ class Exchange<out T>(
     private fun cachedDataIn(url: String) = context.cacheFile(url).dataIn()
 
     private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
+        val growingFile = File(cacheFile.path + ".growing")
         synchronized(threadPool) {
             try {
-                val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
+                val cachedLastModified = runOrNull { growingFile.dataIn().use { it.readUTF() }.parseLastModified() }
                 val fetchedLastModified = lastModifiedStr.parseLastModified()
                 cachedLastModified?.takeIf { it >= fetchedLastModified }?.also {
                     return
                 }
-                cacheFile.dataOut().use { it.writeUTF(lastModifiedStr); it.write(responseBody) }
+                growingFile.dataOut().use { it.writeUTF(lastModifiedStr); it.write(responseBody) }
+                growingFile.renameTo(cacheFile).takeIf { !it }?.also {
+                    throw IOException("Failed to rename $growingFile to ${cacheFile.name}")
+                }
             } catch (e: IOException) {
-                severe(e) { "Failed to write cached image to $cacheFile" }
+                severe(e) { "Failed to write cached image to $growingFile" }
             }
         }
     }
