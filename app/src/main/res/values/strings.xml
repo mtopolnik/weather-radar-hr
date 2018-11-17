@@ -12,7 +12,7 @@
     <string name="refresh">Refresh</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
-    <string name="widget_log">App Widget Log</string>
+    <string name="widget_log">Application Log</string>
     <string name="widget_log_enabled">Enabled</string>
     <string name="show_widget_log">Show</string>
     <string name="clear_widget_log">Clear</string>

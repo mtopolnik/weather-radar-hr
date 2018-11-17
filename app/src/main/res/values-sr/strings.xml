@@ -12,7 +12,7 @@
     <string name="refresh">Osveži</string>
     <string name="animation_rate">Brzina animacije</string>
     <string name="freeze_time">Pauza pre ponavljanja</string>
-    <string name="widget_log">Dijagnostički dnevnik za App Widget</string>
+    <string name="widget_log">Dijagnostički dnevnik aplikacije</string>
     <string name="widget_log_enabled">Uključeno</string>
     <string name="show_widget_log">Prikaži</string>
     <string name="clear_widget_log">Obriši</string>
