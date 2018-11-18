@@ -76,6 +76,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     ): View {
         info { "RadarImageFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
+        ds.startCoroutineScope()
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
         vGroupOverview = rootView.findViewById(R.id.radar_overview)
