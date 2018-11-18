@@ -133,7 +133,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     }
             )
         }
-        ds.imgBundles.map { it.imgView!! }.forEach { it.animateStrobe() }
         (ds.imgBundles + fullScreenBundle).also { allBundles ->
             locationState.imageBundles = allBundles
             allBundles.map { it.imgView!! }.forEach { it.locationState = locationState }
