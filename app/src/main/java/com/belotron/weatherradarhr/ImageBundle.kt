@@ -45,6 +45,8 @@ class ImageBundle {
         get() = imgView!!.drawable?.let { it as BitmapDrawable }?.bitmap
         set(value) { imgView!!.setImageBitmap(value) }
 
+    fun invalidateImgView() = imgView?.invalidate()
+
     fun updateFrom(that: ImageBundle) {
         this.text = that.text
         this.bitmap = that.bitmap

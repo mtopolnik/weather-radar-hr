@@ -44,12 +44,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
-const val REQUEST_CODE_LOCATION_PERMISSION = 13
 
 class RadarImageFragment : Fragment(), CoroutineScope {
 
     val ds = DisplayState()
     private lateinit var locationClient: FusedLocationProviderClient
+    private val locationState = LocationState()
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(ds)
@@ -132,20 +132,25 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     }
             )
         }
-        val allBundles = ds.imgBundles + fullScreenBundle
-        allBundles.map { it.imgView!! }.forEach { it.animateStrobe() }
+        ds.imgBundles.map { it.imgView!! }.forEach { it.animateStrobe() }
+        (ds.imgBundles + fullScreenBundle).also { allBundles ->
+            locationState.imageBundles = allBundles
+            allBundles.map { it.imgView!! }.forEach { it.locationState = locationState }
+        }
         receiveAzimuthUpdates(
                 azimuthChanged = { azimuth ->
-                    allBundles.map { it.imgView!! }.forEach { it.azimuth = azimuth }
+                    locationState.azimuth = azimuth
                 },
                 accuracyChanged = { accuracy ->
-                    allBundles.map { it.imgView!! }.forEach { it.azimuthAccuracy = accuracy }
+                    locationState.azimuthAccuracy = accuracy
                 })
+        info { "receiveLocationUpdates" }
         launch {
-            info { "receiveLocationUpdates" }
+            info { "Launched receiveLocationUpdates" }
             receiveLocationUpdates(locationClient) { location ->
-                info { "Our location: $location" }
-                allBundles.map { it.imgView!! }.forEach { it.location = location }
+                info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
+                        " bearing: ${location.bearing}" }
+                locationState.location = location
             }
         }
         val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)

@@ -13,4 +13,5 @@
     <dimen name="locdot_min_size">3dp</dimen>
     <dimen name="locdot_strobe_min_size">50dp</dimen>
     <dimen name="locdot_compass_min_size">9dp</dimen>
+    <dimen name="hundred_dp">100dp</dimen>
 </resources>

@@ -4,7 +4,7 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.app.Activity
 import android.content.Context
 import android.hardware.Sensor
-import android.hardware.Sensor.*
+import android.hardware.Sensor.TYPE_ROTATION_VECTOR
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
@@ -12,7 +12,6 @@ import android.location.Location
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
-import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -24,6 +23,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.properties.Delegates.observable
+import kotlin.reflect.KProperty
 
 
 val lradarShape = MapShape(
@@ -109,6 +110,17 @@ fun resumeReceiveLocationUpdates(requestCode: Int, result: Int) {
     }
 }
 
+class LocationState {
+    lateinit var imageBundles: List<ImageBundle>
+    var location by observable(null as Location?) { _, _, _ -> imageBundles.forEach { it.invalidateImgView() } }
+    var azimuth by observable(0f, ::invalidateIfGotLocation)
+    var azimuthAccuracy by observable(0, ::invalidateIfGotLocation)
+
+    private fun <T: Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
+        if (location != null) imageBundles.forEach { it.invalidateImgView() }
+    }
+}
+
 suspend fun Fragment.receiveLocationUpdates(
         locationClient: FusedLocationProviderClient,
         callback: (Location) -> Unit
@@ -143,12 +155,17 @@ suspend fun Fragment.receiveLocationUpdates(
             info { "ResolvableApiException is now resolved" }
         }
     }
-    info(CC_PRIVATE) { "getLastLocation()" }
+    info { "getLastLocation()" }
     locationClient.lastLocation.await()?.also {
-        info(CC_PRIVATE) { "Got response from getLastLocation()" }
+        info { "Got response from getLastLocation()" }
         callback(it)
-    } ?: warn(CC_PRIVATE) { "getLastLocation() returned null" }
-    info(CC_PRIVATE) { "After getLastLocation()" }
+    } ?: run {
+        warn { "getLastLocation() returned null" }
+        callback(Location("mock").apply {
+            latitude = 45.82
+            longitude = 16.0
+        })
+    }
     locationClient.requestLocationUpdates(locationRequest,
             object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
