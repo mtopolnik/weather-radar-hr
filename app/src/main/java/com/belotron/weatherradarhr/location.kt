@@ -1,6 +1,6 @@
 package com.belotron.weatherradarhr
 
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
+import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Activity
 import android.content.Context
 import android.hardware.Sensor
@@ -125,9 +125,9 @@ suspend fun Fragment.receiveLocationUpdates(
         locationClient: FusedLocationProviderClient,
         callback: (Location) -> Unit
 ) {
-    if (checkSelfPermission(context!!, ACCESS_COARSE_LOCATION) != PERMISSION_GRANTED) {
-        warn { "Our app has no permission to access coarse location" }
-        requestCoarseLocationPermission().also { grantResult ->
+    if (checkSelfPermission(context!!, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+        warn { "Our app has no permission to access fine location" }
+        requestFineLocationPermission().also { grantResult ->
             if (grantResult != PERMISSION_GRANTED) {
                 warn { "Result of requestPermissions: $grantResult" }
                 return
@@ -173,8 +173,8 @@ suspend fun Fragment.receiveLocationUpdates(
             null)
 }
 
-private suspend fun Fragment.requestCoarseLocationPermission(): Int = suspendCancellableCoroutine {
-    requestPermissions(arrayOf(ACCESS_COARSE_LOCATION), prepareToSuspend(it))
+private suspend fun Fragment.requestFineLocationPermission(): Int = suspendCancellableCoroutine {
+    requestPermissions(arrayOf(ACCESS_FINE_LOCATION), prepareToSuspend(it))
 }
 
 private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCancellableCoroutine {

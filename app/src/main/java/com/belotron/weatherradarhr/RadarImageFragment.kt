@@ -144,9 +144,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 accuracyChanged = { accuracy ->
                     locationState.azimuthAccuracy = accuracy
                 })
-        info { "receiveLocationUpdates" }
         launch {
-            info { "Launched receiveLocationUpdates" }
             receiveLocationUpdates(locationClient) { location ->
                 info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
                         " bearing: ${location.bearing}" }
