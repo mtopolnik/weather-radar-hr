@@ -26,6 +26,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.PermissionChecker.PERMISSION_DENIED
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -35,8 +36,6 @@ import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,7 +47,6 @@ private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
 class RadarImageFragment : Fragment(), CoroutineScope {
 
     val ds = DisplayState()
-    private lateinit var locationClient: FusedLocationProviderClient
     private val locationState = LocationState()
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
@@ -68,7 +66,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
-        locationClient = getFusedLocationProviderClient(context!!)
     }
 
     override fun onCreateView(
@@ -145,7 +142,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     locationState.azimuthAccuracy = accuracy
                 })
         launch {
-            receiveLocationUpdates(locationClient) { location ->
+            receiveLocationUpdates { location ->
                 info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
                         " bearing: ${location.bearing}" }
                 locationState.location = location
@@ -307,8 +304,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        require(permissions.size == 1)
-        resumeReceiveLocationUpdates(requestCode, grantResults[0])
+        require(permissions.size == 1) { "Unexpected requested permissions size ${permissions.size}" }
+        resumeReceiveLocationUpdates(requestCode, grantResults.takeIf { it.isNotEmpty() }?.get(0) ?: PERMISSION_DENIED)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

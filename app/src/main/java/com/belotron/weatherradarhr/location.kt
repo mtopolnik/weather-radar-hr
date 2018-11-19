@@ -13,9 +13,9 @@ import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
@@ -122,7 +122,6 @@ class LocationState {
 }
 
 suspend fun Fragment.receiveLocationUpdates(
-        locationClient: FusedLocationProviderClient,
         callback: (Location) -> Unit
 ) {
     if (checkSelfPermission(context!!, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
@@ -138,7 +137,7 @@ suspend fun Fragment.receiveLocationUpdates(
     val locationRequest = LocationRequest().apply {
         interval = 1000
         fastestInterval = 10
-        priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
+        priority = PRIORITY_BALANCED_POWER_ACCURACY
     }
     try {
         LocationServices.getSettingsClient(context!!)
@@ -155,22 +154,17 @@ suspend fun Fragment.receiveLocationUpdates(
             info { "ResolvableApiException is now resolved" }
         }
     }
-    info { "getLastLocation()" }
-    locationClient.lastLocation.await()?.also {
-        info { "Got response from getLastLocation()" }
-        callback(it)
-    } ?: run {
-        warn { "getLastLocation() returned null" }
-        callback(Location("mock").apply {
-            latitude = 45.82
-            longitude = 16.0
-        })
-    }
+    val locationClient = LocationServices.getFusedLocationProviderClient(context!!)
     locationClient.requestLocationUpdates(locationRequest,
             object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
             },
             null)
+    info { "getLastLocation()" }
+    locationClient.lastLocation.await()?.also {
+        info { "Got response from getLastLocation()" }
+        callback(it)
+    } ?: warn { "getLastLocation() returned null" }
 }
 
 private suspend fun Fragment.requestFineLocationPermission(): Int = suspendCancellableCoroutine {
@@ -205,6 +199,7 @@ private class OrientationListener(
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
+        info { "Azimuth accuracy changed to $accuracy" }
         if (sensor.type == TYPE_ROTATION_VECTOR) {
             accuracyChanged(accuracy)
         }

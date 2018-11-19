@@ -130,5 +130,3 @@ open class ImageViewWithLocation
     }
 }
 
-private val Float.degrees get() = toDegrees(this.toDouble()).toFloat()
-
