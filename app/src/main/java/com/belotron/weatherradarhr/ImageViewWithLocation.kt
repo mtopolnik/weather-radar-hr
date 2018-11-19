@@ -45,7 +45,7 @@ open class ImageViewWithLocation
     private val flashlightRange = resources.getDimension(R.dimen.locdot_flashlight_range)
     private val ourColor = resources.getColor(R.color.locdot)
     private val dotPaint = Paint().apply { color = ourColor }
-    private val compassPaint = Paint().apply { color = ourColor }
+    private val flashlightPaint = Paint()
     private val borderThickness = resources.getDimension(R.dimen.locdot_border_thickness)
     private val whiteBorderPaint = Paint().apply {
         color = resources.getColor(android.R.color.white)
@@ -79,6 +79,12 @@ open class ImageViewWithLocation
         }
     }
 
+    private val flashlightColorStops = run {
+        val transparent = 0x00ffffff
+        val redTransparent = ourColor and (0xa0ffffffu).toInt()
+        intArrayOf(transparent, transparent, redTransparent, transparent)
+    }
+
     private fun Canvas.paintFlashlight(imageX: Float, imageY: Float) {
         val flashlightRange = flashlightRange
         val angle = when (azimuthAccuracy) {
@@ -99,18 +105,15 @@ open class ImageViewWithLocation
         save()
         try {
             rotate(azimuth.degrees - 90, imageX, imageY)
-            with(compassPaint) {
-                val transparent = 0x00ffffff
-                shader = RadialGradient(
-                        arcCenterX,
-                        imageY,
-                        arcRadius,
-                        intArrayOf(transparent, transparent, ourColor, transparent),
-                        floatArrayOf(0f, arcPortionBeforeTouchPoint, arcPortionBeforeTouchPoint,
-                                if (angle <= PI) 1f else .4f),
-                        Shader.TileMode.CLAMP
-                )
-            }
+            flashlightPaint.shader = RadialGradient(
+                    arcCenterX,
+                    imageY,
+                    arcRadius,
+                    flashlightColorStops,
+                    floatArrayOf(0f, arcPortionBeforeTouchPoint, arcPortionBeforeTouchPoint,
+                            if (angle <= PI) 1f else .4f),
+                    Shader.TileMode.CLAMP
+            )
             drawArc(
                     arcCenterX - arcRadius,
                     imageY - arcRadius,
@@ -119,7 +122,7 @@ open class ImageViewWithLocation
                     -angle.degrees / 2,
                     angle.degrees,
                     true,
-                    compassPaint
+                    flashlightPaint
             )
         } finally {
             restore()
