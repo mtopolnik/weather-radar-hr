@@ -23,9 +23,11 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.math.PI
+import kotlin.math.atan
+import kotlin.math.sign
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
-
 
 val lradarShape = MapShape(
         topLat = 47.40,
@@ -52,6 +54,8 @@ val kradarShape = MapShape(
         topImageY = 1,
         botImageY = 478
 )
+
+val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
 
 class MapShape(
         val topLat: Double,
@@ -188,14 +192,15 @@ private class OrientationListener(
         private val azimuthChanged: (Float) -> Unit,
         private val accuracyChanged: (Int) -> Unit
 ) : SensorEventListener {
-    private val rotationMatrix = FloatArray(16) { i -> if (i % 4 == 0) 1f else 0f }
-    private var orientation = FloatArray(3)
+    private val rotationMatrix = FloatArray(9)
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != TYPE_ROTATION_VECTOR) return
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-        SensorManager.getOrientation(rotationMatrix, orientation)
-        azimuthChanged(orientation[0])
+        val x = rotationMatrix[0]
+        val y = rotationMatrix[3]
+        val azimuth = atan(x / y) - sign(y) * PI.toFloat() / 2
+        azimuthChanged(azimuth)
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
