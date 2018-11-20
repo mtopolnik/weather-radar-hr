@@ -11,6 +11,6 @@
     <dimen name="seekbar_thumb_text_offset">2dp</dimen>
     <dimen name="seekbar_landscape_right_margin">50dp</dimen>
     <dimen name="locdot_radius">6dp</dimen>
-    <dimen name="locdot_flashlight_range">25dp</dimen>
+    <dimen name="locdot_flashlight_range">20dp</dimen>
     <dimen name="locdot_border_thickness">1dp</dimen>
 </resources>

@@ -9,6 +9,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
@@ -23,9 +24,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.math.PI
-import kotlin.math.atan
-import kotlin.math.sign
+import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
 
@@ -185,10 +184,11 @@ fun Fragment.receiveAzimuthUpdates(
 ) {
     val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     val sensor: Sensor? = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR)
-    sensorManager.registerListener(OrientationListener(azimuthChanged, accuracyChanged), sensor, 10_000)
+    sensorManager.registerListener(OrientationListener(activity!!, azimuthChanged, accuracyChanged), sensor, 10_000)
 }
 
 private class OrientationListener(
+        private val activity: Activity,
         private val azimuthChanged: (Float) -> Unit,
         private val accuracyChanged: (Int) -> Unit
 ) : SensorEventListener {
@@ -197,10 +197,29 @@ private class OrientationListener(
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != TYPE_ROTATION_VECTOR) return
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-        val x = rotationMatrix[0]
-        val y = rotationMatrix[3]
-        val azimuth = atan(x / y) - sign(y) * PI.toFloat() / 2
-        azimuthChanged(azimuth)
+        // Each column of the rotation matrix has the components of the unit vector of
+        // the corresponding axis of the device, described from the perspective of
+        // Earth's coordinate system (y points to North).
+        // column 0 describes the device's x-axis, pointing right
+        // column 1 -> y-axis, pointing up
+        // When the device's screen is in the natural orientation (e.g., portrait
+        // for phones), we use the x-axis to determine azimuth. It is the best
+        // choice because it is usable when the device is both horizontal and
+        // upright (it doesn't move with changing pitch). When the screen is
+        // oriented sideways, we use the y-axis because in that orientation, it is
+        // the one that doesn't get disturbed by pitch.
+        // The `sense` variable tells whether to use the chosen axis as-is or
+        // with the opposite sense (e.g., x would point left when opposite)
+        val (matrixColumn, sense) = when (val rotation = activity.windowManager.defaultDisplay.rotation) {
+            Surface.ROTATION_0 -> Pair(0, 1)
+            Surface.ROTATION_90 -> Pair(1, -1)
+            Surface.ROTATION_180 -> Pair(0, -1)
+            Surface.ROTATION_270 -> Pair(1, 1)
+            else -> error("Invalid screen rotation value: $rotation")
+        }
+        val x = sense * rotationMatrix[matrixColumn]
+        val y = sense * rotationMatrix[matrixColumn + 3]
+        azimuthChanged(-atan2(y, x))
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {

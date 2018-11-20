@@ -22,7 +22,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 private const val PREFERRED_LOCDOT_RADIUS_IMAGEPIXELS = 3
-private const val MAX_LOCDOT_SCALE = 2.5f
+private const val MAX_LOCDOT_SCALE = 1.75f
 
 open class ImageViewWithLocation
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
@@ -81,7 +81,7 @@ open class ImageViewWithLocation
 
     private val flashlightColorStops = run {
         val transparent = 0x00ffffff
-        val redTransparent = ourColor and (0xa0ffffffu).toInt()
+        val redTransparent = ourColor and 0xe0ffffffu.toInt()
         intArrayOf(transparent, transparent, redTransparent, transparent)
     }
 
