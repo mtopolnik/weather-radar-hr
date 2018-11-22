@@ -3,14 +3,21 @@ package com.belotron.weatherradarhr
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.location.Location
+import android.text.format.DateUtils
+import android.text.format.DateUtils.*
 import androidx.preference.PreferenceManager
 import java.lang.Math.max
+import java.lang.System.currentTimeMillis
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_LAST_PAUSED_TIMESTAMP = "last-paused-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
+private const val KEY_LOCATION_LATITUDE = "location_latitude"
+private const val KEY_LOCATION_LONGITUDE = "location_longitude"
+private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 
 const val DEFAULT_ANIMATION_RATE = 85
 const val DEFAULT_FREEZE_TIME = 1500
@@ -32,6 +39,19 @@ fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long): SharedPreferen
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
         putBoolean(KEY_WIDGET_LOG_ENABLED, value)
+
+val SharedPreferences.location: Pair<Double, Double> get() =
+    if (getLong(KEY_LOCATION_TIMESTAMP, 0) > currentTimeMillis() - HOUR_IN_MILLIS)
+        Pair(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(), getFloat(KEY_LOCATION_LONGITUDE, 0f).toDouble())
+    else Pair(0.0, 0.0)
+
+fun SharedPreferences.Editor.setLocation(location: Location): SharedPreferences.Editor {
+    val (lat, lon) = location
+    putFloat(KEY_LOCATION_LATITUDE, lat.toFloat())
+    putFloat(KEY_LOCATION_LONGITUDE, lon.toFloat())
+    putLong(KEY_LOCATION_TIMESTAMP, location.time)
+    return this
+}
 
 @SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {

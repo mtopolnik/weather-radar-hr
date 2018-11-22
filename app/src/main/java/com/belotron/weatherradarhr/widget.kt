@@ -14,6 +14,8 @@ import android.content.Intent.ACTION_MAIN
 import android.graphics.Bitmap
 import android.graphics.Bitmap.createBitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.os.PersistableBundle
 import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
@@ -47,7 +49,10 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
                 LradarWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
-                { bitmap, isOffline ->
+                lradarShape,
+                cropLeft = 0,
+                cropTop = LRADAR_CROP_Y_TOP,
+                toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
                             ocrLradarTimestamp(bitmap),
                             isOffline,
@@ -56,7 +61,10 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 10,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
-                { bitmap, isOffline ->
+                kradarShape,
+                cropLeft = 0,
+                cropTop = 0,
+                toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
                             ocrKradarTimestamp(bitmap),
                             isOffline,
@@ -71,6 +79,9 @@ private data class WidgetDescriptor(
         val updatePeriodMinutes: Long,
         val providerClass: Class<out AppWidgetProvider>,
         val previewResourceId: Int,
+        val mapShape: MapShape,
+        val cropLeft: Int,
+        val cropTop: Int,
         val toTimestampedBitmap: (Bitmap, Boolean) -> TimestampedBitmap
 ) {
     var refreshJobRunning = false
@@ -197,6 +208,11 @@ private class WidgetContext (
             scheduleUpdateAge()
             appCoroScope.launch {
                 try {
+                    context.receiveLocationUpdatesBg()
+                } catch (t: Throwable) {
+                    severe(CC_PRIVATE, t) { "$logHead: error setting up to receive location updates" }
+                }
+                try {
                     val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
                     if (lastModified != null) {
                         info(CC_PRIVATE) { "$logHead: success" }
@@ -260,6 +276,8 @@ private class WidgetContext (
         with(remoteViews) {
             setOnClickPendingIntent(R.id.img_view_widget, context.intentLaunchMainActivity())
             tsBitmap?.also {
+                info { "Draw location on bitmap" }
+                it.bitmap.drawLocation(context.sharedPrefs.location)
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)
             } ?: run {
@@ -307,6 +325,26 @@ private class WidgetContext (
         } catch (e : Exception) {
             null
         }
+    }
+
+    private fun Bitmap.drawLocation(location: Pair<Double, Double>) {
+        val (lat, lon) = location
+        if (lat == 0.0 && lon == 0.0) return
+        val point = FloatArray(2)
+        wDesc.mapShape.locationToPixel(lat, lon, point)
+        point[0] -= wDesc.cropLeft.toFloat()
+        point[1] -= wDesc.cropTop.toFloat()
+        val (x, y) = point
+        with(Canvas(this)) {
+            val dotRadius = 0.015f * this.width
+            drawCircle(x, y, dotRadius, Paint().apply { color = context.resources.getColor(R.color.locdot) })
+            drawCircle(x, y, 0.6f * dotRadius, Paint().apply {
+                color = context.resources.getColor(android.R.color.white)
+                style = Paint.Style.STROKE
+                strokeWidth = 0.25f * dotRadius
+            })
+        }
+        info { "Location ($lat, $lon) ($x, $y) drawn" }
     }
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {

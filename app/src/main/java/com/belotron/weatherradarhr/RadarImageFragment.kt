@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
+import android.location.Location
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.GestureDetector
@@ -66,6 +67,27 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onCreate(savedInstanceState)
         retainInstance = true
         setHasOptionsMenu(true)
+        receiveAzimuthUpdates(
+                azimuthChanged = { azimuth ->
+                    debug { "Azimuth changed to $azimuth" }
+                    locationState.azimuth = azimuth
+                },
+                accuracyChanged = { accuracy ->
+                    info { "Azimuth accuracy changed to $accuracy" }
+                    locationState.azimuthAccuracy = accuracy
+                })
+        launch {
+            if (!ensureLocationPermissionsAndSettings()) {
+                context!!.sharedPrefs.applyUpdate { setLocation(Location("zero")) }
+                return@launch
+            }
+            receiveLocationUpdatesFg { location ->
+                info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
+                        " bearing: ${location.bearing}" }
+                locationState.location = location
+            }
+            context!!.receiveLocationUpdatesBg()
+        }
     }
 
     override fun onCreateView(
@@ -133,20 +155,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         (ds.imgBundles + fullScreenBundle).also { allBundles ->
             locationState.imageBundles = allBundles
             allBundles.map { it.imgView!! }.forEach { it.locationState = locationState }
-        }
-        receiveAzimuthUpdates(
-                azimuthChanged = { azimuth ->
-                    locationState.azimuth = azimuth
-                },
-                accuracyChanged = { accuracy ->
-                    locationState.azimuthAccuracy = accuracy
-                })
-        launch {
-            receiveLocationUpdates { location ->
-                info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
-                        " bearing: ${location.bearing}" }
-                locationState.location = location
-            }
         }
         val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)
         val sl = object : SimpleOnScaleGestureListener() {

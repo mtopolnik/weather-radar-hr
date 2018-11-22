@@ -16,7 +16,6 @@ import android.util.AttributeSet
 import android.widget.ImageView
 import java.lang.Math.PI
 import java.lang.Math.sin
-import java.lang.Math.toDegrees
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -111,7 +110,7 @@ open class ImageViewWithLocation
                     arcRadius,
                     flashlightColorStops,
                     floatArrayOf(0f, arcPortionBeforeTouchPoint, arcPortionBeforeTouchPoint,
-                            if (angle <= PI) 1f else .4f),
+                            if (angle <= PI) 1f else .45f),
                     Shader.TileMode.CLAMP
             )
             drawArc(

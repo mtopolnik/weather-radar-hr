@@ -2,22 +2,29 @@ package com.belotron.weatherradarhr
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Activity
+import android.app.IntentService
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.Sensor.TYPE_ROTATION_VECTOR
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
+import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
 import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -54,28 +61,42 @@ val kradarShape = MapShape(
         botImageY = 478
 )
 
+val locationRequestFg = LocationRequest().apply {
+    interval = 1000
+    fastestInterval = 10
+    priority = PRIORITY_BALANCED_POWER_ACCURACY
+}
+
+val locationRequestBg = LocationRequest().apply {
+    interval = MINUTE_IN_MILLIS
+    fastestInterval = MINUTE_IN_MILLIS
+    priority = PRIORITY_LOW_POWER
+}
+
 val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
+operator fun Location.component1() = latitude
+operator fun Location.component2() = longitude
 
 class MapShape(
-        val topLat: Double,
-        val botLat: Double,
-        val topLeftLon: Double,
+        private val topLat: Double,
+        private val botLat: Double,
+        topLeftLon: Double,
         topRightLon: Double,
         botLeftLon: Double,
         botRightLon: Double,
         leftScreenX: Int,
         rightScreenX: Int,
-        val topImageY: Int,
+        private val topImageY: Int,
         botImageY: Int
 ) {
     // zeroLon satisfies the following:
     // (zeroLon - topLeftLon) / (topRightLon - zeroLon) ==
     // (zeroLon - botLeftLon) / (botRightLon - zeroLon)
-    val zeroLon: Double
-    val xScaleAtTop: Double
-    val xScaleAtBot: Double
-    val zeroImageX: Double
-    val imageHeight: Int = botImageY - topImageY
+    private val zeroLon: Double
+    private val xScaleAtTop: Double
+    private val xScaleAtBot: Double
+    private val zeroImageX: Double
+    private val imageHeight: Int = botImageY - topImageY
 
     init {
         val topLonWidth = topRightLon - topLeftLon
@@ -88,9 +109,14 @@ class MapShape(
     }
 
     fun locationToPixel(location: Location, point: FloatArray) {
-        val normY: Double = (topLat - location.latitude) / (topLat - botLat)
+        val (lat, lon) = location
+        locationToPixel(lat, lon, point)
+    }
+
+    fun locationToPixel(lat: Double, lon: Double, point: FloatArray) {
+        val normY: Double = (topLat - lat) / (topLat - botLat)
         val xScaleAtY: Double = xScaleAtTop + (xScaleAtBot - xScaleAtTop) * normY
-        point[0] = (zeroImageX + xScaleAtY * (location.longitude - zeroLon)).toFloat()
+        point[0] = (zeroImageX + xScaleAtY * (lon - zeroLon)).toFloat()
         point[1] = topImageY + (imageHeight * normY).toFloat()
     }
 }
@@ -124,50 +150,58 @@ class LocationState {
     }
 }
 
-suspend fun Fragment.receiveLocationUpdates(
-        callback: (Location) -> Unit
-) {
+suspend fun Fragment.receiveLocationUpdatesFg(callback: (Location) -> Unit) {
+    val locationClient = LocationServices.getFusedLocationProviderClient(context!!)
+    locationClient.tryFetchLastLocation(callback)
+    locationClient.requestLocationUpdates(locationRequestFg,
+            object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
+            },
+            null)
+            .await()
+}
+
+private suspend fun FusedLocationProviderClient.tryFetchLastLocation(callback: (Location) -> Unit) {
+    lastLocation.await()?.also {
+        info { "Got response from getLastLocation()" }
+        callback(it)
+    } ?: warn { "getLastLocation() returned null" }
+}
+
+suspend fun Fragment.ensureLocationPermissionsAndSettings() =
+        ensureLocationPermission() && ensureLocationSettings(locationRequestFg, locationRequestBg)
+
+private suspend fun Fragment.ensureLocationPermission(): Boolean {
     if (checkSelfPermission(context!!, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
-        warn { "Our app has no permission to access fine location" }
+        warn { "fg: our app has no permission to access fine location" }
         requestFineLocationPermission().also { grantResult ->
             if (grantResult != PERMISSION_GRANTED) {
                 warn { "Result of requestPermissions: $grantResult" }
-                return
+                return false
             }
-            info { "User has granted us the coarse location permission" }
+            info { "User has granted us the fine location permission" }
         }
     }
-    val locationRequest = LocationRequest().apply {
-        interval = 1000
-        fastestInterval = 10
-        priority = PRIORITY_BALANCED_POWER_ACCURACY
-    }
+    return true
+}
+
+private suspend fun Fragment.ensureLocationSettings(vararg locationRequest: LocationRequest): Boolean {
     try {
         LocationServices.getSettingsClient(context!!)
                 .checkLocationSettings(LocationSettingsRequest.Builder()
-                        .addLocationRequest(locationRequest).build())
+                        .addAllLocationRequests(locationRequest.asList()).build())
                 .await()
     } catch (e: ResolvableApiException) {
         warn { "ResolvableApiException for location request" }
         resolve(e).also { result ->
             if (result != Activity.RESULT_OK) {
                 warn { "ResolvableApiException resolution failed with code $result" }
-                return
+                return false
             }
             info { "ResolvableApiException is now resolved" }
         }
     }
-    val locationClient = LocationServices.getFusedLocationProviderClient(context!!)
-    locationClient.requestLocationUpdates(locationRequest,
-            object : LocationCallback() {
-                override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
-            },
-            null)
-    info { "getLastLocation()" }
-    locationClient.lastLocation.await()?.also {
-        info { "Got response from getLastLocation()" }
-        callback(it)
-    } ?: warn { "getLastLocation() returned null" }
+    return true
 }
 
 private suspend fun Fragment.requestFineLocationPermission(): Int = suspendCancellableCoroutine {
@@ -178,12 +212,35 @@ private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCa
     startIntentSenderForResult(e.resolution.intentSender, prepareToSuspend(it), null, 0, 0, 0, null)
 }
 
+suspend fun Context.receiveLocationUpdatesBg() {
+    if (checkSelfPermission(this, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+        warn { "bg: our app has no permission to access fine location" }
+        return
+    }
+    val locationClient = LocationServices.getFusedLocationProviderClient(this)
+    locationClient.tryFetchLastLocation {
+        info { "bg: lastLocation = $it" }
+        appContext.sharedPrefs.commitUpdate { setLocation(it) }
+    }
+    locationClient.requestLocationUpdates(locationRequestBg,
+            PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0))
+            .await()
+}
+
+class ReceiveLocationService : IntentService("Receive Location Updates") {
+    override fun onHandleIntent(intent: Intent) {
+        val location = extractResult(intent)?.lastLocation ?: return
+        info { "ReceiveLocationService: $location" }
+        appContext.sharedPrefs.commitUpdate { setLocation(location) }
+    }
+}
+
 fun Fragment.receiveAzimuthUpdates(
         azimuthChanged: (Float) -> Unit,
         accuracyChanged: (Int) -> Unit
 ) {
     val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    val sensor: Sensor? = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR)
+    val sensor = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR)!!
     sensorManager.registerListener(OrientationListener(activity!!, azimuthChanged, accuracyChanged), sensor, 10_000)
 }
 
@@ -199,17 +256,20 @@ private class OrientationListener(
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
         // Each column of the rotation matrix has the components of the unit vector of
         // the corresponding axis of the device, described from the perspective of
-        // Earth's coordinate system (y points to North).
-        // column 0 describes the device's x-axis, pointing right
-        // column 1 -> y-axis, pointing up
+        // Earth's coordinate system (y points to North):
+        //
+        // - column 0 describes the device's x-axis, pointing right
+        // - column 1 describes the device's y-axis, pointing up
+        //
         // When the device's screen is in the natural orientation (e.g., portrait
         // for phones), we use the x-axis to determine azimuth. It is the best
         // choice because it is usable when the device is both horizontal and
         // upright (it doesn't move with changing pitch). When the screen is
         // oriented sideways, we use the y-axis because in that orientation, it is
         // the one that doesn't get disturbed by pitch.
+        //
         // The `sense` variable tells whether to use the chosen axis as-is or
-        // with the opposite sense (e.g., x would point left when opposite)
+        // with the opposite sense (e.g., x points left when opposite).
         val (matrixColumn, sense) = when (val rotation = activity.windowManager.defaultDisplay.rotation) {
             Surface.ROTATION_0 -> Pair(0, 1)
             Surface.ROTATION_90 -> Pair(1, -1)
@@ -223,7 +283,6 @@ private class OrientationListener(
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        info { "Azimuth accuracy changed to $accuracy" }
         if (sensor.type == TYPE_ROTATION_VECTOR) {
             accuracyChanged(accuracy)
         }

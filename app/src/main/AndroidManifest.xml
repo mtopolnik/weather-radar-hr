@@ -58,10 +58,16 @@
         <service
             android:name=".RefreshImageService"
             android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"
         />
         <service
             android:name=".UpdateAgeService"
             android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"
+        />
+        <service
+            android:name=".ReceiveLocationService"
+            android:exported="false"
         />
     </application>
 </manifest>
