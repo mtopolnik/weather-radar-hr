@@ -17,6 +17,7 @@ import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -225,18 +226,19 @@ suspend fun Context.receiveLocationUpdatesBg() {
     locationClient.requestLocationUpdates(locationRequestBg,
             PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0))
             .await()
+    info(CC_PRIVATE) { "Started receiving location in the background" }
 }
 
 class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent) {
         val location = extractResult(intent)?.lastLocation ?: return
-        info { "ReceiveLocationService: $location" }
+        info(CC_PRIVATE) { "Received location in the background: $location" }
         appContext.sharedPrefs.commitUpdate { setLocation(location) }
     }
 }
 
 fun Fragment.receiveAzimuthUpdates(
-        azimuthChanged: (Float) -> Unit,
+        azimuthChanged: (Float, Int) -> Unit,
         accuracyChanged: (Int) -> Unit
 ) {
     val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -246,7 +248,7 @@ fun Fragment.receiveAzimuthUpdates(
 
 private class OrientationListener(
         private val activity: Activity,
-        private val azimuthChanged: (Float) -> Unit,
+        private val azimuthChanged: (Float, Int) -> Unit,
         private val accuracyChanged: (Int) -> Unit
 ) : SensorEventListener {
     private val rotationMatrix = FloatArray(9)
@@ -279,7 +281,7 @@ private class OrientationListener(
         }
         val x = sense * rotationMatrix[matrixColumn]
         val y = sense * rotationMatrix[matrixColumn + 3]
-        azimuthChanged(-atan2(y, x))
+        azimuthChanged(-atan2(y, x), event.accuracy)
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {

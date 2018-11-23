@@ -276,7 +276,7 @@ private class WidgetContext (
         with(remoteViews) {
             setOnClickPendingIntent(R.id.img_view_widget, context.intentLaunchMainActivity())
             tsBitmap?.also {
-                info { "Draw location on bitmap" }
+                info(CC_PRIVATE) { "Draw location on bitmap" }
                 it.bitmap.drawLocation(context.sharedPrefs.location)
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)

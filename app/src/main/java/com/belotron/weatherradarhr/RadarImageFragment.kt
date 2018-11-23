@@ -68,12 +68,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         retainInstance = true
         setHasOptionsMenu(true)
         receiveAzimuthUpdates(
-                azimuthChanged = { azimuth ->
-                    debug { "Azimuth changed to $azimuth" }
+                azimuthChanged = { azimuth, accuracy ->
+                    debug { "Azimuth changed to $azimuth, accuracy $accuracy" }
                     locationState.azimuth = azimuth
+                    locationState.azimuthAccuracy = accuracy
                 },
                 accuracyChanged = { accuracy ->
-                    info { "Azimuth accuracy changed to $accuracy" }
+                    info(CC_PRIVATE) { "Azimuth accuracy changed to $accuracy" }
                     locationState.azimuthAccuracy = accuracy
                 })
         launch {

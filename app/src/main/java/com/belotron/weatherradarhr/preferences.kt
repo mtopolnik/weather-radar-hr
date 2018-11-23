@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.location.Location
-import android.text.format.DateUtils
-import android.text.format.DateUtils.*
+import android.text.format.DateUtils.HOUR_IN_MILLIS
 import androidx.preference.PreferenceManager
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import java.lang.Math.max
 import java.lang.System.currentTimeMillis
+import java.text.DateFormat
+import java.text.SimpleDateFormat
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_LAST_PAUSED_TIMESTAMP = "last-paused-timestamp"
@@ -41,9 +43,15 @@ fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferen
         putBoolean(KEY_WIDGET_LOG_ENABLED, value)
 
 val SharedPreferences.location: Pair<Double, Double> get() =
-    if (getLong(KEY_LOCATION_TIMESTAMP, 0) > currentTimeMillis() - HOUR_IN_MILLIS)
+    if (currentTimeMillis() - getLong(KEY_LOCATION_TIMESTAMP, 0) < HOUR_IN_MILLIS)
         Pair(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(), getFloat(KEY_LOCATION_LONGITUDE, 0f).toDouble())
-    else Pair(0.0, 0.0)
+    else run {
+        val df = DateFormat.getDateTimeInstance()
+        val storedTime = df.format(getLong(KEY_LOCATION_TIMESTAMP, Long.MIN_VALUE))
+        val currTime = df.format(currentTimeMillis())
+        warn(CC_PRIVATE) { "Stored location is too old: $storedTime. Current time: $currTime" }
+        Pair(0.0, 0.0)
+    }
 
 fun SharedPreferences.Editor.setLocation(location: Location): SharedPreferences.Editor {
     val (lat, lon) = location
