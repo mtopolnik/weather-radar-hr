@@ -91,7 +91,7 @@ fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
     }
 }
 
-fun viewPrivateLog() = logFile.takeIf { it.exists() }?.readText() ?: "The log is empty."
+fun appLogString() = logFile.takeIf { it.exists() }?.readText() ?: "The log is empty."
 
 fun clearPrivateLog() {
     val now = System.currentTimeMillis()

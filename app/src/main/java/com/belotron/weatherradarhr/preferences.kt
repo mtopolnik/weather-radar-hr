@@ -41,7 +41,6 @@ val SharedPreferences.location: Triple<Double, Double, Long> get() =
     Triple(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(),
             getFloat(KEY_LOCATION_LONGITUDE, 0f).toDouble(),
             getLong(KEY_LOCATION_TIMESTAMP, 0))
-
 fun SharedPreferences.Editor.setLocation(location: Location): SharedPreferences.Editor {
     val (lat, lon) = location
     putFloat(KEY_LOCATION_LATITUDE, lat.toFloat())
