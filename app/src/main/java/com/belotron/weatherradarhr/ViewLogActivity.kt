@@ -15,4 +15,9 @@ class ViewLogActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.log_content).text = appLogString()
         findViewById<ScrollView>(R.id.log_scroller).apply { post { fullScroll(FOCUS_DOWN) } }
     }
+
+    override fun onPause() {
+        super.onPause()
+        finish()
+    }
 }

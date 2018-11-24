@@ -2,6 +2,7 @@ package com.belotron.weatherradarhr
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import android.location.Location
 import androidx.preference.PreferenceManager
@@ -19,7 +20,8 @@ private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 const val DEFAULT_ANIMATION_RATE = 85
 const val DEFAULT_FREEZE_TIME = 1500
 
-val Context.sharedPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
+val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
+val Context.localPrefs: SharedPreferences get() = getSharedPreferences("local", MODE_PRIVATE)
 
 val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
@@ -37,16 +39,33 @@ val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LO
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
         putBoolean(KEY_WIDGET_LOG_ENABLED, value)
 
-val SharedPreferences.location: Triple<Double, Double, Long> get() =
+val Context.storedLocation: Triple<Double, Double, Long> get() = with(localPrefs) {
     Triple(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(),
             getFloat(KEY_LOCATION_LONGITUDE, 0f).toDouble(),
             getLong(KEY_LOCATION_TIMESTAMP, 0))
-fun SharedPreferences.Editor.setLocation(location: Location): SharedPreferences.Editor {
-    val (lat, lon) = location
-    putFloat(KEY_LOCATION_LATITUDE, lat.toFloat())
-    putFloat(KEY_LOCATION_LONGITUDE, lon.toFloat())
-    putLong(KEY_LOCATION_TIMESTAMP, System.currentTimeMillis())
-    return this
+}
+fun Context.storeLocation(location: Location) {
+    localPrefs.applyUpdate {
+        val (lat, lon) = location
+        putFloat(KEY_LOCATION_LATITUDE, lat.toFloat())
+        putFloat(KEY_LOCATION_LONGITUDE, lon.toFloat())
+        putLong(KEY_LOCATION_TIMESTAMP, System.currentTimeMillis())
+    }
+}
+fun Context.deleteLocation() {
+    localPrefs.applyUpdate {
+        remove(KEY_LOCATION_LATITUDE)
+        remove(KEY_LOCATION_LONGITUDE)
+        remove(KEY_LOCATION_TIMESTAMP)
+    }
+}
+
+fun Context.deleteGarbagePrefs() {
+    mainPrefs.applyUpdate {
+        remove(KEY_LOCATION_LATITUDE)
+        remove(KEY_LOCATION_LONGITUDE)
+        remove(KEY_LOCATION_TIMESTAMP)
+    }
 }
 
 @SuppressLint("CommitPrefEdits")

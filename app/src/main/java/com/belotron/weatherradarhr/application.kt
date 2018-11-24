@@ -61,7 +61,8 @@ class MyApplication : Application() {
         appCoroScope = object : CoroutineScope {
             override val coroutineContext get() = Dispatchers.Main + masterJob
         }
-        privateLogEnabled = sharedPrefs.widgetLogEnabled
+        privateLogEnabled = mainPrefs.widgetLogEnabled
+        deleteGarbagePrefs()
     }
 }
 

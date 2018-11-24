@@ -207,6 +207,7 @@ private class WidgetContext (
             updateRemoteViews(null)
             scheduleUpdateAge()
             appCoroScope.launch {
+                context.refreshLocation()
                 try {
                     context.receiveLocationUpdatesBg()
                 } catch (t: Throwable) {
@@ -277,7 +278,7 @@ private class WidgetContext (
         with(remoteViews) {
             setOnClickPendingIntent(R.id.img_view_widget, context.intentLaunchMainActivity())
             tsBitmap?.also {
-                it.bitmap.drawLocation(context.storedLocaton)
+                it.bitmap.drawLocation(context.locationIfFresh)
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)
             } ?: run {
@@ -327,13 +328,15 @@ private class WidgetContext (
         }
     }
 
-    private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>) {
-        val (lat, lon) = location
-        if (lat == 0.0 && lon == 0.0) {
+    private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>?) {
+        if (location == null) {
             warn(CC_PRIVATE) { "Location not present, not drawing on bitmap" }
             return
         }
-        info(CC_PRIVATE) { "Draw location (%.3f, %.3f) on bitmap".format(lat, lon) }
+        val (lat, lon, timestamp) = location
+        val age = System.currentTimeMillis() - timestamp
+        info(CC_PRIVATE) { "Draw location (%.3f, %.3f) aged %d minutes on bitmap".format(
+                lat, lon, MILLISECONDS.toMinutes(age)) }
         val point = FloatArray(2)
         wDesc.mapShape.locationToPixel(lat, lon, point)
         point[0] -= wDesc.cropLeft.toFloat()
@@ -348,7 +351,6 @@ private class WidgetContext (
                 strokeWidth = 0.25f * dotRadius
             })
         }
-        info { "Location ($lat, $lon) ($x, $y) drawn" }
     }
 
     private fun writeImgAndTimestamp(tsBitmap: TimestampedBitmap) {

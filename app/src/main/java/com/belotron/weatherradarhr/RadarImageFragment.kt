@@ -79,7 +79,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 })
         launch {
             if (!ensureLocationPermissionsAndSettings()) {
-                context!!.sharedPrefs.applyUpdate { setLocation(Location("zero")) }
+                context!!.deleteLocation()
                 return@launch
             }
             receiveLocationUpdatesFg {
@@ -223,7 +223,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onResume()
         possibleStateLoss = false
         val activity = activity!!
-        activity.sharedPrefs.also {
+        activity.mainPrefs.also {
             lastReloadedTimestamp = it.lastReloadedTimestamp
             if (it.lastPausedTimestamp < aWhileAgo && ds.isInFullScreen) {
                 exitFullScreen()
@@ -232,7 +232,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
         val isAnimationShowing = ds.imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
-            with (activity.sharedPrefs) {
+            with (activity.mainPrefs) {
                 animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
             }
         } else {
@@ -260,7 +260,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onPause()
         wasFastResume = false
         animationLooper.stop()
-        activity!!.sharedPrefs.applyUpdate {
+        activity!!.mainPrefs.applyUpdate {
             setLastReloadedTimestamp(lastReloadedTimestamp)
             setLastPausedTimestamp(System.currentTimeMillis())
         }
@@ -301,7 +301,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 privateLogEnabled = newState
                 if (newState) info(CC_PRIVATE) { "\n\nLog enabled" }
                 item.isChecked = newState
-                activity.sharedPrefs.applyUpdate { setWidgetLogEnabled(newState) }
+                activity.mainPrefs.applyUpdate { setWidgetLogEnabled(newState) }
             }
             R.id.show_widget_log -> startActivity(Intent(activity, ViewLogActivity::class.java))
             R.id.clear_widget_log -> clearPrivateLog()
@@ -391,8 +391,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             it.status = LOADING
             it.animationProgress = 0
         }
-        val rateMinsPerSec = context.sharedPrefs.rateMinsPerSec
-        val freezeTimeMillis = context.sharedPrefs.freezeTimeMillis
+        val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
+        val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         for (desc in imgDescs) {
             val bundle = ds.imgBundles[desc.index]
             ds.start {

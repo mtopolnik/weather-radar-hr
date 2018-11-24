@@ -12,6 +12,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.os.Build
 import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.Surface
@@ -27,12 +28,13 @@ import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_A
 import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationResult.extractResult
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
+import com.google.android.gms.location.LocationServices.getSettingsClient
 import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
-import java.text.DateFormat
+import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -81,7 +83,9 @@ val locationRequestBg = LocationRequest().apply {
 val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
-val Location.description get() = "lat: $latitude lon: $longitude accuracy: $accuracy bearing: $bearing"
+val Location.description get() =
+    "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
+            if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else ""
 
 class MapShape(
         private val topLat: Double,
@@ -157,7 +161,7 @@ class LocationState {
 }
 
 suspend fun Fragment.receiveLocationUpdatesFg(callback: (Location) -> Unit) {
-    val locationClient = LocationServices.getFusedLocationProviderClient(context!!)
+    val locationClient = getFusedLocationProviderClient(context!!)
     locationClient.tryFetchLastLocation()?.also { callback(it) }
     locationClient.requestLocationUpdates(locationRequestFg,
             object : LocationCallback() {
@@ -168,26 +172,27 @@ suspend fun Fragment.receiveLocationUpdatesFg(callback: (Location) -> Unit) {
 }
 
 suspend fun Context.refreshLocation() {
-    val timestamp = sharedPrefs.location.third
-    if (System.currentTimeMillis() - timestamp > 20 * MINUTE_IN_MILLIS) {
-        LocationServices.getFusedLocationProviderClient(this).tryFetchLastLocation()?.also {
-            sharedPrefs.applyUpdate { setLocation(it) }
-        }
+    val timestamp = storedLocation.third
+    val age = System.currentTimeMillis() - timestamp
+    if (age <= 20 * MINUTE_IN_MILLIS) return
+    info(CC_PRIVATE) { "Refreshing stale location, age ${MILLISECONDS.toMinutes(age)} minutes" }
+    if (!locationPermissionAndSettingsOk()) {
+        deleteLocation()
+        return
     }
+    getFusedLocationProviderClient(this).tryFetchLastLocation()?.also { storeLocation(it) }
 }
 
-val Context.storedLocaton: Triple<Double, Double, Long> get() {
+val Context.locationIfFresh: Triple<Double, Double, Long>? get() {
     val now = System.currentTimeMillis()
-    val locTriple = sharedPrefs.location
+    val locTriple = storedLocation
     val timestamp = locTriple.third
-    return if (now - timestamp < HOUR_IN_MILLIS)
+    val age = now - timestamp
+    return if (age < HOUR_IN_MILLIS)
         locTriple
     else run {
-        val df = DateFormat.getDateTimeInstance()
-        val storedTime = df.format(timestamp)
-        val currTime = df.format(now)
-        warn(CC_PRIVATE) { "Stored location is too old: $storedTime. Current time: $currTime" }
-        Triple(0.0, 0.0, 0L)
+        warn(CC_PRIVATE) { "Stored location is too old, age ${MILLISECONDS.toMinutes(age)} minutes" }
+        null
     }
 }
 
@@ -238,7 +243,7 @@ private suspend fun Fragment.ensureLocationSettings(vararg locationRequests: Loc
 private suspend fun Context.locationSettingsException(
         vararg locationRequests: LocationRequest
 ): ResolvableApiException? = try {
-    LocationServices.getSettingsClient(this)
+    getSettingsClient(this)
             .checkLocationSettings(LocationSettingsRequest.Builder()
                     .addAllLocationRequests(locationRequests.asList()).build())
             .await()
@@ -257,15 +262,15 @@ private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCa
 }
 
 suspend fun Context.receiveLocationUpdatesBg() {
-    if (!appHasLocationPermission() || locationSettingsException(locationRequestBg) != null) {
+    if (!locationPermissionAndSettingsOk()) {
         warn { "bg: insufficient permissions or settings to receive location" }
         return
     }
     val context = this
-    with(LocationServices.getFusedLocationProviderClient(context)) {
+    with(getFusedLocationProviderClient(context)) {
         tryFetchLastLocation()?.also {
             info { "bg: lastLocation = $it" }
-            appContext.sharedPrefs.commitUpdate { setLocation(it) }
+            appContext.storeLocation(it)
         }
         requestLocationUpdates(locationRequestBg,
                 PendingIntent.getService(context, 0, Intent(context, ReceiveLocationService::class.java), 0))
@@ -274,11 +279,14 @@ suspend fun Context.receiveLocationUpdatesBg() {
     info(CC_PRIVATE) { "Started receiving location in the background" }
 }
 
+private suspend fun Context.locationPermissionAndSettingsOk() =
+        appHasLocationPermission() || locationSettingsException(locationRequestBg) == null
+
 class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent) {
         val location = extractResult(intent)?.lastLocation ?: return
         info(CC_PRIVATE) { "Received location in the background: $location" }
-        appContext.sharedPrefs.commitUpdate { setLocation(location) }
+        appContext.storeLocation(location)
     }
 }
 
