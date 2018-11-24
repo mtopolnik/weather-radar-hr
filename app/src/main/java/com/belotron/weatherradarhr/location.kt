@@ -12,6 +12,8 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.text.format.DateUtils
+import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
@@ -28,10 +30,13 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import java.text.DateFormat
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
@@ -77,6 +82,7 @@ val locationRequestBg = LocationRequest().apply {
 val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
+val Location.description get() = "lat: $latitude lon: $longitude accuracy: $accuracy bearing: $bearing"
 
 class MapShape(
         private val topLat: Double,
@@ -153,7 +159,7 @@ class LocationState {
 
 suspend fun Fragment.receiveLocationUpdatesFg(callback: (Location) -> Unit) {
     val locationClient = LocationServices.getFusedLocationProviderClient(context!!)
-    locationClient.tryFetchLastLocation(callback)
+    locationClient.tryFetchLastLocation()?.also { callback(it) }
     locationClient.requestLocationUpdates(locationRequestFg,
             object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
@@ -162,18 +168,48 @@ suspend fun Fragment.receiveLocationUpdatesFg(callback: (Location) -> Unit) {
             .await()
 }
 
-private suspend fun FusedLocationProviderClient.tryFetchLastLocation(callback: (Location) -> Unit) {
-    lastLocation.await()?.also {
-        info { "Got response from getLastLocation()" }
-        callback(it)
-    } ?: warn { "getLastLocation() returned null" }
+suspend fun Context.refreshLocation() {
+    val timestamp = sharedPrefs.location.third
+    if (System.currentTimeMillis() - timestamp > 20 * MINUTE_IN_MILLIS) {
+        LocationServices.getFusedLocationProviderClient(this).tryFetchLastLocation()?.also {
+            sharedPrefs.applyUpdate { setLocation(it) }
+        }
+    }
+}
+
+val Context.storedLocaton: Triple<Double, Double, Long> get() {
+    val now = System.currentTimeMillis()
+    val locTriple = sharedPrefs.location
+    val timestamp = locTriple.third
+    return if (now - timestamp < HOUR_IN_MILLIS)
+        locTriple
+    else run {
+        val df = DateFormat.getDateTimeInstance()
+        val storedTime = df.format(timestamp)
+        val currTime = df.format(now)
+        warn(CC_PRIVATE) { "Stored location is too old: $storedTime. Current time: $currTime" }
+        Triple(0.0, 0.0, 0L)
+    }
+}
+
+private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? {
+    return suspendCancellableCoroutine { continuation ->
+        lastLocation
+                .addOnSuccessListener {
+                    it?.also { info { "Got response from getLastLocation()" } }
+                            ?: warn { "getLastLocation() returned null" }
+                    continuation.resume(it)
+                }
+                .addOnCanceledListener { continuation.resumeWithException(CancellationException()) }
+                .addOnFailureListener { continuation.resumeWithException(it) }
+    }
 }
 
 suspend fun Fragment.ensureLocationPermissionsAndSettings() =
         ensureLocationPermission() && ensureLocationSettings(locationRequestFg, locationRequestBg)
 
 private suspend fun Fragment.ensureLocationPermission(): Boolean {
-    if (checkSelfPermission(context!!, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+    if (!context!!.appHasLocationPermission()) {
         warn { "fg: our app has no permission to access fine location" }
         requestFineLocationPermission().also { grantResult ->
             if (grantResult != PERMISSION_GRANTED) {
@@ -186,15 +222,10 @@ private suspend fun Fragment.ensureLocationPermission(): Boolean {
     return true
 }
 
-private suspend fun Fragment.ensureLocationSettings(vararg locationRequest: LocationRequest): Boolean {
-    try {
-        LocationServices.getSettingsClient(context!!)
-                .checkLocationSettings(LocationSettingsRequest.Builder()
-                        .addAllLocationRequests(locationRequest.asList()).build())
-                .await()
-    } catch (e: ResolvableApiException) {
+private suspend fun Fragment.ensureLocationSettings(vararg locationRequests: LocationRequest): Boolean {
+    context!!.locationSettingsException(*locationRequests)?.also { resolvableApiException ->
         warn { "ResolvableApiException for location request" }
-        resolve(e).also { result ->
+        resolve(resolvableApiException).also { result ->
             if (result != Activity.RESULT_OK) {
                 warn { "ResolvableApiException resolution failed with code $result" }
                 return false
@@ -205,6 +236,19 @@ private suspend fun Fragment.ensureLocationSettings(vararg locationRequest: Loca
     return true
 }
 
+private suspend fun Context.locationSettingsException(
+        vararg locationRequests: LocationRequest
+): ResolvableApiException? = try {
+    LocationServices.getSettingsClient(this)
+            .checkLocationSettings(LocationSettingsRequest.Builder()
+                    .addAllLocationRequests(locationRequests.asList()).build())
+            .await()
+    null
+} catch (e: ResolvableApiException) { e }
+
+private fun Context.appHasLocationPermission() =
+        checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+
 private suspend fun Fragment.requestFineLocationPermission(): Int = suspendCancellableCoroutine {
     requestPermissions(arrayOf(ACCESS_FINE_LOCATION), prepareToSuspend(it))
 }
@@ -214,18 +258,20 @@ private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCa
 }
 
 suspend fun Context.receiveLocationUpdatesBg() {
-    if (checkSelfPermission(this, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
-        warn { "bg: our app has no permission to access fine location" }
+    if (!appHasLocationPermission() || locationSettingsException(locationRequestBg) != null) {
+        warn { "bg: insufficient permissions or settings to receive location" }
         return
     }
-    val locationClient = LocationServices.getFusedLocationProviderClient(this)
-    locationClient.tryFetchLastLocation {
-        info { "bg: lastLocation = $it" }
-        appContext.sharedPrefs.commitUpdate { setLocation(it) }
+    val context = this
+    with(LocationServices.getFusedLocationProviderClient(context)) {
+        tryFetchLastLocation()?.also {
+            info { "bg: lastLocation = $it" }
+            appContext.sharedPrefs.commitUpdate { setLocation(it) }
+        }
+        requestLocationUpdates(locationRequestBg,
+                PendingIntent.getService(context, 0, Intent(context, ReceiveLocationService::class.java), 0))
+                .await()
     }
-    locationClient.requestLocationUpdates(locationRequestBg,
-            PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0))
-            .await()
     info(CC_PRIVATE) { "Started receiving location in the background" }
 }
 

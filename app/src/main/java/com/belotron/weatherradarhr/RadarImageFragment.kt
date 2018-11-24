@@ -82,10 +82,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 context!!.sharedPrefs.applyUpdate { setLocation(Location("zero")) }
                 return@launch
             }
-            receiveLocationUpdatesFg { location ->
-                info { "Our lat: ${location.latitude} lon: ${location.longitude} accuracy: ${location.accuracy}" +
-                        " bearing: ${location.bearing}" }
-                locationState.location = location
+            receiveLocationUpdatesFg {
+                info { "Received location FG: ${it.description}" }
+                locationState.location = it
             }
             context!!.receiveLocationUpdatesBg()
         }
@@ -239,7 +238,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         } else {
             info { "Reloading animations" }
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
-            startFetchWidgetImages()
+            refreshWidgetsInForeground()
         }
     }
 
@@ -287,7 +286,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         when (item.itemId) {
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
-                startFetchWidgetImages()
+                refreshWidgetsInForeground()
             }
             R.id.settings -> {
                 startActivity(Intent(activity, SettingsActivity::class.java))

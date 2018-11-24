@@ -97,7 +97,7 @@ private data class WidgetDescriptor(
 
 private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
 
-fun startFetchWidgetImages() {
+fun refreshWidgetsInForeground() {
     widgetDescriptors
             .map { WidgetContext(appContext, it) }
             .filter { it.isWidgetInUse && !it.wDesc.refreshJobRunning }
@@ -243,6 +243,7 @@ private class WidgetContext (
                 val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
                 info(CC_PRIVATE) { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
                 writeImgAndTimestamp(tsBitmap)
+                context.refreshLocation()
                 updateRemoteViews(tsBitmap)
                 return lastModified_mmss
             } catch (e: ImageFetchException) {
@@ -276,8 +277,7 @@ private class WidgetContext (
         with(remoteViews) {
             setOnClickPendingIntent(R.id.img_view_widget, context.intentLaunchMainActivity())
             tsBitmap?.also {
-                info(CC_PRIVATE) { "Draw location on bitmap" }
-                it.bitmap.drawLocation(context.sharedPrefs.location)
+                it.bitmap.drawLocation(context.storedLocaton)
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
                 setAgeText(context, it.timestamp, it.isOffline)
             } ?: run {
@@ -327,9 +327,13 @@ private class WidgetContext (
         }
     }
 
-    private fun Bitmap.drawLocation(location: Pair<Double, Double>) {
+    private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>) {
         val (lat, lon) = location
-        if (lat == 0.0 && lon == 0.0) return
+        if (lat == 0.0 && lon == 0.0) {
+            warn(CC_PRIVATE) { "Location not present, not drawing on bitmap" }
+            return
+        }
+        info(CC_PRIVATE) { "Draw location (%.3f, %.3f) on bitmap".format(lat, lon) }
         val point = FloatArray(2)
         wDesc.mapShape.locationToPixel(lat, lon, point)
         point[0] -= wDesc.cropLeft.toFloat()
