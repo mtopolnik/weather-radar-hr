@@ -4,7 +4,6 @@ import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
-import android.location.Location
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.GestureDetector
@@ -42,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 
 private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
 
@@ -60,11 +60,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     // Serves to avoid IllegalStateException in DialogFragment.show()
     private var possibleStateLoss = false
 
-    override val coroutineContext = SupervisorJob() + Dispatchers.Main
+    private var _coroutineContext: CoroutineContext? = null
+    override val coroutineContext get() = _coroutineContext!!
 
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
+        ensureCoroutineContext()
         retainInstance = true
         setHasOptionsMenu(true)
         receiveAzimuthUpdates(
@@ -78,7 +80,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     locationState.azimuthAccuracy = accuracy
                 })
         launch {
-            if (!ensureLocationPermissionsAndSettings()) {
+            if (!ensureCanUseLocation()) {
                 context!!.deleteLocation()
                 return@launch
             }
@@ -221,6 +223,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         info { "RadarImageFragment.onResume" }
         super.onResume()
+        ensureCoroutineContext()
         possibleStateLoss = false
         val activity = activity!!
         activity.mainPrefs.also {
@@ -239,6 +242,20 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             info { "Reloading animations" }
             startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
             refreshWidgetsInForeground()
+        }
+        launch {
+            if (!activity.canUseLocation()) {
+                info { "Can't use location" }
+                activity.deleteLocation()
+                return@launch
+            }
+            activity.refreshLocation()
+            receiveLocationUpdatesFg {
+                info { "Received location FG: ${it.description}" }
+                locationState.location = it
+            }
+            activity.receiveLocationUpdatesBg()
+            redrawWidgetsInForeground()
         }
     }
 
@@ -268,7 +285,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
 
     override fun onStop() {
         super.onStop()
-        coroutineContext[Job]!!.cancel()
+        info { "RadarImageFragment.onStop" }
+        cancelCoroutineContext()
         possibleStateLoss = true
     }
 
@@ -318,6 +336,17 @@ class RadarImageFragment : Fragment(), CoroutineScope {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         resumeReceiveLocationUpdates(requestCode, resultCode)
+    }
+
+    private fun ensureCoroutineContext() {
+        _coroutineContext ?: run { _coroutineContext = SupervisorJob() + Dispatchers.Main }
+    }
+
+    private fun cancelCoroutineContext() {
+        _coroutineContext?.also {
+            it[Job]!!.cancel()
+            _coroutineContext = null
+        }
     }
 
     private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {

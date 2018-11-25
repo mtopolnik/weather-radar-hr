@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit.SECONDS
 
 private const val SECS_IN_HOUR = 3600L
 private const val SECS_IN_MINUTE = 60L
+private const val MINUTES_IN_HOUR = 60L
 private const val UPDATE_AGE_PERIOD_MINUTES = 3
 private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
@@ -95,22 +96,34 @@ private data class WidgetDescriptor(
     }
 }
 
-private data class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
+private class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val bitmap: Bitmap)
 
 fun refreshWidgetsInForeground() {
+    onEachWidget {
+        val logHead = "refreshWidgetsInForeground ${wDesc.name}"
+        info(CC_PRIVATE) { logHead }
+        appCoroScope.launch {
+            fetchImageAndUpdateWidget(onlyIfNew = false).also { lastModified_mmss ->
+                logFetchResult(logHead, lastModified_mmss)
+            }
+        }
+        ensureWidgetRefreshScheduled()
+    }
+}
+
+fun redrawWidgetsInForeground() {
+    onEachWidget {
+        if (isWidgetInUse) {
+            updateRemoteViews(readImgAndTimestamp())
+        }
+    }
+}
+
+private fun onEachWidget(action: WidgetContext.() -> Unit) {
     widgetDescriptors
             .map { WidgetContext(appContext, it) }
             .filter { it.isWidgetInUse && !it.wDesc.refreshJobRunning }
-            .forEach { wCtx -> wCtx.apply {
-                val logHead = "startFetchWidgetImages ${wDesc.name}"
-                info(CC_PRIVATE) { logHead }
-                appCoroScope.launch {
-                    fetchImageAndUpdateWidget(onlyIfNew = false).also { lastModified_mmss ->
-                        logFetchResult(logHead, lastModified_mmss)
-                    }
-                }
-                ensureWidgetRefreshScheduled()
-            } }
+            .forEach { it.action() }
 }
 
 class LradarWidgetProvider : AppWidgetProvider() {
@@ -181,7 +194,7 @@ class UpdateAgeService : JobService() {
                 }
             }
         } catch (e: Throwable) {
-            severe(e) { "$logHead: error" }
+            severe(CC_PRIVATE, e) { "$logHead: error" }
         }
         return false
     }
@@ -322,7 +335,10 @@ private class WidgetContext (
     fun readImgAndTimestamp() : TimestampedBitmap? {
         val file = context.fileInCache(wDesc.timestampFilename)
         return try {
-            file.dataIn().use { TimestampedBitmap(it.readLong(), it.readBoolean(), BitmapFactory.decodeStream(it)) }
+            file.dataIn().use {
+                TimestampedBitmap(it.readLong(), it.readBoolean(),
+                        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inMutable = true })!!)
+            }
         } catch (e : Exception) {
             null
         }
@@ -413,7 +429,7 @@ private fun reportScheduleResult(task: String, resultCode: Int) {
  * @param lastModified_mmss last modified time in seconds past full hour
  */
 private fun millisToNextUpdate(lastModified_mmss : Long, updateIntervalMinutes: Long) : Long {
-    require(updateIntervalMinutes in 0 until 60) { "updateInterval out of range: $updateIntervalMinutes" }
+    require(updateIntervalMinutes in 0 until MINUTES_IN_HOUR) { "updateInterval out of range: $updateIntervalMinutes" }
     require(lastModified_mmss in 0 until SECS_IN_HOUR) { "lastModified out of range: $lastModified_mmss" }
 
     val now_mmss = currentTime_mmss()
