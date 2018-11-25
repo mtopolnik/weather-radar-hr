@@ -84,10 +84,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 context!!.deleteLocation()
                 return@launch
             }
-            receiveLocationUpdatesFg {
-                info { "Received location FG: ${it.description}" }
-                locationState.location = it
-            }
+            receiveLocationUpdatesFg(locationState)
             context!!.receiveLocationUpdatesBg()
         }
     }
@@ -262,10 +259,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 return@launch
             }
             activity.refreshLocation()
-            receiveLocationUpdatesFg {
-                info { "Received location FG: ${it.description}" }
-                locationState.location = it
-            }
+            receiveLocationUpdatesFg(locationState)
             activity.receiveLocationUpdatesBg()
             redrawWidgetsInForeground()
         }

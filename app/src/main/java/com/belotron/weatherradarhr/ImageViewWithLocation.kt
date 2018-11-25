@@ -1,5 +1,6 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -12,6 +13,7 @@ import android.graphics.Shader
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_HIGH
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_LOW
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+import android.os.Build
 import android.util.AttributeSet
 import android.widget.ImageView
 import java.lang.Math.PI
@@ -32,7 +34,7 @@ open class ImageViewWithLocation
     lateinit var locationState: LocationState
     private val location get() = locationState.location
     private val azimuth get() = locationState.azimuth
-    private val azimuthAccuracy get() = locationState.azimuthAccuracy
+    private val azimuthAccuracyRating get() = locationState.azimuthAccuracy
 
     // Reusable value containers
     private val point = FloatArray(2)
@@ -84,16 +86,27 @@ open class ImageViewWithLocation
         intArrayOf(transparent, transparent, redTransparent, transparent)
     }
 
+    @SuppressLint("NewApi")
     private fun Canvas.paintFlashlight(imageX: Float, imageY: Float) {
         val flashlightRange = flashlightRange
-        val angle = when (azimuthAccuracy) {
+        val bearingAccuracy = location
+                ?.takeIf { Build.VERSION.SDK_INT >= 26 }
+                ?.let { it.bearingAccuracyDegrees }
+                ?: 0f
+                .radians
+        val azimuthAccuracy = when (azimuthAccuracyRating) {
             SENSOR_STATUS_ACCURACY_HIGH -> PI / 6
             SENSOR_STATUS_ACCURACY_MEDIUM -> PI / 2
             SENSOR_STATUS_ACCURACY_LOW -> 3 * PI / 4
             else -> 2 * PI
         }.toFloat()
+        val (direction, spread) = if (bearingAccuracy != 0f && bearingAccuracy < PI / 2) {
+            Pair(location!!.bearing, bearingAccuracy)
+        } else {
+            Pair(azimuth, azimuthAccuracy)
+        }
         val dotRadius = locdotRadius
-        val arcCenterDist = if (angle <= PI) dotRadius / sin(angle / 2.0).toFloat() else 0f
+        val arcCenterDist = if (spread <= PI) dotRadius / sin(spread / 2.0).toFloat() else 0f
         val arcCenterX = imageX - arcCenterDist
         val arcRadius = flashlightRange + arcCenterDist
         val arcPortionBeforeTouchPoint =
@@ -103,14 +116,14 @@ open class ImageViewWithLocation
                 } else 0f
         save()
         try {
-            rotate(azimuth.degrees - 90, imageX, imageY)
+            rotate(direction.degrees - 90, imageX, imageY)
             flashlightPaint.shader = RadialGradient(
                     arcCenterX,
                     imageY,
                     arcRadius,
                     flashlightColorStops,
                     floatArrayOf(0f, arcPortionBeforeTouchPoint, arcPortionBeforeTouchPoint,
-                            if (angle <= PI) 1f else .45f),
+                            if (spread <= PI) 1f else .45f),
                     Shader.TileMode.CLAMP
             )
             drawArc(
@@ -118,8 +131,8 @@ open class ImageViewWithLocation
                     imageY - arcRadius,
                     arcCenterX + arcRadius,
                     imageY + arcRadius,
-                    -angle.degrees / 2,
-                    angle.degrees,
+                    -spread.degrees / 2,
+                    spread.degrees,
                     true,
                     flashlightPaint
             )
