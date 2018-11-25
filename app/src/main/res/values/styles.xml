@@ -10,11 +10,14 @@
         <item name="background">@color/primary</item>
         <item name="displayOptions">showTitle</item>
     </style>
+    <style name="ProgressBar" parent="ThemeOverlay.AppCompat.Light">
+        <item name="colorAccent">@color/secondary</item>
+    </style>
     <style name="RatemeDialogTheme" parent="@style/Theme.AppCompat.Dialog.Alert">
         <item name="android:background">@color/primary</item>
     </style>
     <style name="Rateme.Button.Large" parent="@android:style/ThemeOverlay">
-        <item name="android:backgroundTint">@color/rateme_button_large</item>
+        <item name="android:backgroundTint">@color/secondary</item>
     </style>
     <style name="Rateme.Button.Small" parent="@android:style/ThemeOverlay">
         <item name="android:backgroundTint">@color/rateme_button_small</item>

@@ -244,8 +244,15 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
             }
         } else {
-            info { "Reloading animations" }
-            startReloadAnimations(if (isTimeToReload) UP_TO_DATE else PREFER_CACHED)
+            val reloadJobs = startReloadAnimations(PREFER_CACHED)
+            launch {
+                reloadJobs.forEach { it.join() }
+                (activity as AppCompatActivity).supportActionBar?.hide()
+                if (isTimeToReload) {
+                    info { "Reloading animations" }
+                    startReloadAnimations(UP_TO_DATE)
+                }
+            }
             refreshWidgetsInForeground()
         }
         launch {
@@ -418,16 +425,12 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         }
     }
 
-    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
-        val context = activity as AppCompatActivity? ?: return
-        animationLooper.stop()
-        imgDescs.map { ds.imgBundles[it.index] }.forEach {
-            it.status = LOADING
-            it.animationProgress = 0
-        }
+    private fun startReloadAnimations(fetchPolicy: FetchPolicy): List<Job> {
+        val context = activity as AppCompatActivity? ?: return emptyList()
+        imgDescs.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
-        for (desc in imgDescs) {
+        return imgDescs.map { desc ->
             val bundle = ds.imgBundles[desc.index]
             ds.start {
                 val coroScope = this
@@ -445,19 +448,18 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     parsedGif.apply {
                         assignTimestamps(coroScope, context, desc)
                         sortAndDeduplicateFrames()
-                        with (frames) {
+                        with(frames) {
                             while (size > desc.framesToKeep) {
                                 removeAt(0)
                             }
                         }
                     }
                     bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
-                    with (animationLooper) {
+                    with(animationLooper) {
                         receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
                         resume(context, rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
-                    context.supportActionBar?.hide()
                 } catch (t: Throwable) {
                     severe(t) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN

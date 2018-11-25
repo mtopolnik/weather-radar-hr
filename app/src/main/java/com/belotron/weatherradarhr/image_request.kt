@@ -57,7 +57,7 @@ class Exchange<out T>(
         private val fetchPolicy: FetchPolicy,
         private val decode: (ByteArray) -> T
 ) {
-    suspend fun proceed(): Pair<Long, T?> {
+    fun proceed(): Pair<Long, T?> {
         if (fetchPolicy == PREFER_CACHED) {
             try {
                 loadCachedResult?.also { return it }
@@ -80,7 +80,7 @@ class Exchange<out T>(
                     Pair(0L, null)
                 else -> { // responseCode == 304, fetch from cache
                     info { "Not Modified since $ifModifiedSince: $url" }
-                    loadCachedResult ?: context.fetchImg(url, UP_TO_DATE, decode)
+                    loadCachedResult ?: Exchange(context, url, UP_TO_DATE, decode).proceed()
                 }
             }
         } catch (t: Throwable) {

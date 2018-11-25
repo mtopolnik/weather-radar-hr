@@ -30,7 +30,7 @@ class ImageBundle {
         set(value) {
             field = value
             progressBar?.setVisible(value == LOADING)
-            viewGroup?.setVisible(value == SHOWING)
+            viewGroup?.setVisible(value == LOADING || value == SHOWING)
             brokenImgView?.setVisible(value == BROKEN)
             if (value != SHOWING) {
                 textView?.text = ""
