@@ -232,6 +232,10 @@ val Context.locationIfFresh: Triple<Double, Double, Long>? get() {
     val now = System.currentTimeMillis()
     val locTriple = storedLocation
     val timestamp = locTriple.third
+    if (timestamp == 0L) {
+        warn(CC_PRIVATE) { "Stored location not present" }
+        return null
+    }
     val age = now - timestamp
     return if (age < HOUR_IN_MILLIS)
         locTriple

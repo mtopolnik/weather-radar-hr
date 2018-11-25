@@ -13,6 +13,8 @@ private const val KEY_LAST_PAUSED_TIMESTAMP = "last-paused-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
+
+private const val NAME_LOCAL_PREFS = "local"
 private const val KEY_LOCATION_LATITUDE = "location_latitude"
 private const val KEY_LOCATION_LONGITUDE = "location_longitude"
 private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
@@ -21,7 +23,8 @@ const val DEFAULT_ANIMATION_RATE = 85
 const val DEFAULT_FREEZE_TIME = 1500
 
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
-val Context.localPrefs: SharedPreferences get() = getSharedPreferences("local", MODE_PRIVATE)
+
+val Context.localPrefs: SharedPreferences get() = getSharedPreferences(NAME_LOCAL_PREFS, MODE_PRIVATE)
 
 val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
@@ -54,14 +57,6 @@ fun Context.storeLocation(location: Location) {
 }
 fun Context.deleteLocation() {
     localPrefs.applyUpdate {
-        remove(KEY_LOCATION_LATITUDE)
-        remove(KEY_LOCATION_LONGITUDE)
-        remove(KEY_LOCATION_TIMESTAMP)
-    }
-}
-
-fun Context.deleteGarbagePrefs() {
-    mainPrefs.applyUpdate {
         remove(KEY_LOCATION_LATITUDE)
         remove(KEY_LOCATION_LONGITUDE)
         remove(KEY_LOCATION_TIMESTAMP)
