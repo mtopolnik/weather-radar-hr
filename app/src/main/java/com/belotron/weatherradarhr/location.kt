@@ -84,9 +84,10 @@ val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
 val Float.radians get() = Math.toRadians(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
+val Location.bearingAccuracyGuarded get() = if (Build.VERSION.SDK_INT >= 26) bearingAccuracyDegrees else 0f
 val Location.description get() =
     "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
-            if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else ""
+            (bearingAccuracyGuarded.takeIf { it != 0f }?.let { " acc: %.1f".format(it) } ?: "")
 
 class MapShape(
         private val topLat: Double,
@@ -169,7 +170,7 @@ suspend fun Fragment.ensureCanUseLocation() =
 
 suspend fun Fragment.receiveLocationUpdatesFg(locationState: LocationState) {
     val callback: (Location) -> Unit = {
-        if (it.bearing != 0f) {
+        if (it.bearingAccuracyGuarded != 0f) {
             info(CC_PRIVATE) { "Received location FG with bearing: ${it.description}" }
         } else {
             info { "Received location FG: ${it.description}" }

@@ -13,7 +13,6 @@ import android.graphics.Shader
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_HIGH
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_LOW
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-import android.os.Build
 import android.util.AttributeSet
 import android.widget.ImageView
 import java.lang.Math.PI
@@ -89,11 +88,7 @@ open class ImageViewWithLocation
     @SuppressLint("NewApi")
     private fun Canvas.paintFlashlight(imageX: Float, imageY: Float) {
         val flashlightRange = flashlightRange
-        val bearingAccuracy = location
-                ?.takeIf { Build.VERSION.SDK_INT >= 26 }
-                ?.let { it.bearingAccuracyDegrees }
-                ?: 0f
-                .radians
+        val bearingAccuracy = (location?.bearingAccuracyGuarded ?: 0f).radians
         val azimuthAccuracy = when (azimuthAccuracyRating) {
             SENSOR_STATUS_ACCURACY_HIGH -> PI / 6
             SENSOR_STATUS_ACCURACY_MEDIUM -> PI / 2
