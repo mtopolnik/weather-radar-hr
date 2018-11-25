@@ -100,12 +100,12 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         ds.startCoroutineScope()
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
-        vGroupOverview = rootView.findViewById(R.id.radar_overview)
-        vGroupFullScreen = rootView.findViewById(R.id.radar_zoomed)
+        vGroupOverview = rootView.findViewById(R.id.overview)
+        vGroupFullScreen = rootView.findViewById(R.id.zoomed)
         fullScreenBundle.restoreViews(
-                viewGroup = rootView.findViewById(R.id.vg_radar_zoomed),
-                textView = rootView.findViewById(R.id.text_radar_zoomed),
-                imgView = rootView.findViewById<TouchImageView>(R.id.img_radar_zoomed).apply {
+                viewGroup = rootView.findViewById(R.id.vg_zoomed),
+                textView = rootView.findViewById(R.id.text_zoomed),
+                imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
                     coroScope = ds
                     setOnDoubleTapListener(object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
@@ -126,11 +126,14 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
         }
         imgDescs.forEachIndexed { i, desc ->
-            val viewGroup = rootView.findViewById<ViewGroup>(desc.viewGroupId)
-            val imgView = rootView.findViewById<ImageViewWithLocation>(desc.imgViewId)
-            val textView = rootView.findViewById<TextView>(desc.textViewId)
-            val brokenImgView = rootView.findViewById<ImageView>(desc.brokenImgViewId)
-            val progressBar = rootView.findViewById<ProgressBar>(desc.progressBarId)
+            val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
+            val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
+            radarList.addView(radarGroup)
+            val viewGroup = radarGroup.findViewById<ViewGroup>(R.id.radar_image_group)
+            val imgView = radarGroup.findViewById<ImageViewWithLocation>(R.id.radar_img)
+            val textView = radarGroup.findViewById<TextView>(R.id.radar_img_title_text)
+            val brokenImgView = radarGroup.findViewById<ImageView>(R.id.radar_broken_img)
+            val progressBar = radarGroup.findViewById<ProgressBar>(R.id.radar_progress_bar)
             ds.imgBundles[i].restoreViews(
                     viewGroup = viewGroup,
                     textView = textView.apply {
@@ -156,9 +159,11 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         }
         (ds.imgBundles + fullScreenBundle).also { allBundles ->
             locationState.imageBundles = allBundles
-            allBundles.map { it.imgView!! }.forEach { it.locationState = locationState }
+            allBundles.map { it.imgView!! }.forEach {
+                it.locationState = locationState
+            }
         }
-        val scrollView = rootView.findViewById<ScrollView>(R.id.radar_scrollview)
+        val scrollView = rootView.findViewById<ScrollView>(R.id.scrollview)
         val sl = object : SimpleOnScaleGestureListener() {
             private val rect = Rect()
             override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {

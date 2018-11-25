@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/radar_frame"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+>
+    <LinearLayout
+            android:id="@+id/radar_image_group"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+    >
+        <TextView
+                android:id="@+id/radar_img_title_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:minLines="1"
+                android:maxLines="1"
+                android:layout_gravity="bottom"
+                android:textColor="@color/text_primary"
+                android:shadowColor="@color/text_shadow"
+                android:shadowDx="2"
+                android:shadowDy="2"
+                android:shadowRadius="2"
+        />
+        <com.belotron.weatherradarhr.ImageViewWithLocation
+                android:id="@+id/radar_img"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+        />
+    </LinearLayout>
+    <ProgressBar
+            android:id="@+id/radar_progress_bar"
+            style="?android:attr/progressBarStyleLarge"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:paddingTop="100dp"
+            android:paddingBottom="100dp"
+    />
+    <ImageView
+            android:id="@+id/radar_broken_img"
+            app:srcCompat="@drawable/thunderbolt"
+            android:layout_width="match_parent"
+            android:layout_gravity="center"
+            android:layout_height="300dp"
+            android:paddingTop="50dp"
+            android:paddingBottom="50dp"
+    />
+</FrameLayout>

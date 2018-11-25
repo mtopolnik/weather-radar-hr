@@ -7,130 +7,41 @@
         android:layout_width="match_parent"
 >
     <FrameLayout
-            android:id="@+id/radar_overview"
+            android:id="@+id/overview"
             android:orientation="vertical"
             android:layout_height="match_parent"
             android:layout_width="match_parent"
     >
         <com.belotron.weatherradarhr.MyScrollView
-                android:id="@+id/radar_scrollview"
+                android:id="@+id/scrollview"
                 android:layout_height="match_parent"
                 android:layout_width="match_parent"
                 android:scrollbars="none"
         >
             <LinearLayout
+                    android:id="@+id/radar_img_container"
                     android:orientation="vertical"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
             >
-                <LinearLayout
-                        android:id="@+id/vg_kradar"
-                        android:orientation="vertical"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                >
-                    <TextView
-                            android:id="@+id/text_kradar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:paddingLeft="4dp"
-                            android:paddingRight="4dp"
-                            android:minLines="1"
-                            android:maxLines="1"
-                            android:layout_gravity="bottom"
-                            android:textColor="@color/text_primary"
-                            android:shadowColor="@color/text_shadow"
-                            android:shadowDx="2"
-                            android:shadowDy="2"
-                            android:shadowRadius="2"
-                    />
-                    <com.belotron.weatherradarhr.ImageViewWithLocation
-                            android:id="@+id/img_kradar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:adjustViewBounds="true"
-                    />
-                </LinearLayout>
-                <ImageView
-                        android:id="@+id/broken_img_kradar"
-                        app:srcCompat="@drawable/thunderbolt"
-                        android:layout_width="match_parent"
-                        android:layout_gravity="center"
-                        android:layout_height="300dp"
-                        android:paddingTop="50dp"
-                        android:paddingBottom="50dp"
-                />
-                <ProgressBar
-                        android:id="@+id/progress_bar_kradar"
-                        style="?android:attr/progressBarStyleLarge"
-                        android:layout_width="match_parent"
-                        android:layout_height="300dp"
-                        android:paddingTop="100dp"
-                        android:paddingBottom="100dp"
-                />
-                <LinearLayout
-                        android:id="@+id/vg_lradar"
-                        android:orientation="vertical"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                >
-                    <TextView
-                            android:id="@+id/text_lradar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:paddingLeft="4dp"
-                            android:paddingTop="4dp"
-                            android:minLines="1"
-                            android:maxLines="1"
-                            android:layout_gravity="bottom"
-                            android:textColor="@color/text_primary"
-                            android:shadowColor="@color/text_shadow"
-                            android:shadowDx="2"
-                            android:shadowDy="2"
-                            android:shadowRadius="2"
-                    />
-                    <com.belotron.weatherradarhr.ImageViewWithLocation
-                            android:id="@+id/img_lradar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:adjustViewBounds="true"
-                    />
-                </LinearLayout>
-                <ImageView
-                        android:id="@+id/broken_img_lradar"
-                        app:srcCompat="@drawable/thunderbolt"
-                        android:layout_width="match_parent"
-                        android:layout_height="300dp"
-                        android:paddingTop="50dp"
-                        android:paddingBottom="50dp"
-                        android:layout_gravity="center"
-                />
-                <ProgressBar
-                        android:id="@+id/progress_bar_lradar"
-                        style="?android:attr/progressBarStyleLarge"
-                        android:layout_width="match_parent"
-                        android:layout_height="300dp"
-                        android:paddingTop="100dp"
-                        android:paddingBottom="100dp"
-                />
             </LinearLayout>
         </com.belotron.weatherradarhr.MyScrollView>
     </FrameLayout>
     <LinearLayout
-            android:id="@+id/radar_zoomed"
+            android:id="@+id/zoomed"
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
     >
         <RelativeLayout
-                android:id="@+id/vg_radar_zoomed"
+                android:id="@+id/vg_zoomed"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
         >
             <TextView
-                    android:id="@+id/text_radar_zoomed"
+                    android:id="@+id/text_zoomed"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingLeft="4dp"
@@ -145,10 +56,10 @@
                     android:shadowRadius="2"
             />
             <com.belotron.weatherradarhr.TouchImageView
-                    android:id="@+id/img_radar_zoomed"
+                    android:id="@+id/img_zoomed"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_below="@id/text_radar_zoomed"
+                    android:layout_below="@id/text_zoomed"
                     android:layout_alignParentBottom="true"
                     android:adjustViewBounds="true"
                     android:scaleType="fitCenter"
