@@ -27,10 +27,9 @@ inline fun debug(lazyMessage: () -> String) {
 }
 
 inline fun info(ccOption: CcOption, lazyMessage: () -> String) {
+    if (notLoggable(ccOption, Log.INFO)) return
     lazyMessage().also { msg ->
-        if (Log.isLoggable(LOGTAG, Log.INFO)) {
-            Log.i(LOGTAG, msg)
-        }
+        Log.i(LOGTAG, msg)
         logPrivate(ccOption, msg)
     }
 }
@@ -40,10 +39,9 @@ inline fun info(lazyMessage: () -> String) {
 }
 
 inline fun warn(ccOption: CcOption, lazyMessage: () -> String) {
+    if (notLoggable(ccOption, Log.WARN)) return
     lazyMessage().also { msg ->
-        if (Log.isLoggable(LOGTAG, Log.WARN)) {
-            Log.w(LOGTAG, msg)
-        }
+        Log.w(LOGTAG, msg)
         logPrivate(ccOption, msg)
     }
 }
@@ -53,11 +51,18 @@ inline fun warn(lazyMessage: () -> String) {
 }
 
 inline fun severe(ccOption: CcOption, exception: Throwable, lazyMessage: () -> String) {
+    if (notLoggable(ccOption, Log.ERROR)) return
     lazyMessage().also { msg ->
-        if (Log.isLoggable(LOGTAG, Log.ERROR)) {
-            Log.e(LOGTAG, msg, exception)
-        }
+        Log.e(LOGTAG, msg, exception)
         logPrivate(ccOption, msg, exception)
+    }
+}
+
+inline fun severe(ccOption: CcOption, lazyMessage: () -> String) {
+    if (notLoggable(ccOption, Log.ERROR)) return
+    lazyMessage().also { msg ->
+        Log.e(LOGTAG, msg)
+        logPrivate(ccOption, msg)
     }
 }
 
@@ -65,23 +70,12 @@ inline fun severe(exception: Throwable, lazyMessage: () -> String) {
     severe(NO_CC, exception, lazyMessage)
 }
 
-inline fun severe(ccOption: CcOption, lazyMessage: () -> String) {
-    lazyMessage().also { msg ->
-        if (Log.isLoggable(LOGTAG, Log.ERROR)) {
-            Log.e(LOGTAG, msg)
-        }
-        logPrivate(ccOption, msg)
-    }
-}
-
 inline fun severe(lazyMessage: () -> String) {
     severe(NO_CC, lazyMessage)
 }
 
 fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
-    if (ccOption != CC_PRIVATE || !privateLogEnabled) {
-        return
-    }
+    if (!shouldLogPrivate(ccOption)) return
     val now = System.currentTimeMillis()
     val stacktrace = exception?.let { e ->
         ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
@@ -98,4 +92,10 @@ fun clearPrivateLog() {
     logFile.writer(false).use {
         it.println("${timeFormat.format(now)} Log cleared")
     }
+}
+
+inline fun notLoggable(ccOption: CcOption, level: Int) = !(shouldLogPrivate(ccOption) || Log.isLoggable(LOGTAG, level))
+
+inline fun shouldLogPrivate(ccOption: CcOption): Boolean {
+    return ccOption == CC_PRIVATE && privateLogEnabled
 }
