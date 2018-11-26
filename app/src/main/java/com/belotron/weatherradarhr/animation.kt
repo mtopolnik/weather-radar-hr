@@ -210,7 +210,7 @@ class GifAnimator(
     }
 
     private fun updateAgeText() {
-        imgBundle.takeIf { it.status == SHOWING }?.textView?.setAgeText(
+        imgBundle.takeIf { it.status in ImageBundle.loadingOrShowing }?.textView?.setAgeText(
                 timestamp(parsedGif.frameCount - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
     }
 

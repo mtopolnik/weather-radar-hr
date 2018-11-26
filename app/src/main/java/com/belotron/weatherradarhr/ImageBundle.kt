@@ -11,10 +11,14 @@ import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
+import java.util.EnumSet
 
 class ImageBundle {
     enum class Status {
         UNKNOWN, HIDDEN, LOADING, BROKEN, SHOWING
+    }
+    companion object {
+        val loadingOrShowing = EnumSet.of(LOADING, SHOWING)!!
     }
 
     var textView: TextView? = null; private set
@@ -30,9 +34,9 @@ class ImageBundle {
         set(value) {
             field = value
             progressBar?.setVisible(value == LOADING)
-            viewGroup?.setVisible(value == LOADING || value == SHOWING)
+            viewGroup?.setVisible(value in loadingOrShowing)
             brokenImgView?.setVisible(value == BROKEN)
-            if (!(value == LOADING || value == SHOWING)) {
+            if (value !in loadingOrShowing) {
                 textView?.text = ""
             }
         }

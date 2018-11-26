@@ -41,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.EnumSet
 import kotlin.coroutines.CoroutineContext
 
 private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
@@ -94,7 +95,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     ): View {
         info { "RadarImageFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
-        ds.startCoroutineScope()
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
         vGroupOverview = rootView.findViewById(R.id.overview)
@@ -149,9 +149,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                         setOnClickListener { switchActionBarVisible() }
                         visibility = GONE
                     },
-                    progressBar = progressBar.apply {
-                        setOnClickListener { switchActionBarVisible() }
-                    }
+                    progressBar = progressBar
             )
         }
         (ds.imgBundles + fullScreenBundle).also { allBundles ->
@@ -176,7 +174,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 val imgIndex = if (focusY <= rect.top) 0 else 1
                 val imgView = ds
                         .imgBundles[imgIndex]
-                        .takeIf { it.status == SHOWING }
+                        .takeIf { it.status in ImageBundle.loadingOrShowing }
                         ?.imgView
                         ?: return true
                 if (!imgView.isDescendantOf(scrollView)) {
@@ -196,9 +194,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 if (e.pointerCount > 1) {
                     secondPointerDown = true
                 }
-                try {
-                    secondPointerDown
-                } finally {
+                secondPointerDown.also {
                     if (e.actionMasked == MotionEvent.ACTION_UP) {
                         secondPointerDown = false
                     }
@@ -235,7 +231,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
         }
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
-        val isAnimationShowing = ds.imgBundles.all { it.status == SHOWING || it.status == HIDDEN }
+        val isAnimationShowing = ds.imgBundles.all { it.status in EnumSet.of(LOADING, SHOWING, HIDDEN) }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.mainPrefs) {
                 animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
@@ -362,13 +358,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val (imgOnScreenX, imgOnScreenY) = IntArray(2).also { srcImgView.getLocationInWindow(it) }
 
         ds.indexOfImgInFullScreen = index
-        with (fullScreenBundle) {
+        with(fullScreenBundle) {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
             animationLooper.resume(activity)
             seekBar?.visibility = INVISIBLE
-            ds.start {
+            start {
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitBitmapMeasured()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
@@ -381,9 +377,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     fun exitFullScreen() {
         val index = ds.indexOfImgInFullScreen ?: return
         ds.indexOfImgInFullScreen = null
-        ds.start {
+        start {
             val bundleInTransition = ds.imgBundles[index]
-            if (bundleInTransition.status == SHOWING) {
+            if (bundleInTransition.status in ImageBundle.loadingOrShowing) {
                 fullScreenBundle.seekBar?.startAnimateExit()
                 bundleInTransition.imgView?.let { it as? TouchImageView }?.animateZoomExit()
                 ds.imgBundles.forEach {
@@ -420,6 +416,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     private fun startReloadAnimations(fetchPolicy: FetchPolicy): List<Job> {
+        lastReloadedTimestamp = System.currentTimeMillis()
         val context = activity as AppCompatActivity? ?: return emptyList()
         imgDescs.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
@@ -438,7 +435,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                         bundle.status = BROKEN
                         return@start
                     }
-                    lastReloadedTimestamp = System.currentTimeMillis()
                     parsedGif.apply {
                         assignTimestamps(coroScope, context, desc)
                         sortAndDeduplicateFrames()

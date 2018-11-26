@@ -13,19 +13,9 @@ class DisplayState : CoroutineScope {
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
     val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
 
-    override lateinit var coroutineContext: CoroutineContext
-        private set
-
-    fun start(block: suspend CoroutineScope.() -> Unit) =
-            this.launch(start = CoroutineStart.UNDISPATCHED, block = block)
-
-    fun startCoroutineScope() {
-        coroutineContext = Dispatchers.Main + SupervisorJob()
-    }
+    override val coroutineContext: CoroutineContext = Dispatchers.Main + SupervisorJob()
 
     fun destroy() {
         imgBundles.forEach { it.destroyViews() }
-        coroutineContext[Job]!!.cancel()
     }
-
 }
