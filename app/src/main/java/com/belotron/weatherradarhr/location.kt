@@ -210,8 +210,14 @@ fun Fragment.receiveAzimuthUpdates(
         azimuthChanged: (Float, Int) -> Unit,
         accuracyChanged: (Int) -> Unit
 ) {
-    val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    val sensor = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR)!!
+    val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager? ?: run {
+        warn(CC_PRIVATE) { "SensorManager not available" }
+        return
+    }
+    val sensor = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR) ?: run {
+        warn(CC_PRIVATE) { "Rotation vector sensor not available" }
+        return
+    }
     sensorManager.registerListener(OrientationListener(activity!!, azimuthChanged, accuracyChanged), sensor, 10_000)
 }
 
