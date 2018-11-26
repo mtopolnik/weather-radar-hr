@@ -48,7 +48,7 @@
                     android:paddingRight="4dp"
                     android:minLines="1"
                     android:maxLines="1"
-                    android:layout_gravity="bottom"
+                    android:layout_alignParentTop="true"
                     android:textColor="@color/text_primary"
                     android:shadowColor="@color/text_shadow"
                     android:shadowDx="2"
@@ -73,18 +73,21 @@
             >
                 <include layout="@layout/thumb_seekbar"/>
             </FrameLayout>
+            <ProgressBar
+                    android:id="@+id/progress_bar_zoomed"
+                    style="?android:attr/progressBarStyleLarge"
+                    android:theme="@style/ProgressBar"
+                    android:background="#0000"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:layout_centerVertical="true"
+            />
         </RelativeLayout>
         <ImageView
                 android:id="@+id/broken_img_zoomed"
                 app:srcCompat="@drawable/thunderbolt"
                 android:layout_width="match_parent"
                 android:layout_height="300dp"
-        />
-        <ProgressBar
-                android:id="@+id/progress_bar_zoomed"
-                style="?android:attr/progressBarStyleLarge"
-                android:layout_width="match_parent"
-                android:layout_height="150dp"
         />
     </LinearLayout>
 </LinearLayout>
