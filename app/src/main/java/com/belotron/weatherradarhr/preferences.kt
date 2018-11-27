@@ -13,6 +13,7 @@ private const val KEY_LAST_PAUSED_TIMESTAMP = "last-paused-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
+private const val KEY_SHOULD_ASK_ENABLE_LOCATION = "should_ask_to_enable_location"
 
 private const val NAME_LOCAL_PREFS = "local"
 private const val KEY_LOCATION_LATITUDE = "location_latitude"
@@ -41,6 +42,10 @@ fun SharedPreferences.Editor.setLastPausedTimestamp(value: Long): SharedPreferen
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
         putBoolean(KEY_WIDGET_LOG_ENABLED, value)
+
+val SharedPreferences.shouldAskToEnableLocation: Boolean get() = getBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, true)
+fun SharedPreferences.Editor.setShouldAskToEnableLocation(value: Boolean): SharedPreferences.Editor =
+        putBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, value)
 
 val Context.storedLocation: Triple<Double, Double, Long> get() = with(localPrefs) {
     Triple(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(),

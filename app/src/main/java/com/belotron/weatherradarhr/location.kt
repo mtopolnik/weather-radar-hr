@@ -32,15 +32,18 @@ import com.google.android.gms.location.LocationServices.getFusedLocationProvider
 import com.google.android.gms.location.LocationServices.getSettingsClient
 import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
+
+const val CODE_REQUEST_FINE_LOCATION = 13
+const val CODE_RESOLVE_API_EXCEPTION = 14
 
 val lradarShape = MapShape(
         topLat = 47.40,
@@ -87,7 +90,7 @@ operator fun Location.component2() = longitude
 val Location.bearingAccuracyGuarded get() = if (Build.VERSION.SDK_INT >= 26) bearingAccuracyDegrees else 0f
 val Location.description get() =
     "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
-            (bearingAccuracyGuarded.takeIf { it != 0f }?.let { " acc: %.1f".format(it) } ?: "")
+            (if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else "")
 
 class MapShape(
         private val topLat: Double,
@@ -133,92 +136,125 @@ class MapShape(
     }
 }
 
-private var nextRequestCode = 0; get() = ++field
-private var contRequestCode = 0
-private var continuation: Continuation<Int>? = null
-
-private fun prepareToSuspend(newContinuation: Continuation<Int>): Int {
-    contRequestCode = nextRequestCode
-    continuation = newContinuation
-    return contRequestCode
-}
-
-fun resumeReceiveLocationUpdates(requestCode: Int, result: Int) {
-    continuation?.takeIf { requestCode == contRequestCode }?.also {
-        continuation = null
-        contRequestCode = 0
-        it.resume(result)
-    }
-}
-
 class LocationState {
     lateinit var imageBundles: List<ImageBundle>
     var location by observable(null as Location?) { _, _, _ -> imageBundles.forEach { it.invalidateImgView() } }
     var azimuth by observable(0f, ::invalidateIfGotLocation)
     var azimuthAccuracy by observable(0, ::invalidateIfGotLocation)
 
+    private var azimuthListener : SensorEventListener? = null
+    private var locationCallback: LocationCallback? = null
+
     private fun <T: Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
         if (location != null) imageBundles.forEach { it.invalidateImgView() }
     }
+
+    fun setAzimuthListener(listener: SensorEventListener) {
+        azimuthListener = listener
+    }
+
+    fun clearAzimuthListener(sensorManager: SensorManager) {
+        azimuthListener?.also {
+            sensorManager.unregisterListener(it)
+            azimuthListener = null
+        }
+    }
+
+    fun setLocationCallback(callback: LocationCallback) {
+        locationCallback = callback
+    }
+
+    fun clearLocationCallback(locationProvider: FusedLocationProviderClient) {
+        locationCallback?.also {
+            locationProvider.removeLocationUpdates(it)
+            locationCallback = null
+        }
+    }
 }
 
-suspend fun Context.canUseLocation() =
+suspend fun Context.canUseLocationBg() =
         appHasLocationPermission() && locationSettingsException(locationRequestBg) == null
 
-suspend fun Fragment.ensureCanUseLocation() =
-        ensureLocationPermission() && ensureLocationSettings(locationRequestFg, locationRequestBg)
+suspend fun Context.canUseLocationFg() =
+        appHasLocationPermission() && locationSettingsException(locationRequestFg, locationRequestBg) == null
 
-suspend fun Fragment.receiveLocationUpdatesFg(locationState: LocationState) {
-    val callback: (Location) -> Unit = {
+suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
+    with(context!!) {
+        if (!appHasLocationPermission()) {
+            warn { "FG: our app has no permission to access fine location" }
+            delay(5_000)
+            startIntentRequestLocationPermission()
+            return
+        }
+        locationSettingsException(locationRequestFg, locationRequestBg)?.also {
+            warn { "FG: ResolvableApiException for location request (probably location disabled)" }
+            if (!mainPrefs.shouldAskToEnableLocation) return
+            delay(5_000)
+            startIntentResolveException(it)
+            return
+        }
+    }
+}
+
+suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
+    val action: (Location) -> Unit = {
         if (it.bearingAccuracyGuarded != 0f) {
-            info(CC_PRIVATE) { "Received location FG with bearing: ${it.description}" }
+            info(CC_PRIVATE) { "FG: received location with bearing ${it.description}" }
         } else {
-            info { "Received location FG: ${it.description}" }
+            info { "FG: received location ${it.description}" }
         }
         locationState.location = it
     }
-    getFusedLocationProviderClient(context!!).apply {
-        tryFetchLastLocation()?.also { callback(it) }
-        requestLocationUpdates(locationRequestFg,
-                object : LocationCallback() {
-                    override fun onLocationResult(result: LocationResult) = callback(result.lastLocation)
-                },
-                null)
-                .await()
+    fusedLocationProviderClient.apply {
+        tryFetchLastLocation()?.also { action(it) }
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) = action(result.lastLocation)
+        }
+        locationState.setLocationCallback(callback)
+        requestLocationUpdates(locationRequestFg, callback, null).await()
     }
 }
 
+fun Context.stopReceivingLocationUpdatesFg(locationState: LocationState) {
+    locationState.clearLocationCallback(fusedLocationProviderClient)
+}
+
 suspend fun Context.receiveLocationUpdatesBg() {
-    if (!canUseLocation()) {
-        warn { "bg: insufficient permissions or settings to receive location" }
+    if (!canUseLocationBg()) {
+        warn { "BG: insufficient permissions or settings to receive location" }
         return
     }
     val context = this
-    with(getFusedLocationProviderClient(context)) {
+    with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
-            info { "bg: lastLocation = $it" }
+            info { "BG: lastLocation = ${it.description}" }
             appContext.storeLocation(it)
         }
         requestLocationUpdates(locationRequestBg,
                 PendingIntent.getService(context, 0, Intent(context, ReceiveLocationService::class.java), 0))
                 .await()
     }
-    info(CC_PRIVATE) { "Started receiving location in the background" }
+    info(CC_PRIVATE) { "BG: started receiving location" }
 }
 
-fun Fragment.receiveAzimuthUpdates(
-        azimuthChanged: (Float, Int) -> Unit,
-        accuracyChanged: (Int) -> Unit
-) {
-    val sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager? ?: run {
+fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
+    val sensorManager = sensorManager ?: run {
         warn(CC_PRIVATE) { "SensorManager not available" }
         return
     }
+    locationState.clearAzimuthListener(sensorManager)
     val sensor = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR) ?: run {
         warn(CC_PRIVATE) { "Rotation vector sensor not available" }
         return
     }
-    sensorManager.registerListener(OrientationListener(activity!!, azimuthChanged, accuracyChanged), sensor, 10_000)
+    val newListener = OrientationListener(this, locationState)
+    sensorManager.registerListener(newListener, sensor, 10_000)
+    locationState.setAzimuthListener(newListener)
+    info(CC_PRIVATE) { "FG: receiving azimuth updates" }
+}
+
+fun Context.stopReceivingAzimuthUpdates(locationState: LocationState) {
+    sensorManager?.also { locationState.clearAzimuthListener(it) }
 }
 
 suspend fun Context.refreshLocation() {
@@ -226,7 +262,7 @@ suspend fun Context.refreshLocation() {
     val age = System.currentTimeMillis() - timestamp
     if (age <= 5 * MINUTE_IN_MILLIS) return
     val ageString = if (timestamp != 0L) "stale (${MILLISECONDS.toMinutes(age)} minutes old)" else "absent"
-    if (!canUseLocation()) {
+    if (!canUseLocationBg()) {
         info(CC_PRIVATE) { "Location is $ageString, can't refresh it due to lack of permissions/location settings" }
         deleteLocation()
         return
@@ -252,10 +288,10 @@ val Context.locationIfFresh: Triple<Double, Double, Long>? get() {
     }
 }
 
-private fun Context.appHasLocationPermission() =
+fun Context.appHasLocationPermission() =
         checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
 
-private suspend fun Context.locationSettingsException(
+suspend fun Context.locationSettingsException(
         vararg locationRequests: LocationRequest
 ): ResolvableApiException? = try {
     getSettingsClient(this)
@@ -265,33 +301,14 @@ private suspend fun Context.locationSettingsException(
     null
 } catch (e: ResolvableApiException) { e }
 
-private suspend fun Fragment.ensureLocationPermission(): Boolean {
-    if (!context!!.appHasLocationPermission()) {
-        warn { "fg: our app has no permission to access fine location" }
-        requestFineLocationPermission().also { grantResult ->
-            if (grantResult != PERMISSION_GRANTED) {
-                warn { "Result of requestPermissions: $grantResult" }
-                return false
-            }
-            info { "User has granted us the fine location permission" }
-        }
-    }
-    return true
-}
+fun Fragment.startIntentRequestLocationPermission() =
+        requestPermissions(arrayOf(ACCESS_FINE_LOCATION), CODE_REQUEST_FINE_LOCATION)
 
-private suspend fun Fragment.ensureLocationSettings(vararg locationRequests: LocationRequest): Boolean {
-    context!!.locationSettingsException(*locationRequests)?.also { resolvableApiException ->
-        warn { "ResolvableApiException for location request" }
-        resolve(resolvableApiException).also { result ->
-            if (result != Activity.RESULT_OK) {
-                warn { "ResolvableApiException resolution failed with code $result" }
-                return false
-            }
-            info { "ResolvableApiException is now resolved" }
-        }
-    }
-    return true
-}
+fun Fragment.startIntentResolveException(e: ResolvableApiException) =
+        startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
+
+private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
+private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)
 
 private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? {
     return suspendCancellableCoroutine { continuation ->
@@ -306,13 +323,6 @@ private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location
     }
 }
 
-private suspend fun Fragment.requestFineLocationPermission(): Int = suspendCancellableCoroutine {
-    requestPermissions(arrayOf(ACCESS_FINE_LOCATION), prepareToSuspend(it))
-}
-
-private suspend fun Fragment.resolve(e: ResolvableApiException): Int = suspendCancellableCoroutine {
-    startIntentSenderForResult(e.resolution.intentSender, prepareToSuspend(it), null, 0, 0, 0, null)
-}
 
 class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent) {
@@ -324,8 +334,7 @@ class ReceiveLocationService : IntentService("Receive Location Updates") {
 
 private class OrientationListener(
         private val activity: Activity,
-        private val azimuthChanged: (Float, Int) -> Unit,
-        private val accuracyChanged: (Int) -> Unit
+        private val locationState: LocationState
 ) : SensorEventListener {
     private val rotationMatrix = FloatArray(9)
 
@@ -358,12 +367,17 @@ private class OrientationListener(
         }
         val easting = sense * rotationMatrix[matrixColumn]
         val northing = sense * rotationMatrix[matrixColumn + 3]
-        azimuthChanged(-atan2(northing, easting), event.accuracy)
+        with(locationState) {
+            azimuth = -atan2(northing, easting)
+            azimuthAccuracy = event.accuracy
+            debug { "Azimuth changed to ${azimuth}, accuracy ${azimuthAccuracy}" }
+        }
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
         if (sensor.type == TYPE_ROTATION_VECTOR) {
-            accuracyChanged(accuracy)
+            info(CC_PRIVATE) { "Azimuth accuracy changed to $accuracy" }
+            locationState.azimuthAccuracy = accuracy
         }
     }
 }

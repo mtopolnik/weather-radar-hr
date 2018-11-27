@@ -1,5 +1,6 @@
 package com.belotron.weatherradarhr
 
+import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
@@ -26,7 +27,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.PermissionChecker.PERMISSION_DENIED
+import androidx.core.content.PermissionChecker
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -40,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.EnumSet
 import kotlin.coroutines.CoroutineContext
@@ -70,24 +72,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         ensureCoroutineContext()
         retainInstance = true
         setHasOptionsMenu(true)
-        receiveAzimuthUpdates(
-                azimuthChanged = { azimuth, accuracy ->
-                    debug { "Azimuth changed to $azimuth, accuracy $accuracy" }
-                    locationState.azimuth = azimuth
-                    locationState.azimuthAccuracy = accuracy
-                },
-                accuracyChanged = { accuracy ->
-                    info(CC_PRIVATE) { "Azimuth accuracy changed to $accuracy" }
-                    locationState.azimuthAccuracy = accuracy
-                })
-        launch {
-            if (!ensureCanUseLocation()) {
-                context!!.deleteLocation()
-                return@launch
-            }
-            receiveLocationUpdatesFg(locationState)
-            context!!.receiveLocationUpdatesBg()
-        }
+        launch { checkAndCorrectPermissionsAndSettings() }
     }
 
     override fun onCreateView(
@@ -248,16 +233,20 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
             refreshWidgetsInForeground()
         }
-        launch {
-            if (!activity.canUseLocation()) {
-                info { "Can't use location" }
-                activity.deleteLocation()
-                return@launch
+        with(activity) {
+            launch {
+                if (!canUseLocationFg()) {
+                    warn { "Location not available" }
+                    deleteLocation()
+                    locationState.location = null
+                    return@launch
+                }
+                refreshLocation()
+                receiveLocationUpdatesFg(locationState)
+                receiveLocationUpdatesBg()
+                redrawWidgetsInForeground()
+                receiveAzimuthUpdates(locationState)
             }
-            activity.refreshLocation()
-            receiveLocationUpdatesFg(locationState)
-            activity.receiveLocationUpdatesBg()
-            redrawWidgetsInForeground()
         }
     }
 
@@ -279,9 +268,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onPause()
         wasFastResume = false
         animationLooper.stop()
-        activity!!.mainPrefs.applyUpdate {
-            setLastReloadedTimestamp(lastReloadedTimestamp)
-            setLastPausedTimestamp(System.currentTimeMillis())
+        with(activity!!) {
+            stopReceivingAzimuthUpdates(locationState)
+            stopReceivingLocationUpdatesFg(locationState)
+            mainPrefs.applyUpdate {
+                setLastReloadedTimestamp(lastReloadedTimestamp)
+                setLastPausedTimestamp(System.currentTimeMillis())
+            }
         }
     }
 
@@ -332,12 +325,23 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode != CODE_REQUEST_FINE_LOCATION) return
         require(permissions.size == 1) { "Unexpected requested permissions size ${permissions.size}" }
-        resumeReceiveLocationUpdates(requestCode, grantResults.takeIf { it.isNotEmpty() }?.get(0) ?: PERMISSION_DENIED)
+        if (grantResults[0] == PermissionChecker.PERMISSION_GRANTED) {
+            info { "User has granted us the fine location permission" }
+        } else {
+            warn { "User hasn't granted us the fine location permission (grant result: ${grantResults[0]})" }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        resumeReceiveLocationUpdates(requestCode, resultCode)
+        if (requestCode != CODE_RESOLVE_API_EXCEPTION) return
+        if (resultCode == Activity.RESULT_OK) {
+            info { "ResolvableApiException is now resolved" }
+        } else {
+            warn { "ResolvableApiException resolution failed with code $resultCode" }
+            activity!!.mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
+        }
     }
 
     private fun ensureCoroutineContext() {
@@ -417,7 +421,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
 
     private fun startReloadAnimations(fetchPolicy: FetchPolicy): List<Job> {
         lastReloadedTimestamp = System.currentTimeMillis()
-        val context = activity as AppCompatActivity? ?: return emptyList()
+        val context = appContext
         imgDescs.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
