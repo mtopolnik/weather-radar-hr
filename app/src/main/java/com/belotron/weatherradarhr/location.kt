@@ -201,7 +201,7 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
 suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
     val action: (Location) -> Unit = {
         if (it.bearingAccuracyGuarded != 0f) {
-            info(CC_PRIVATE) { "FG: received location with bearing ${it.description}" }
+            info { "FG: received location with bearing ${it.description}" }
         } else {
             info { "FG: received location ${it.description}" }
         }
@@ -252,7 +252,7 @@ fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val newListener = OrientationListener(this, locationState)
     sensorManager.registerListener(newListener, sensor, 10_000)
     locationState.setAzimuthListener(newListener)
-    info(CC_PRIVATE) { "FG: receiving azimuth updates" }
+    info { "FG: receiving azimuth updates" }
 }
 
 fun Context.stopReceivingAzimuthUpdates(locationState: LocationState) {
@@ -378,7 +378,7 @@ private class OrientationListener(
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
         if (sensor.type == TYPE_ROTATION_VECTOR) {
-            info(CC_PRIVATE) { "Azimuth accuracy changed to $accuracy" }
+            info { "Azimuth accuracy changed to $accuracy" }
             locationState.azimuthAccuracy = accuracy
         }
     }
