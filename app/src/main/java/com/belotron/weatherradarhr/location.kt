@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
+import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.atan2
@@ -44,6 +45,7 @@ import kotlin.reflect.KProperty
 
 const val CODE_REQUEST_FINE_LOCATION = 13
 const val CODE_RESOLVE_API_EXCEPTION = 14
+private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2_000L
 
 val lradarShape = MapShape(
         topLat = 47.40,
@@ -182,14 +184,14 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     with(context!!) {
         if (!appHasLocationPermission()) {
             warn { "FG: our app has no permission to access fine location" }
-            delay(5_000)
+            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
             startIntentRequestLocationPermission()
             return
         }
         locationSettingsException(locationRequestFg, locationRequestBg)?.also {
             warn { "FG: ResolvableApiException for location request (probably location disabled)" }
             if (!mainPrefs.shouldAskToEnableLocation) return
-            delay(5_000)
+            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
             startIntentResolveException(it)
             return
         }
