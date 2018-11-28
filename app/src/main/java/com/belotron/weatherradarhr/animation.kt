@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
-import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
