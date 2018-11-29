@@ -21,7 +21,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-private const val PREFERRED_LOCDOT_RADIUS_IMAGEPIXELS = 3
+private const val PREFERRED_LOCDOT_RADIUS_METERS = 1_500
 private const val MAX_LOCDOT_SCALE = 1.75f
 
 open class ImageViewWithLocation
@@ -66,7 +66,7 @@ open class ImageViewWithLocation
             val viewX = point[0]
             val viewY = point[1]
             val scale = run {
-                val preferredLocdotRadius = m[MSCALE_X] * PREFERRED_LOCDOT_RADIUS_IMAGEPIXELS
+                val preferredLocdotRadius = m[MSCALE_X] * PREFERRED_LOCDOT_RADIUS_METERS / mapShape.pixelSizeMeters
                 val preferredScale = preferredLocdotRadius / locdotRadius
                 max(1f, min(MAX_LOCDOT_SCALE, preferredScale))
             }
@@ -90,9 +90,9 @@ open class ImageViewWithLocation
         val flashlightRange = flashlightRange
         val bearingAccuracy = (location?.bearingAccuracyGuarded ?: 0f).radians
         val azimuthAccuracy = when (azimuthAccuracyRating) {
-            SENSOR_STATUS_ACCURACY_HIGH -> PI / 6
-            SENSOR_STATUS_ACCURACY_MEDIUM -> PI / 2
-            SENSOR_STATUS_ACCURACY_LOW -> 3 * PI / 4
+            SENSOR_STATUS_ACCURACY_HIGH ->   1 * PI / 6
+            SENSOR_STATUS_ACCURACY_MEDIUM -> 3 * PI / 6
+            SENSOR_STATUS_ACCURACY_LOW ->    5 * PI / 6
             else -> 2 * PI
         }.toFloat()
         val (direction, spread) = if (bearingAccuracy != 0f && bearingAccuracy < PI / 2) {

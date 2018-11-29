@@ -44,6 +44,7 @@ import kotlin.reflect.KProperty
 
 const val CODE_REQUEST_FINE_LOCATION = 13
 const val CODE_RESOLVE_API_EXCEPTION = 14
+const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2_000L
 
 val lradarShape = MapShape(
@@ -53,8 +54,8 @@ val lradarShape = MapShape(
         botLeftLon = 12.19,
         topRightLon = 17.40,
         botRightLon = 17.30,
-        leftScreenX = 10,
-        rightScreenX = 810,
+        leftImageX = 10,
+        rightImageX = 810,
         topImageY = 49,
         botImageY = 649
 )
@@ -66,8 +67,8 @@ val kradarShape = MapShape(
         botLeftLon = 13.15,
         topRightLon = 19.84,
         botRightLon = 19.74,
-        leftScreenX = 1,
-        rightScreenX = 478,
+        leftImageX = 1,
+        rightImageX = 478,
         topImageY = 1,
         botImageY = 478
 )
@@ -100,11 +101,13 @@ class MapShape(
         topRightLon: Double,
         botLeftLon: Double,
         botRightLon: Double,
-        leftScreenX: Int,
-        rightScreenX: Int,
+        leftImageX: Int,
+        rightImageX: Int,
         private val topImageY: Int,
         botImageY: Int
 ) {
+    val pixelSizeMeters: Float
+
     // zeroLon satisfies the following:
     // (zeroLon - topLeftLon) / (topRightLon - zeroLon) ==
     // (zeroLon - botLeftLon) / (botRightLon - zeroLon)
@@ -112,16 +115,19 @@ class MapShape(
     private val xScaleAtTop: Double
     private val xScaleAtBot: Double
     private val zeroImageX: Double
-    private val imageHeight: Int = botImageY - topImageY
+    private val imageHeightPixels: Int = botImageY - topImageY
 
     init {
         val topLonWidth = topRightLon - topLeftLon
         val botLonWidth = botRightLon - botLeftLon
         zeroLon = (topRightLon * botLeftLon - topLeftLon * botRightLon) / (topLonWidth - botLonWidth)
-        val screenWidth: Int = rightScreenX - leftScreenX
+        val screenWidth: Int = rightImageX - leftImageX
         xScaleAtTop = screenWidth / topLonWidth
-        zeroImageX = 0.5 + leftScreenX + xScaleAtTop * (zeroLon - topLeftLon)
+        zeroImageX = 0.5 + leftImageX + xScaleAtTop * (zeroLon - topLeftLon)
         xScaleAtBot = screenWidth / botLonWidth
+        val imageHeightDegrees: Double = topLat - botLat
+        pixelSizeMeters = (imageHeightDegrees * METERS_PER_DEGREE / imageHeightPixels).toFloat()
+        println("Pixel size: $pixelSizeMeters meters")
     }
 
     fun locationToPixel(location: Location, point: FloatArray) {
@@ -133,7 +139,7 @@ class MapShape(
         val normY: Double = (topLat - lat) / (topLat - botLat)
         val xScaleAtY: Double = xScaleAtTop + (xScaleAtBot - xScaleAtTop) * normY
         point[0] = (zeroImageX + xScaleAtY * (lon - zeroLon)).toFloat()
-        point[1] = topImageY + (imageHeight * normY).toFloat()
+        point[1] = topImageY + (imageHeightPixels * normY).toFloat()
     }
 }
 
