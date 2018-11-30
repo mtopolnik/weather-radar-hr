@@ -208,12 +208,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         ensureCoroutineContext()
         possibleStateLoss = false
         val activity = activity!!
-        activity.mainPrefs.also {
-            lastReloadedTimestamp = it.lastReloadedTimestamp
-            if (it.lastPausedTimestamp < aWhileAgo && ds.isInFullScreen) {
-                exitFullScreen()
-            }
-        }
+        lastReloadedTimestamp = activity.mainPrefs.lastReloadedTimestamp
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
         val isAnimationShowing = ds.imgBundles.all { it.status in EnumSet.of(LOADING, SHOWING, HIDDEN) }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
