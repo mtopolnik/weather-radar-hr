@@ -33,9 +33,9 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
-import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
 import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
 import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
+import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -210,7 +210,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val activity = activity!!
         lastReloadedTimestamp = activity.mainPrefs.lastReloadedTimestamp
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
-        val isAnimationShowing = ds.imgBundles.all { it.status in EnumSet.of(LOADING, SHOWING, HIDDEN) }
+        val isAnimationShowing = ds.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.mainPrefs) {
                 animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
@@ -264,7 +264,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         animationLooper.stop()
         with(activity!!) {
             stopReceivingAzimuthUpdates(locationState)
-            stopReceivingLocationUpdatesFg(locationState)
+            start { stopReceivingLocationUpdatesFg() }
             mainPrefs.applyUpdate {
                 setLastReloadedTimestamp(lastReloadedTimestamp)
                 setLastPausedTimestamp(System.currentTimeMillis())

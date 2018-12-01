@@ -34,6 +34,8 @@ import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.coroutines.resume
@@ -150,7 +152,6 @@ class LocationState {
     var azimuthAccuracy by observable(0, ::invalidateIfGotLocation)
 
     private var azimuthListener : SensorEventListener? = null
-    private var locationCallback: LocationCallback? = null
 
     private fun <T: Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
         if (location != null) imageBundles.forEach { it.invalidateImgView() }
@@ -166,16 +167,16 @@ class LocationState {
             azimuthListener = null
         }
     }
+}
 
-    fun setLocationCallback(callback: LocationCallback) {
-        locationCallback = callback
-    }
+object LocationCallbackFg : LocationCallback() {
+    var locationState: LocationState? = null
 
-    fun clearLocationCallback(locationProvider: FusedLocationProviderClient) {
-        locationCallback?.also {
-            locationProvider.removeLocationUpdates(it)
-            locationCallback = null
-        }
+    override fun onLocationResult(result: LocationResult) {
+        val lastLocation = result.lastLocation
+        info { "FG: received location ${lastLocation.description}" }
+        locationState?.apply { location = lastLocation }
+                ?: error { "LocationCallbackFg received an event while not in use" }
     }
 }
 
@@ -204,26 +205,22 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
 }
 
 suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
-    val action: (Location) -> Unit = {
-        if (it.bearingAccuracyGuarded != 0f) {
-            info { "FG: received location with bearing ${it.description}" }
-        } else {
-            info { "FG: received location ${it.description}" }
-        }
-        locationState.location = it
-    }
     fusedLocationProviderClient.apply {
-        tryFetchLastLocation()?.also { action(it) }
-        val callback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) = action(result.lastLocation)
+        tryFetchLastLocation()?.also {
+            info { "lastLocation: ${it.description}" }
+            locationState.location = it
         }
-        locationState.setLocationCallback(callback)
-        requestLocationUpdates(locationRequestFg, callback, null).await()
+        LocationCallbackFg.locationState = locationState
+        requestLocationUpdates(locationRequestFg, LocationCallbackFg, null).await()
     }
 }
 
-fun Context.stopReceivingLocationUpdatesFg(locationState: LocationState) {
-    locationState.clearLocationCallback(fusedLocationProviderClient)
+suspend fun Context.stopReceivingLocationUpdatesFg() {
+    if (LocationCallbackFg.locationState == null) return
+    fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg).apply {
+        LocationCallbackFg.locationState = null
+        await()
+    }
 }
 
 suspend fun Context.receiveLocationUpdatesBg() {
