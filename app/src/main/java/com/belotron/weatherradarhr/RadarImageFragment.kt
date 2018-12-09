@@ -267,7 +267,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             start { stopReceivingLocationUpdatesFg() }
             mainPrefs.applyUpdate {
                 setLastReloadedTimestamp(lastReloadedTimestamp)
-                setLastPausedTimestamp(System.currentTimeMillis())
             }
         }
     }
