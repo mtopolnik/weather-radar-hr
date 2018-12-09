@@ -52,7 +52,7 @@ class AnimationLooper(
             dateFormat = it.dateFormat
             timeFormat = it.timeFormat
         }
-        if (animators.none()) {
+        if (animators.all { it == null }) {
             return
         }
         stop()
