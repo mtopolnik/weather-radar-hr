@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
@@ -63,15 +62,6 @@ fun Context.deleteLocation() {
     }
 }
 
-@SuppressLint("CommitPrefEdits")
-inline fun SharedPreferences.commitUpdate(block: SharedPreferences.Editor.() -> Unit) {
-    with (edit()) {
-        block()
-        commit()
-    }
-}
-
-@SuppressLint("CommitPrefEdits")
 inline fun SharedPreferences.applyUpdate(block: SharedPreferences.Editor.() -> Unit) {
     with (edit()) {
         try {
