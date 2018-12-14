@@ -1,5 +1,6 @@
 package com.belotron.weatherradarhr
 
+import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -319,12 +320,15 @@ class RadarImageFragment : Fragment(), CoroutineScope {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         if (requestCode != CODE_REQUEST_FINE_LOCATION) return
-        require(permissions.size == 1) { "Unexpected requested permissions size ${permissions.size}" }
-        if (grantResults[0] == PermissionChecker.PERMISSION_GRANTED) {
-            info { "User has granted us the fine location permission" }
-        } else {
-            warn { "User hasn't granted us the fine location permission (grant result: ${grantResults[0]})" }
-        }
+        permissions.zip(grantResults.asList())
+            .find { (perm, _) -> perm == ACCESS_FINE_LOCATION }
+            ?.also { (_, result) ->
+                if (result == PermissionChecker.PERMISSION_GRANTED) {
+                    info { "User has granted us the fine location permission" }
+                } else {
+                    warn { "User hasn't granted us the fine location permission (grant result: ${grantResults[0]})" }
+                }
+            }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
