@@ -8,8 +8,8 @@ android {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
         targetSdkVersion 28
-        versionCode 90
-        versionName "2.0"
+        versionCode 91
+        versionName "2.0.1"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes.release {
@@ -26,7 +26,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinx_coroutines_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:$kotlinx_coroutines_version"
-    implementation "androidx.appcompat:appcompat:$androidx_version"
+    implementation "androidx.appcompat:appcompat:1.0.2"
     implementation "androidx.fragment:fragment:$androidx_version"
     implementation "androidx.preference:preference:$androidx_version"
     implementation 'com.google.android.gms:play-services-location:16.0.0'
