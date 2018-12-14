@@ -34,8 +34,6 @@ import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.coroutines.resume
@@ -176,7 +174,7 @@ object LocationCallbackFg : LocationCallback() {
         val lastLocation = result.lastLocation
         info { "FG: received location ${lastLocation.description}" }
         locationState?.apply { location = lastLocation }
-                ?: error { "LocationCallbackFg received an event while not in use" }
+                ?: warn { "LocationCallbackFg received an event while not in use" }
     }
 }
 
