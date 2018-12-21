@@ -330,7 +330,7 @@ class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent) {
         val location = extractResult(intent)?.lastLocation ?: return
         info(CC_PRIVATE) { "Received location in the background: ${location.description}" }
-        appContext.storeLocation(location)
+        application?.storeLocation(location)
     }
 }
 
