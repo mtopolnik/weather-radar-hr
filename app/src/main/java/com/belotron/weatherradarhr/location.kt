@@ -203,6 +203,10 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
 }
 
 suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
+    if (!canUseLocationFg()) {
+        warn { "FG: insufficient permissions or settings to receive location" }
+        return
+    }
     fusedLocationProviderClient.apply {
         tryFetchLastLocation()?.also {
             info { "lastLocation: ${it.description}" }
