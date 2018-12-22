@@ -214,6 +214,7 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
         }
         LocationCallbackFg.locationState = locationState
         requestLocationUpdates(locationRequestFg, LocationCallbackFg, null).await()
+        info { "FG: started receiving location updates" }
     }
 }
 
@@ -240,7 +241,7 @@ suspend fun Context.receiveLocationUpdatesBg() {
                 PendingIntent.getService(context, 0, Intent(context, ReceiveLocationService::class.java), 0))
                 .await()
     }
-    info(CC_PRIVATE) { "BG: started receiving location" }
+    info(CC_PRIVATE) { "BG: started receiving location updates" }
 }
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
