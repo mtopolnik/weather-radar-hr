@@ -7,7 +7,7 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
-import android.text.format.DateUtils
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.Gravity
@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 import java.util.EnumSet
 import kotlin.coroutines.CoroutineContext
 
-private const val A_WHILE_IN_MILLIS = 5 * DateUtils.MINUTE_IN_MILLIS
+private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
 class RadarImageFragment : Fragment(), CoroutineScope {
 
@@ -55,6 +55,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(ds)
+
     private var rootView: View? = null
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
@@ -228,21 +229,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
             refreshWidgetsInForeground()
         }
-        with(activity) {
-            launch {
-                if (!canUseLocationFg()) {
-                    warn { "Location not available" }
-                    deleteLocation()
-                    locationState.location = null
-                    return@launch
-                }
-                refreshLocation()
-                receiveLocationUpdatesFg(locationState)
-                receiveLocationUpdatesBg()
-                redrawWidgetsInForeground()
-                receiveAzimuthUpdates(locationState)
-            }
-        }
+        launch { locationState.trackLocationEnablement(activity) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -338,17 +325,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         } else {
             warn { "ResolvableApiException resolution failed with code $resultCode" }
             activity!!.mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
-        }
-    }
-
-    private fun ensureCoroutineContext() {
-        _coroutineContext ?: run { _coroutineContext = SupervisorJob() + Dispatchers.Main }
-    }
-
-    private fun cancelCoroutineContext() {
-        _coroutineContext?.also {
-            it[Job]!!.cancel()
-            _coroutineContext = null
         }
     }
 
@@ -456,6 +432,17 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     bundle.status = BROKEN
                 }
             }
+        }
+    }
+
+    private fun ensureCoroutineContext() {
+        _coroutineContext ?: run { _coroutineContext = SupervisorJob() + Dispatchers.Main }
+    }
+
+    private fun cancelCoroutineContext() {
+        _coroutineContext?.also {
+            it[Job]!!.cancel()
+            _coroutineContext = null
         }
     }
 

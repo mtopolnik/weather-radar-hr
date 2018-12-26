@@ -15,6 +15,7 @@ import android.location.Location
 import android.os.Build
 import android.text.format.DateUtils.HOUR_IN_MILLIS
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
+import android.text.format.DateUtils.SECOND_IN_MILLIS
 import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
@@ -45,7 +46,8 @@ import kotlin.reflect.KProperty
 const val CODE_REQUEST_FINE_LOCATION = 13
 const val CODE_RESOLVE_API_EXCEPTION = 14
 const val METERS_PER_DEGREE = 111_111
-private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2_000L
+private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
+private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
 
 val lradarShape = MapShape(
         topLat = 47.40,
@@ -165,6 +167,36 @@ class LocationState {
             azimuthListener = null
         }
     }
+
+    suspend fun trackLocationEnablement(activity: Activity) {
+        val onLocationDisabled: suspend () -> Unit = {
+            info { "Location not available" }
+            activity.deleteLocation()
+            location = null
+            redrawWidgetsInForeground()
+        }
+        val onLocationEnabled: suspend () -> Unit = {
+            info { "Location available" }
+            val locationState = this
+            with(activity) {
+                refreshLocation()
+                receiveLocationUpdatesFg(locationState)
+                receiveAzimuthUpdates(locationState)
+                receiveLocationUpdatesBg()
+            }
+            redrawWidgetsInForeground()
+        }
+        val transitionActions = mapOf(false to onLocationDisabled, true to onLocationEnabled)
+        var prevLocationState: Boolean? = null
+        while (true) {
+            val newLocationState = activity.canUseLocationFg()
+            if (newLocationState != prevLocationState) {
+                transitionActions[newLocationState]!!()
+                prevLocationState = newLocationState
+            }
+            delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
+        }
+    }
 }
 
 object LocationCallbackFg : LocationCallback() {
@@ -189,15 +221,17 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
         if (!appHasLocationPermission()) {
             warn { "FG: our app has no permission to access fine location" }
             delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-            startIntentRequestLocationPermission()
-            return
+            if (!appHasLocationPermission()) {
+                startIntentRequestLocationPermission()
+                return
+            }
         }
+        if (locationSettingsException(locationRequestFg, locationRequestBg) == null) return
+        warn { "FG: ResolvableApiException for location request (probably location disabled)" }
+        if (!mainPrefs.shouldAskToEnableLocation) return
+        delay(WAIT_MILLISECONDS_BEFORE_ASKING)
         locationSettingsException(locationRequestFg, locationRequestBg)?.also {
-            warn { "FG: ResolvableApiException for location request (probably location disabled)" }
-            if (!mainPrefs.shouldAskToEnableLocation) return
-            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
             startIntentResolveException(it)
-            return
         }
     }
 }
