@@ -169,30 +169,26 @@ class LocationState {
     }
 
     suspend fun trackLocationEnablement(activity: Activity) {
-        val onLocationDisabled: suspend () -> Unit = {
-            info { "Location not available" }
-            activity.deleteLocation()
-            location = null
-            redrawWidgetsInForeground()
-        }
-        val onLocationEnabled: suspend () -> Unit = {
-            info { "Location available" }
-            val locationState = this
-            with(activity) {
-                refreshLocation()
-                receiveLocationUpdatesFg(locationState)
-                receiveAzimuthUpdates(locationState)
-                receiveLocationUpdatesBg()
-            }
-            redrawWidgetsInForeground()
-        }
-        val transitionActions = mapOf(false to onLocationDisabled, true to onLocationEnabled)
         var prevLocationState: Boolean? = null
         while (true) {
-            val newLocationState = activity.canUseLocationFg()
-            if (newLocationState != prevLocationState) {
-                transitionActions[newLocationState]!!()
-                prevLocationState = newLocationState
+            val canUseLocation = activity.canUseLocationFg()
+            if (canUseLocation != prevLocationState) {
+                prevLocationState = canUseLocation
+                if (canUseLocation) {
+                    info { "Location available" }
+                    val locationState = this
+                    with(activity) {
+                        refreshLocation()
+                        receiveLocationUpdatesFg(locationState)
+                        receiveAzimuthUpdates(locationState)
+                        receiveLocationUpdatesBg()
+                    }
+                } else {
+                    info { "Location not available" }
+                    activity.deleteLocation()
+                    location = null
+                }
+                redrawWidgetsInForeground()
             }
             delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
         }
