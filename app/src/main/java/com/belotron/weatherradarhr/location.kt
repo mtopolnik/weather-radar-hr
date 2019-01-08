@@ -21,6 +21,7 @@ import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -232,11 +233,7 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     }
 }
 
-suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
-    if (!canUseLocationFg()) {
-        warn { "FG: insufficient permissions or settings to receive location" }
-        return
-    }
+suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringGoogleApiException {
     fusedLocationProviderClient.apply {
         tryFetchLastLocation()?.also {
             info { "lastLocation: ${it.description}" }
@@ -248,7 +245,7 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) {
     }
 }
 
-suspend fun Context.stopReceivingLocationUpdatesFg() {
+suspend fun Context.stopReceivingLocationUpdatesFg() = ignoringGoogleApiException {
     if (LocationCallbackFg.locationState == null) return
     fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg).apply {
         LocationCallbackFg.locationState = null
@@ -256,11 +253,7 @@ suspend fun Context.stopReceivingLocationUpdatesFg() {
     }
 }
 
-suspend fun Context.receiveLocationUpdatesBg() {
-    if (!canUseLocationBg()) {
-        warn { "BG: insufficient permissions or settings to receive location" }
-        return
-    }
+suspend fun Context.receiveLocationUpdatesBg() = ignoringGoogleApiException {
     val context = this
     with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
@@ -294,7 +287,7 @@ fun Context.stopReceivingAzimuthUpdates(locationState: LocationState) {
     sensorManager?.also { locationState.clearAzimuthListener(it) }
 }
 
-suspend fun Context.refreshLocation() {
+suspend fun Context.refreshLocation() = ignoringGoogleApiException {
     val timestamp = storedLocation.third
     val age = System.currentTimeMillis() - timestamp
     if (age <= 5 * MINUTE_IN_MILLIS) return
@@ -344,6 +337,7 @@ fun Fragment.startIntentRequestLocationPermission() =
 fun Fragment.startIntentResolveException(e: ResolvableApiException) =
         startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
 
+
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
 private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)
 
@@ -357,6 +351,14 @@ private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location
                 }
                 .addOnCanceledListener { continuation.resumeWithException(CancellationException()) }
                 .addOnFailureListener { continuation.resumeWithException(it) }
+    }
+}
+
+private inline fun ignoringGoogleApiException(block: () -> Unit) {
+    try {
+        block()
+    } catch (e: ApiException) {
+        severe(e) { "Failed to complete a Location Service operation" }
     }
 }
 
@@ -407,7 +409,7 @@ private class OrientationListener(
         with(locationState) {
             azimuth = -atan2(northing, easting)
             azimuthAccuracy = event.accuracy
-            debug { "Azimuth changed to ${azimuth}, accuracy ${azimuthAccuracy}" }
+            debug { "Azimuth changed to ${azimuth}, accuracy $azimuthAccuracy" }
         }
     }
 
