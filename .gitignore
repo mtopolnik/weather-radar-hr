@@ -6,3 +6,4 @@ captures
 commit.sh
 *.apk
 *.iml
+attic/
