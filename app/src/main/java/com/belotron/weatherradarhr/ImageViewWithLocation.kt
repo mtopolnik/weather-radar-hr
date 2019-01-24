@@ -23,6 +23,9 @@ import kotlin.math.sqrt
 
 private const val PREFERRED_LOCDOT_RADIUS_METERS = 1_500
 private const val MAX_LOCDOT_SCALE = 1.75f
+private const val COLORMASK_TRANSPARENT = 0x00_ff_ff_ff
+@ExperimentalUnsignedTypes
+private val COLORMASK_88_PERCENT_OPACITY = 0xe0_ff_ff_ff_u.toInt()
 
 open class ImageViewWithLocation
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
@@ -79,9 +82,10 @@ open class ImageViewWithLocation
         }
     }
 
+    @ExperimentalUnsignedTypes
     private val flashlightColorStops = run {
-        val transparent = 0x00ffffff
-        val redTransparent = ourColor and 0xe0ffffffu.toInt()
+        val transparent = COLORMASK_TRANSPARENT
+        val redTransparent = ourColor and COLORMASK_88_PERCENT_OPACITY
         intArrayOf(transparent, transparent, redTransparent, transparent)
     }
 
