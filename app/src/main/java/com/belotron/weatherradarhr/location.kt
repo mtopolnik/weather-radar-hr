@@ -33,10 +33,10 @@ import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import com.google.android.gms.location.LocationServices.getSettingsClient
 import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -227,9 +227,9 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
         warn { "FG: ResolvableApiException for location request (probably location disabled)" }
         if (!mainPrefs.shouldAskToEnableLocation) return
         delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-        locationSettingsException(locationRequestFg, locationRequestBg)?.also {
-            startIntentResolveException(it)
-        }
+        locationSettingsException(locationRequestFg, locationRequestBg)
+                ?.let { it as? ResolvableApiException }
+                ?.also { startIntentResolveException(it) }
     }
 }
 
@@ -298,7 +298,7 @@ suspend fun Context.refreshLocation() = ignoringGoogleApiException {
         return
     }
     info(CC_PRIVATE) { "Refreshing location because it's $ageString" }
-    getFusedLocationProviderClient(this).tryFetchLastLocation()?.also { storeLocation(it) }
+    fusedLocationProviderClient.tryFetchLastLocation()?.also { storeLocation(it) }
 }
 
 val Context.locationIfFresh: Triple<Double, Double, Long>? get() {
@@ -323,13 +323,13 @@ fun Context.appHasLocationPermission() =
 
 suspend fun Context.locationSettingsException(
         vararg locationRequests: LocationRequest
-): ResolvableApiException? = try {
+): ApiException? = try {
     getSettingsClient(this)
             .checkLocationSettings(LocationSettingsRequest.Builder()
                     .addAllLocationRequests(locationRequests.asList()).build())
             .await()
     null
-} catch (e: ResolvableApiException) { e }
+} catch (e: ApiException) { e }
 
 fun Fragment.startIntentRequestLocationPermission() =
         requestPermissions(arrayOf(ACCESS_FINE_LOCATION), CODE_REQUEST_FINE_LOCATION)
@@ -341,24 +341,48 @@ fun Fragment.startIntentResolveException(e: ResolvableApiException) =
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
 private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)
 
-private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? {
-    return suspendCancellableCoroutine { continuation ->
-        lastLocation
-                .addOnSuccessListener {
-                    it?.also { info { "Got response from getLastLocation()" } }
-                            ?: warn { "getLastLocation() returned null" }
-                    continuation.resume(it)
-                }
-                .addOnCanceledListener { continuation.resumeWithException(CancellationException()) }
-                .addOnFailureListener { continuation.resumeWithException(it) }
-    }
-}
+private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? = lastLocation.await()
+        ?.also { info { "Got response from getLastLocation()" } }
+        ?: run { warn { "getLastLocation() returned null" }; null }
 
 private inline fun ignoringGoogleApiException(block: () -> Unit) {
     try {
         block()
     } catch (e: ApiException) {
         severe(e) { "Failed to complete a Location Service operation" }
+    }
+}
+
+private suspend fun <T> Task<T>.await(): T? {
+    // fast path
+    if (isComplete) {
+        val e = exception
+        return if (e == null) {
+            if (isCanceled) {
+                throw CancellationException("Task $this was cancelled normally.")
+            } else {
+                result
+            }
+        } else {
+            e.fillInStackTrace()
+            throw e
+        }
+    }
+
+    try {
+        return suspendCancellableCoroutine { cont ->
+            addOnCompleteListener {
+                val e = exception
+                if (e == null) {
+                    if (isCanceled) cont.cancel() else cont.resume(result)
+                } else {
+                    cont.resumeWithException(e)
+                }
+            }
+        }
+    } catch (e: Throwable) {
+        e.fillInStackTrace()
+        throw e
     }
 }
 
