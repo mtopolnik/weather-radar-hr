@@ -357,16 +357,13 @@ private suspend fun <T> Task<T>.await(): T? {
     // fast path
     if (isComplete) {
         val e = exception
-        return if (e == null) {
-            if (isCanceled) {
-                throw CancellationException("Task $this was cancelled normally.")
-            } else {
-                result
-            }
-        } else {
-            e.fillInStackTrace()
-            throw e
+        if (e != null) {
+            throw e.apply { fillInStackTrace() }
         }
+        if (isCanceled) {
+            throw CancellationException("Task $this was cancelled normally.")
+        }
+        return result
     }
 
     try {
@@ -381,8 +378,7 @@ private suspend fun <T> Task<T>.await(): T? {
             }
         }
     } catch (e: Throwable) {
-        e.fillInStackTrace()
-        throw e
+        throw e.apply { fillInStackTrace() }
     }
 }
 
