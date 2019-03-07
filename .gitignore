@@ -1,9 +1,7 @@
-.idea
 .DS_Store
-build
 .gradle
-captures
-commit.sh
-*.apk
+.idea
+build
 *.iml
-attic/
+*.ipr
+*.iws
