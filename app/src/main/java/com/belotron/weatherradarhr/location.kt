@@ -13,9 +13,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Build
-import android.text.format.DateUtils.HOUR_IN_MILLIS
-import android.text.format.DateUtils.MINUTE_IN_MILLIS
-import android.text.format.DateUtils.SECOND_IN_MILLIS
+import android.text.format.DateUtils.*
 import android.view.Surface
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
@@ -23,16 +21,12 @@ import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.*
 import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
 import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
-import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import com.google.android.gms.location.LocationServices.getSettingsClient
-import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -88,8 +82,8 @@ val locationRequestBg = LocationRequest().apply {
     priority = PRIORITY_LOW_POWER
 }
 
-val Float.degrees get() = Math.toDegrees(this.toDouble()).toFloat()
-val Float.radians get() = Math.toRadians(this.toDouble()).toFloat()
+val Float.toDegrees get() = Math.toDegrees(this.toDouble()).toFloat()
+val Float.toRadians get() = Math.toRadians(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
 val Location.bearingAccuracyGuarded get() = if (Build.VERSION.SDK_INT >= 26) bearingAccuracyDegrees else 0f
@@ -130,7 +124,6 @@ class MapShape(
         xScaleAtBot = screenWidth / botLonWidth
         val imageHeightDegrees: Double = topLat - botLat
         pixelSizeMeters = (imageHeightDegrees * METERS_PER_DEGREE / imageHeightPixels).toFloat()
-        println("Pixel size: $pixelSizeMeters meters")
     }
 
     fun locationToPixel(location: Location, point: FloatArray) {

@@ -91,21 +91,16 @@ open class ImageViewWithLocation
 
     @SuppressLint("NewApi")
     private fun Canvas.paintFlashlight(imageX: Float, imageY: Float) {
+        val π = PI.toFloat()
         val flashlightRange = flashlightRange
-        val bearingAccuracy = (location?.bearingAccuracyGuarded ?: 0f).radians
-        val azimuthAccuracy = when (azimuthAccuracyRating) {
-            SENSOR_STATUS_ACCURACY_HIGH ->   1 * PI / 6
-            SENSOR_STATUS_ACCURACY_MEDIUM -> 3 * PI / 6
-            SENSOR_STATUS_ACCURACY_LOW ->    5 * PI / 6
-            else -> 2 * PI
+        val spread = when (azimuthAccuracyRating) {
+            SENSOR_STATUS_ACCURACY_HIGH ->   1 * π / 6
+            SENSOR_STATUS_ACCURACY_MEDIUM -> 3 * π / 6
+            SENSOR_STATUS_ACCURACY_LOW ->    5 * π / 6
+            else -> 2 * π
         }.toFloat()
-        val (direction, spread) = if (bearingAccuracy != 0f && bearingAccuracy < PI / 2) {
-            Pair(location!!.bearing, bearingAccuracy)
-        } else {
-            Pair(azimuth, azimuthAccuracy)
-        }
         val dotRadius = locdotRadius
-        val arcCenterDist = if (spread <= PI) dotRadius / sin(spread / 2.0).toFloat() else 0f
+        val arcCenterDist = if (spread <= π) dotRadius / sin(spread / 2.0).toFloat() else 0f
         val arcCenterX = imageX - arcCenterDist
         val arcRadius = flashlightRange + arcCenterDist
         val arcPortionBeforeTouchPoint =
@@ -115,7 +110,7 @@ open class ImageViewWithLocation
                 } else 0f
         save()
         try {
-            rotate(direction.degrees - 90, imageX, imageY)
+            rotate(azimuth.toDegrees - 90, imageX, imageY)
             flashlightPaint.shader = RadialGradient(
                     arcCenterX,
                     imageY,
@@ -130,8 +125,8 @@ open class ImageViewWithLocation
                     imageY - arcRadius,
                     arcCenterX + arcRadius,
                     imageY + arcRadius,
-                    -spread.degrees / 2,
-                    spread.degrees,
+                    -spread.toDegrees / 2,
+                    spread.toDegrees,
                     true,
                     flashlightPaint
             )
