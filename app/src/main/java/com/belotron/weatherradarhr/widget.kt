@@ -47,7 +47,7 @@ private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 @Suppress("MoveLambdaOutsideParentheses")
 private val widgetDescriptors = arrayOf(
-        WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 10,
+        WidgetDescriptor("LRadar", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif", 5,
                 LradarWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
                 lradarShape,

@@ -2,12 +2,12 @@ package com.belotron.weatherradarhr
 
 import com.belotron.weatherradarhr.gifdecode.Pixels
 
-private const val ANIMATION_COVERS_MINUTES = 100
+private const val ANIMATION_COVERS_MINUTES = 95
 
 val imgDescs = arrayOf(
         ImgDescriptor(0, "HR", "http://vrijeme.hr/kompozit-anim.gif", 15,
                 kradarShape, KradarOcr::ocrKradarTimestamp),
-        ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 10,
+        ImgDescriptor(1, "SLO", "http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar_anim.gif", 5,
                 lradarShape, LradarOcr::ocrLradarTimestamp)
 )
 
