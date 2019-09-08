@@ -8,11 +8,7 @@ import android.widget.SeekBar
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.text.DateFormat
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadFactory
@@ -23,7 +19,6 @@ import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
-import android.text.format.DateFormat as AndroidDateFormat
 
 private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1),
         ThreadFactory { task -> Thread(task, "weather-radar-animation") }, DiscardOldestPolicy())
@@ -55,11 +50,14 @@ class AnimationLooper(
         if (animators.all { it == null }) {
             return
         }
-        stop()
         animators.filterNotNull().forEach {
             newRateMinsPerSec?.also { _ -> it.rateMinsPerSec = newRateMinsPerSec }
             newFreezeTimeMillis?.also { _ -> it.freezeTimeMillis = newFreezeTimeMillis }
         }
+        if (ds.isTrackingTouch) {
+            return
+        }
+        stop()
         var oldLoopingJob = loopingJob
         loopingJob = appCoroScope.start {
             oldLoopingJob?.join()
@@ -81,6 +79,7 @@ class AnimationLooper(
 
     override fun onStartTrackingTouch(seekBar: SeekBar) {
         if (animators.any { it.hasSeekBar(seekBar) }) {
+            ds.isTrackingTouch = true
             stop()
         }
     }
@@ -99,6 +98,7 @@ class AnimationLooper(
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
             }
+            ds.isTrackingTouch = false
             resume()
         }
     }
