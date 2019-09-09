@@ -3,9 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
-import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
-import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
+import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.withContext
@@ -15,9 +13,8 @@ import java.lang.Integer.parseInt
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
-import java.util.Locale
+import java.util.*
 import kotlin.text.Charsets.UTF_8
-import java.util.logging.Logger as JulLogger
 
 private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
