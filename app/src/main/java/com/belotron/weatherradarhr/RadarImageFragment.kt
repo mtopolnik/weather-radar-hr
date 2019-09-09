@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -76,6 +77,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         launch { checkAndCorrectPermissionsAndSettings() }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {

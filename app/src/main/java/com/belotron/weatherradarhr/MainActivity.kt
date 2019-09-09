@@ -14,6 +14,7 @@ class MainActivity : AppCompatActivity()  {
         info { "MainActivity.onCreate" }
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
         recordAppUsage()
+        supportActionBar?.hide()
         setContentView(R.layout.activity_main)
         if (supportFragmentManager.findFragmentById(R.id.radar_img_fragment) != null) {
             return
