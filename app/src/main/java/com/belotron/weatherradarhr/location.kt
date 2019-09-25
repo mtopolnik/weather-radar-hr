@@ -175,7 +175,9 @@ class LocationState {
                         refreshLocation()
                         receiveLocationUpdatesFg(locationState)
                         receiveAzimuthUpdates(locationState)
-                        receiveLocationUpdatesBg()
+                        if (anyWidgetInUse()) {
+                            receiveLocationUpdatesBg()
+                        }
                     }
                 } else {
                     info { "Location not available" }

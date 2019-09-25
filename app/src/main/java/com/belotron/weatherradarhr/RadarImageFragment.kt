@@ -255,7 +255,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         with(activity!!) {
             stopReceivingAzimuthUpdates(locationState)
             stopReceivingLocationUpdatesFg()
-            if (noWidgetInUse()) {
+            if (!anyWidgetInUse()) {
                 stopReceivingLocationUpdatesBg()
             }
             mainPrefs.applyUpdate {

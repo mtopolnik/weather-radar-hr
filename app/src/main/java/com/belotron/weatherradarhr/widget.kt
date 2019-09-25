@@ -119,10 +119,10 @@ fun redrawWidgetsInForeground() {
     }
 }
 
-fun noWidgetInUse(): Boolean {
+fun anyWidgetInUse(): Boolean {
     return widgetDescriptors
             .map { WidgetContext(appContext, it) }
-            .none { it.isWidgetInUse }
+            .any { it.isWidgetInUse }
 }
 
 private fun onEachWidget(action: WidgetContext.() -> Unit) {
