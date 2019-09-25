@@ -234,31 +234,35 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ign
         }
         LocationCallbackFg.locationState = locationState
         requestLocationUpdates(locationRequestFg, LocationCallbackFg, null).await()
-        info { "FG: started receiving location updates" }
+        info(CC_PRIVATE) { "FG: started receiving location updates" }
     }
 }
 
-suspend fun Context.stopReceivingLocationUpdatesFg() = ignoringGoogleApiException {
+fun Context.stopReceivingLocationUpdatesFg() = ignoringGoogleApiException {
     if (LocationCallbackFg.locationState == null) return
-    fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg).apply {
-        LocationCallbackFg.locationState = null
-        await()
-    }
+    fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg)
+    LocationCallbackFg.locationState = null
+    info(CC_PRIVATE) { "FG: asked to stop receiving location updates" }
 }
 
 suspend fun Context.receiveLocationUpdatesBg() = ignoringGoogleApiException {
-    val context = this
     with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
             info { "BG: lastLocation = ${it.description}" }
             appContext.storeLocation(it)
         }
-        requestLocationUpdates(locationRequestBg,
-                PendingIntent.getService(context, 0, Intent(context, ReceiveLocationService::class.java), 0))
-                .await()
+        requestLocationUpdates(locationRequestBg, intentToReceiveLocation()).await()
     }
     info(CC_PRIVATE) { "BG: started receiving location updates" }
 }
+
+fun Context.stopReceivingLocationUpdatesBg() = ignoringGoogleApiException {
+    fusedLocationProviderClient.removeLocationUpdates(intentToReceiveLocation())
+    info(CC_PRIVATE) { "BG: asked to stop receiving location updates" }
+}
+
+private fun Context.intentToReceiveLocation() =
+        PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0)
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val sensorManager = sensorManager ?: run {

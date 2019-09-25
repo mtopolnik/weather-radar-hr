@@ -254,7 +254,10 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         animationLooper.stop()
         with(activity!!) {
             stopReceivingAzimuthUpdates(locationState)
-            start { stopReceivingLocationUpdatesFg() }
+            stopReceivingLocationUpdatesFg()
+            if (noWidgetInUse()) {
+                stopReceivingLocationUpdatesBg()
+            }
             mainPrefs.applyUpdate {
                 setLastReloadedTimestamp(lastReloadedTimestamp)
             }
