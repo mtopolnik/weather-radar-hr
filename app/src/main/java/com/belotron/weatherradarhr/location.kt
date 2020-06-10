@@ -369,10 +369,10 @@ private suspend fun <T> Task<T>.await(): T? {
         return suspendCancellableCoroutine { cont ->
             addOnCompleteListener {
                 val e = exception
-                if (e == null) {
-                    if (isCanceled) cont.cancel() else cont.resume(result)
-                } else {
-                    cont.resumeWithException(e)
+                when {
+                    e != null -> cont.resumeWithException(e)
+                    isCanceled -> cont.cancel()
+                    else -> cont.resume(result)
                 }
             }
         }
