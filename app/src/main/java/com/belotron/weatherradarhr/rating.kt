@@ -103,7 +103,7 @@ fun FragmentActivity.maybeAskToRate() {
 class RateMeDialogFragment : DialogFragment() {
     @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val activity = activity!!
+        val activity = requireActivity()
         val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
                 activity.openAppRating()
@@ -130,7 +130,7 @@ class RateMeDialogFragment : DialogFragment() {
     }
 
     private fun dontShowAgain() {
-        activity!!.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
+        requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE).applyUpdate {
             putBoolean(KEY_DONT_SHOW_AGAIN, true)
         }
     }

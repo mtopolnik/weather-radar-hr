@@ -15,6 +15,7 @@ import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_LOW
 import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
 import android.util.AttributeSet
 import android.widget.ImageView
+import androidx.appcompat.widget.AppCompatImageView
 import java.lang.Math.PI
 import java.lang.Math.sin
 import kotlin.math.max
@@ -29,7 +30,7 @@ private val COLORMASK_88_PERCENT_OPACITY = 0xe0_ff_ff_ff_u.toInt()
 
 open class ImageViewWithLocation
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
-    : ImageView(context, attrs, defStyle
+    : AppCompatImageView(context, attrs, defStyle
 ) {
     lateinit var mapShape: MapShape
 

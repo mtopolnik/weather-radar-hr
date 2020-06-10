@@ -211,7 +211,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onResume()
         ensureCoroutineContext()
         possibleStateLoss = false
-        val activity = activity!!
+        val activity = requireActivity()
         lastReloadedTimestamp = activity.mainPrefs.lastReloadedTimestamp
         val isTimeToReload = lastReloadedTimestamp < aWhileAgo
         val isAnimationShowing = ds.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
@@ -252,7 +252,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         super.onPause()
         wasFastResume = false
         animationLooper.stop()
-        with(activity!!) {
+        with(requireActivity()) {
             stopReceivingAzimuthUpdates(locationState)
             stopReceivingLocationUpdatesFg()
             if (!anyWidgetInUse()) {
@@ -329,7 +329,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             info { "ResolvableApiException is now resolved" }
         } else {
             warn { "ResolvableApiException resolution failed with code $resultCode" }
-            activity!!.mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
+            requireActivity().mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
         }
     }
 
@@ -377,7 +377,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             fullScreenBundle.bitmap = null
             updateFullScreenVisibility()
             if (!possibleStateLoss) {
-                activity!!.maybeAskToRate()
+                requireActivity().maybeAskToRate()
             }
         }
     }

@@ -11,9 +11,10 @@ import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
 import android.widget.SeekBar
+import androidx.appcompat.widget.AppCompatSeekBar
 
 
-class ThumbSeekBar(context : Context, attrs: AttributeSet) : SeekBar(context, attrs) {
+class ThumbSeekBar(context : Context, attrs: AttributeSet) : AppCompatSeekBar(context, attrs) {
     var thumbText: String = ""
         set(value) {
             field = value
