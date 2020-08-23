@@ -3,6 +3,9 @@ package com.belotron.weatherradarhr
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
@@ -86,7 +89,7 @@ class AnimationLooper(
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
         if (fromUser) ds.start {
-            animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
+            animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress, seekBar.context)
         }
     }
 
@@ -164,17 +167,24 @@ class GifAnimator(
         }
     }
 
-    suspend fun seekTo(animationProgress: Int) {
-        toFrameIndex(animationProgress, 0).also { it ->
-            if (it == currFrameIndex) {
-                return
-            }
-            currFrameIndex = it
-            updateSeekBarThumb(it, timestamp(it))
-            val newFrame = suspendDecodeFrame(it, singleThread)
-            showFrame(newFrame, animationProgress)
-            updateAgeText()
+    suspend fun seekTo(animationProgress: Int, ctx: Context) {
+        val targetIndex = toFrameIndex(animationProgress, 0)
+        if (targetIndex == currFrameIndex) {
+            return
         }
+        currFrameIndex = targetIndex
+        updateSeekBarThumb(targetIndex, timestamp(targetIndex))
+        if (targetIndex == 0 || targetIndex == gifDecoder.frameCount - 1) {
+            val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+            } else {
+                vibrator.vibrate(20)
+            }
+        }
+        val newFrame = suspendDecodeFrame(targetIndex, singleThread)
+        showFrame(newFrame, animationProgress)
+        updateAgeText()
     }
 
     private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
