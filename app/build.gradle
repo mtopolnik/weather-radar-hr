@@ -6,7 +6,7 @@ android {
     compileSdkVersion 29
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
-        minSdkVersion 23
+        minSdkVersion 21
         targetSdkVersion 29
         versionCode 104
         versionName "2.2.0"
