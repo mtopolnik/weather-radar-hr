@@ -45,29 +45,29 @@ private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
 private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
 
 val lradarShape = MapShape(
-        topLat = 47.40,
-        botLat = 44.71,
-        topLeftLon = 12.10,
-        botLeftLon = 12.19,
-        topRightLon = 17.40,
-        botRightLon = 17.30,
-        leftImageX = 10,
-        rightImageX = 810,
-        topImageY = 49,
-        botImageY = 649
+    topLat = 47.40,
+    botLat = 44.71,
+    topLeftLon = 12.10,
+    botLeftLon = 12.19,
+    topRightLon = 17.40,
+    botRightLon = 17.30,
+    leftImageX = 10,
+    rightImageX = 810,
+    topImageY = 49,
+    botImageY = 649
 )
 
 val kradarShape = MapShape(
-        topLat = 48.06,
-        botLat = 43.44,
-        topLeftLon = 13.05,
-        botLeftLon = 13.15,
-        topRightLon = 19.84,
-        botRightLon = 19.74,
-        leftImageX = 1,
-        rightImageX = 478,
-        topImageY = 1,
-        botImageY = 478
+    topLat = 48.06,
+    botLat = 43.44,
+    topLeftLon = 13.05,
+    botLeftLon = 13.15,
+    topRightLon = 19.84,
+    botRightLon = 19.74,
+    leftImageX = 1,
+    rightImageX = 478,
+    topImageY = 1,
+    botImageY = 478
 )
 
 val locationRequestFg = LocationRequest().apply {
@@ -87,21 +87,21 @@ val Float.toRadians get() = Math.toRadians(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
 val Location.bearingAccuracyGuarded get() = if (Build.VERSION.SDK_INT >= 26) bearingAccuracyDegrees else 0f
-val Location.description get() =
-    "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
+val Location.description
+    get() = "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
             (if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else "")
 
 class MapShape(
-        private val topLat: Double,
-        private val botLat: Double,
-        topLeftLon: Double,
-        topRightLon: Double,
-        botLeftLon: Double,
-        botRightLon: Double,
-        leftImageX: Int,
-        rightImageX: Int,
-        private val topImageY: Int,
-        botImageY: Int
+    private val topLat: Double,
+    private val botLat: Double,
+    topLeftLon: Double,
+    topRightLon: Double,
+    botLeftLon: Double,
+    botRightLon: Double,
+    leftImageX: Int,
+    rightImageX: Int,
+    private val topImageY: Int,
+    botImageY: Int
 ) {
     val pixelSizeMeters: Float
 
@@ -145,9 +145,9 @@ class LocationState {
     var azimuth by observable(0f, ::invalidateIfGotLocation)
     var azimuthAccuracy by observable(0, ::invalidateIfGotLocation)
 
-    private var azimuthListener : SensorEventListener? = null
+    private var azimuthListener: SensorEventListener? = null
 
-    private fun <T: Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
+    private fun <T : Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
         if (location != null) imageBundles.forEach { it.invalidateImgView() }
     }
 
@@ -197,16 +197,17 @@ object LocationCallbackFg : LocationCallback() {
     override fun onLocationResult(result: LocationResult) {
         val lastLocation = result.lastLocation
         info { "FG: received location ${lastLocation.description}" }
-        locationState?.apply { location = lastLocation }
-                ?: warn { "LocationCallbackFg received an event while not in use" }
+        locationState
+            ?.apply { location = lastLocation }
+            ?: warn { "LocationCallbackFg received an event while not in use" }
     }
 }
 
 suspend fun Context.canUseLocationBg() =
-        appHasLocationPermission() && locationSettingsException(locationRequestBg) == null
+    appHasLocationPermission() && locationSettingsException(locationRequestBg) == null
 
 suspend fun Context.canUseLocationFg() =
-        appHasLocationPermission() && locationSettingsException(locationRequestFg, locationRequestBg) == null
+    appHasLocationPermission() && locationSettingsException(locationRequestFg, locationRequestBg) == null
 
 suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     with(context!!) {
@@ -223,8 +224,8 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
         if (!mainPrefs.shouldAskToEnableLocation) return
         delay(WAIT_MILLISECONDS_BEFORE_ASKING)
         locationSettingsException(locationRequestFg, locationRequestBg)
-                ?.let { it as? ResolvableApiException }
-                ?.also { startIntentResolveException(it) }
+            ?.let { it as? ResolvableApiException }
+            ?.also { startIntentResolveException(it) }
     }
 }
 
@@ -264,7 +265,7 @@ fun Context.stopReceivingLocationUpdatesBg() = ignoringGoogleApiException {
 }
 
 private fun Context.intentToReceiveLocation() =
-        PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0)
+    PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0)
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val sensorManager = sensorManager ?: run {
@@ -300,49 +301,54 @@ suspend fun Context.refreshLocation() = ignoringGoogleApiException {
     fusedLocationProviderClient.tryFetchLastLocation()?.also { storeLocation(it) }
 }
 
-val Context.locationIfFresh: Triple<Double, Double, Long>? get() {
-    val now = System.currentTimeMillis()
-    val locTriple = storedLocation
-    val timestamp = locTriple.third
-    if (timestamp == 0L) {
-        warn(CC_PRIVATE) { "Stored location not present" }
-        return null
+val Context.locationIfFresh: Triple<Double, Double, Long>?
+    get() {
+        val now = System.currentTimeMillis()
+        val locTriple = storedLocation
+        val timestamp = locTriple.third
+        if (timestamp == 0L) {
+            warn(CC_PRIVATE) { "Stored location not present" }
+            return null
+        }
+        val age = now - timestamp
+        return if (age < HOUR_IN_MILLIS)
+            locTriple
+        else run {
+            warn(CC_PRIVATE) { "Stored location is too old, age ${MILLISECONDS.toMinutes(age)} minutes" }
+            null
+        }
     }
-    val age = now - timestamp
-    return if (age < HOUR_IN_MILLIS)
-        locTriple
-    else run {
-        warn(CC_PRIVATE) { "Stored location is too old, age ${MILLISECONDS.toMinutes(age)} minutes" }
-        null
-    }
-}
 
 fun Context.appHasLocationPermission() =
-        checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+    checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
 
 suspend fun Context.locationSettingsException(
-        vararg locationRequests: LocationRequest
+    vararg locationRequests: LocationRequest
 ): ApiException? = try {
     getSettingsClient(this)
-            .checkLocationSettings(LocationSettingsRequest.Builder()
-                    .addAllLocationRequests(locationRequests.asList()).build())
-            .await()
+        .checkLocationSettings(
+            LocationSettingsRequest.Builder()
+                .addAllLocationRequests(locationRequests.asList()).build()
+        )
+        .await()
     null
-} catch (e: ApiException) { e }
+} catch (e: ApiException) {
+    e
+}
 
 fun Fragment.startIntentRequestLocationPermission() =
-        requestPermissions(arrayOf(ACCESS_FINE_LOCATION), CODE_REQUEST_FINE_LOCATION)
+    requestPermissions(arrayOf(ACCESS_FINE_LOCATION), CODE_REQUEST_FINE_LOCATION)
 
 fun Fragment.startIntentResolveException(e: ResolvableApiException) =
-        startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
+    startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
 
 
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
 private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)
 
 private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? = lastLocation.await()
-        ?.also { info { "Got response from getLastLocation()" } }
-        ?: run { warn { "getLastLocation() returned null" }; null }
+    ?.also { info { "Got response from getLastLocation()" } }
+    ?: run { warn { "getLastLocation() returned null" }; null }
 
 private inline fun ignoringGoogleApiException(block: () -> Unit) {
     try {
@@ -391,8 +397,8 @@ class ReceiveLocationService : IntentService("Receive Location Updates") {
 }
 
 private class OrientationListener(
-        private val activity: Activity,
-        private val locationState: LocationState
+    private val activity: Activity,
+    private val locationState: LocationState
 ) : SensorEventListener {
     private val rotationMatrix = FloatArray(9)
 
