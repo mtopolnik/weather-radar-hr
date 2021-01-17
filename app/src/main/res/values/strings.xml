@@ -27,6 +27,29 @@
     <string name="rateme_later">Remind me later</string>
     <string name="rateme_already_did">I already did it</string>
     <string name="rateme_no">No, thanks</string>
+    <string name="location_notice_title_fg">Location Access</string>
+    <string name="location_notice_title_bg">Location Access in the Background</string>
+    <string name="location_notice_fg">
+        To see your location on the map, give Vrijeme na Radaru access to your
+        location.\n
+        \n
+        If you use the home screen widget, give Vrijeme na Radaru access to your
+        location all the time. That way the widget can stay up to date even when
+        the app is not in use.\n
+        \n
+        The location data stays on your device and the app uses it for no other
+        purpose than to show the red location dot on the map.
+    </string>
+    <string name="location_notice_bg">
+        We noticed you are using a Vrijeme na Radaru widget on your home screen.
+        Consider giving Vrijeme na Radaru access to your location all the time so
+        the widget can stay up to date even when the app is not in use.\n
+        \n
+        The location data stays on your device and the app uses it for no other
+        purpose than to show the red location dot on the map.
+    </string>
+    <string name="location_notice_proceed">Proceed</string>
+    <string name="location_notice_skip">Skip</string>
     <string name="about_text">
         Version %1$s
         \n© 2018 Belotron d.o.o.

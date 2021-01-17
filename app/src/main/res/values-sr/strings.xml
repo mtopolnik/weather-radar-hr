@@ -27,6 +27,30 @@
     <string name="rateme_later">Drugi put</string>
     <string name="rateme_already_did">Već jesam</string>
     <string name="rateme_no">Ne želim</string>
+    <string name="location_notice_title_fg">Očitanje lokacije</string>
+    <string name="location_notice_title_bg">Očitanje lokacije u pozadini</string>
+    <string name="location_notice_fg">
+        Vreme na radaru želi da prikaže tvoju lokaciju na mapi. Za to mu
+        je potrebna tvoja dozvola.\n
+        \n
+        Ako koristiš viđet na glavnom ekranu, dozvoli aplikaciji da uvek može
+        da dozna lokaciju. Tako će moći da prikazuje tvoju tačnu lokaciju i kad
+        ne koristiš aplikaciju.\n
+        \n
+        Podaci o lokaciji ostaju na tvom uređaju, a aplikacija ih koristi
+        isključivo za prikaz crvene tačke tvoje lokacije na mapi.
+    </string>
+    <string name="location_notice_bg">
+        Primetili smo da koristiš viđet ove aplikacije na glavnom ekranu.
+        Savetujemo ti da dozvoliš aplikaciji očitanje lokacije celo vreme,
+        tako da viđet može da pokazuje tačnu lokaciju i kad ne koristiš
+        aplikaciju.\n
+        \n
+        Podaci o lokaciji ostaju na tvom uređaju, a aplikacija ih koristi
+        isključivo za prikaz crvene tačke tvoje lokacije na mapi.
+    </string>
+    <string name="location_notice_proceed">Nastavi</string>
+    <string name="location_notice_skip">Preskoči</string>
     <string name="about_text">
         Verzija %1$s
         \n© 2018 Belotron d.o.o.

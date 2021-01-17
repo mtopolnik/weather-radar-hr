@@ -11,6 +11,8 @@ private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
+private const val KEY_SHOULD_SHOW_FG_LOCATION_NOTICE = "should_show_fg_location_notice"
+private const val KEY_SHOULD_SHOW_BG_LOCATION_NOTICE = "should_show_bg_location_notice"
 private const val KEY_SHOULD_ASK_ENABLE_LOCATION = "should_ask_to_enable_location"
 
 private const val NAME_LOCAL_PREFS = "local"
@@ -36,6 +38,14 @@ fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPrefer
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
         putBoolean(KEY_WIDGET_LOG_ENABLED, value)
+
+val SharedPreferences.shouldShowFgLocationNotice: Boolean get() = getBoolean(KEY_SHOULD_SHOW_FG_LOCATION_NOTICE, true)
+fun SharedPreferences.Editor.setShouldShowFgLocationNotice(value: Boolean): SharedPreferences.Editor =
+        putBoolean(KEY_SHOULD_SHOW_FG_LOCATION_NOTICE, value)
+
+val SharedPreferences.shouldShowBgLocationNotice: Boolean get() = getBoolean(KEY_SHOULD_SHOW_BG_LOCATION_NOTICE, true)
+fun SharedPreferences.Editor.setShouldShowBgLocationNotice(value: Boolean): SharedPreferences.Editor =
+        putBoolean(KEY_SHOULD_SHOW_BG_LOCATION_NOTICE, value)
 
 val SharedPreferences.shouldAskToEnableLocation: Boolean get() = getBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, true)
 fun SharedPreferences.Editor.setShouldAskToEnableLocation(value: Boolean): SharedPreferences.Editor =

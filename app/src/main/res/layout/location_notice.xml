@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingTop="0dp"
+    android:paddingBottom="12dp"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+>
+    <TextView
+        android:id="@+id/location_notice_text"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_margin="16dp"
+        android:gravity="center"
+        android:textIsSelectable="true"
+    />
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+    >
+        <Button
+            android:id="@+id/location_notice_proceed"
+            android:text="@string/location_notice_proceed"
+            android:layout_height="70dp"
+            android:layout_width="0dp"
+            android:layout_weight="0.5"
+            style="@style/LocationNotice.Button.Proceed"
+        />
+        <Button
+            android:id="@+id/location_notice_skip"
+            android:text="@string/location_notice_skip"
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="0.5"
+            style="@style/LocationNotice.Button.Skip"
+        />
+    </LinearLayout>
+</LinearLayout>

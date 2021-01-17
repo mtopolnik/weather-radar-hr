@@ -122,7 +122,7 @@ class RateMeDialogFragment : DialogFragment() {
                 dontShowAgain()
             }
         }
-        return AlertDialog.Builder(activity, R.style.RatemeDialogTheme)
+        return AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setTitle(R.string.rateme_title)
                 .setIcon(R.mipmap.ic_launcher)
                 .setView(rootView)

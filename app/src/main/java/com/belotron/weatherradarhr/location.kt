@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
-import android.Manifest.permission.*
+import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
+import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IntentService
@@ -20,6 +21,7 @@ import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
+import com.belotron.weatherradarhr.UserReaction.PROCEED
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
@@ -39,7 +41,7 @@ import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
 
-const val CODE_REQUEST_FINE_LOCATION = 13
+const val CODE_REQUEST_LOCATION = 13
 const val CODE_RESOLVE_API_EXCEPTION = 14
 const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
@@ -92,11 +94,14 @@ val Location.description
 
 /**
  * Transforms a lat-lon location to its corresponding pixel on the map's
- * bitmap. It imagines the lat-lon coordinate system as follows: parallels
- * are straight horizontal lines and meridians are straight lines that meet
- * in a common intersection point (outside the bitmap). It imagines the
- * map's bitmap as a rectangle overlaid on this coordinate grid, such that
- * its top and bottom sides are segments of two parallels.
+ * bitmap.
+ *
+ * It uses a simple-minded lat-lon coordinate system as follows:
+ * parallels are straight horizontal lines and meridians are straight lines
+ * that meet in a common intersection point (outside the bitmap).
+ *
+ * The map's bitmap is a rectangle overlaid on this coordinate grid, such
+ * that its top and bottom sides are segments of two parallels.
  */
 class MapShape(
     private val topLat: Double,
@@ -112,8 +117,7 @@ class MapShape(
 ) {
     val pixelSizeMeters: Float
 
-    // zeroLon is the longitude of the meeting point of all "meridians".
-    // It is also the longitude of the "meridian" that is vertical.
+    // zeroLon is the longitude of the "meridian" that is vertical.
     // It satisfies the following:
     // (zeroLon - topLeftLon) / (topRightLon - zeroLon) ==
     // (zeroLon - botLeftLon) / (botRightLon - zeroLon)
@@ -217,18 +221,43 @@ object LocationCallbackFg : LocationCallback() {
 
 suspend fun Context.canAccessLocation(fromBg: Boolean) =
     if (fromBg)
-        appHasBgCoarseLocationPermission() && locationSettingsException(locationRequestBg) == null
+        appHasBgLocationPermission() && locationSettingsException(locationRequestBg) == null
     else
-        appHasFgFineLocationPermission() && locationSettingsException(locationRequestFg) == null
+        appHasFgLocationPermission() && locationSettingsException(locationRequestFg) == null
 
 suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     with(context!!) {
-        if (!appHasFgFineLocationPermission()) {
-            warn { "FG: our app has no permission to access fine location" }
+        if (!appHasFgLocationPermission()) {
+            warn { "FG: our app has no permission to access location" }
             delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-            if (!appHasFgFineLocationPermission()) {
-                startIntentRequestLocationPermission()
-                return
+            if (!appHasFgLocationPermission()) {
+                if (mainPrefs.shouldShowFgLocationNotice) {
+                    val userReaction = requireActivity().showFgLocationNotice()
+                    mainPrefs.applyUpdate { setShouldShowFgLocationNotice(false) }
+                    if (userReaction == PROCEED) {
+                        startIntentRequestLocationPermission()
+                        return
+                    }
+                } else {
+                    startIntentRequestLocationPermission()
+                    return
+                }
+            }
+        } else if (anyWidgetInUse() && !appHasBgLocationPermission()) {
+            warn { "BG: our app has no permission to access coarse location" }
+            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
+            if (anyWidgetInUse() && !appHasBgLocationPermission()) {
+                if (mainPrefs.shouldShowBgLocationNotice) {
+                    val userReaction = requireActivity().showBgLocationNotice()
+                    mainPrefs.applyUpdate { setShouldShowBgLocationNotice(false) }
+                    if (userReaction == PROCEED) {
+                        startIntentRequestLocationPermission()
+                        return
+                    }
+                } else {
+                    startIntentRequestLocationPermission()
+                    return
+                }
             }
         }
         if (locationSettingsException(locationRequestFg, locationRequestBg) == null) return
@@ -335,10 +364,10 @@ val Context.locationIfFresh: Triple<Double, Double, Long>?
         }
     }
 
-fun Context.appHasFgFineLocationPermission() =
-    checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+fun Context.appHasFgLocationPermission() =
+    checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED
 
-fun Context.appHasBgCoarseLocationPermission() =
+fun Context.appHasBgLocationPermission() =
     checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED
             && (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
                 || checkSelfPermission(this, ACCESS_BACKGROUND_LOCATION) == PERMISSION_GRANTED)
@@ -357,8 +386,12 @@ suspend fun Context.locationSettingsException(
     e
 }
 
-fun Fragment.startIntentRequestLocationPermission() =
-    requestPermissions(arrayOf(ACCESS_FINE_LOCATION), CODE_REQUEST_FINE_LOCATION)
+fun Fragment.startIntentRequestLocationPermission() = run {
+    val permissionsToAskFor =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) arrayOf(ACCESS_COARSE_LOCATION)
+        else arrayOf(ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION)
+    requestPermissions(permissionsToAskFor, CODE_REQUEST_LOCATION)
+}
 
 fun Fragment.startIntentResolveException(e: ResolvableApiException) =
     startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
