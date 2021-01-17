@@ -90,6 +90,14 @@ val Location.description
     get() = "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
             (if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else "")
 
+/**
+ * Transforms a lat-lon location to its corresponding pixel on the map's
+ * bitmap. It imagines the lat-lon coordinate system as follows: parallels
+ * are straight horizontal lines and meridians are straight lines that meet
+ * in a common intersection point (outside the bitmap). It imagines the
+ * map's bitmap as a rectangle overlaid on this coordinate grid, such that
+ * its top and bottom sides are segments of two parallels.
+ */
 class MapShape(
     private val topLat: Double,
     private val botLat: Double,
@@ -104,7 +112,9 @@ class MapShape(
 ) {
     val pixelSizeMeters: Float
 
-    // zeroLon satisfies the following:
+    // zeroLon is the longitude of the meeting point of all "meridians".
+    // It is also the longitude of the "meridian" that is vertical.
+    // It satisfies the following:
     // (zeroLon - topLeftLon) / (topRightLon - zeroLon) ==
     // (zeroLon - botLeftLon) / (botRightLon - zeroLon)
     private val zeroLon: Double
