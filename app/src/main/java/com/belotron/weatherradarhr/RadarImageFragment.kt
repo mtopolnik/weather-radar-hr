@@ -441,7 +441,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     private fun ensureCoroutineContext() {
-        _coroutineContext ?: run { _coroutineContext = SupervisorJob() + Dispatchers.Main }
+        if (_coroutineContext == null) {
+            _coroutineContext = SupervisorJob() + Dispatchers.Main
+        }
     }
 
     private fun cancelCoroutineContext() {

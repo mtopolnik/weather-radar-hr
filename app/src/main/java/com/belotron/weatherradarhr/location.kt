@@ -1,6 +1,6 @@
 package com.belotron.weatherradarhr
 
-import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.Manifest.permission.*
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IntentService
@@ -175,27 +175,29 @@ class LocationState {
     suspend fun trackLocationEnablement(activity: Activity) {
         var prevLocationState: Boolean? = null
         while (true) {
-            val canUseLocation = activity.canUseLocationFg()
-            if (canUseLocation != prevLocationState) {
-                prevLocationState = canUseLocation
-                if (canUseLocation) {
-                    info { "Location available" }
-                    val locationState = this
-                    with(activity) {
-                        refreshLocation()
-                        receiveLocationUpdatesFg(locationState)
-                        receiveAzimuthUpdates(locationState)
-                        if (anyWidgetInUse()) {
-                            receiveLocationUpdatesBg()
-                        }
-                    }
-                } else {
-                    info { "Location not available" }
-                    activity.deleteLocation()
-                    location = null
-                }
-                redrawWidgetsInForeground()
+            val canAccessLocation = activity.canAccessLocation(fromBg = false)
+            if (canAccessLocation == prevLocationState) {
+                delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
+                continue
             }
+            prevLocationState = canAccessLocation
+            if (canAccessLocation) {
+                info { "Location available" }
+                val locationState = this
+                with(activity) {
+                    refreshLocation(callingFromBg = false)
+                    receiveLocationUpdatesFg(locationState)
+                    receiveAzimuthUpdates(locationState)
+                    if (anyWidgetInUse()) {
+                        receiveLocationUpdatesBg()
+                    }
+                }
+            } else {
+                info { "Location not available" }
+                activity.deleteLocation()
+                location = null
+            }
+            redrawWidgetsInForeground()
             delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
         }
     }
@@ -213,18 +215,18 @@ object LocationCallbackFg : LocationCallback() {
     }
 }
 
-suspend fun Context.canUseLocationBg() =
-    appHasLocationPermission() && locationSettingsException(locationRequestBg) == null
-
-suspend fun Context.canUseLocationFg() =
-    appHasLocationPermission() && locationSettingsException(locationRequestFg, locationRequestBg) == null
+suspend fun Context.canAccessLocation(fromBg: Boolean) =
+    if (fromBg)
+        appHasBgCoarseLocationPermission() && locationSettingsException(locationRequestBg) == null
+    else
+        appHasFgFineLocationPermission() && locationSettingsException(locationRequestFg) == null
 
 suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     with(context!!) {
-        if (!appHasLocationPermission()) {
+        if (!appHasFgFineLocationPermission()) {
             warn { "FG: our app has no permission to access fine location" }
             delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-            if (!appHasLocationPermission()) {
+            if (!appHasFgFineLocationPermission()) {
                 startIntentRequestLocationPermission()
                 return
             }
@@ -239,8 +241,8 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
     }
 }
 
-suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringGoogleApiException {
 @SuppressLint("MissingPermission")
+suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringApiAndSecurityException {
     fusedLocationProviderClient.apply {
         tryFetchLastLocation()?.also {
             info { "lastLocation: ${it.description}" }
@@ -252,15 +254,15 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ign
     }
 }
 
-fun Context.stopReceivingLocationUpdatesFg() = ignoringGoogleApiException {
+fun Context.stopReceivingLocationUpdatesFg() = ignoringApiAndSecurityException {
     if (LocationCallbackFg.locationState == null) return
     fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg)
     LocationCallbackFg.locationState = null
     info(CC_PRIVATE) { "FG: asked to stop receiving location updates" }
 }
 
-suspend fun Context.receiveLocationUpdatesBg() = ignoringGoogleApiException {
 @SuppressLint("MissingPermission")
+suspend fun Context.receiveLocationUpdatesBg() = ignoringApiAndSecurityException {
     with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
             info { "BG: lastLocation = ${it.description}" }
@@ -271,7 +273,7 @@ suspend fun Context.receiveLocationUpdatesBg() = ignoringGoogleApiException {
     info(CC_PRIVATE) { "BG: started receiving location updates" }
 }
 
-fun Context.stopReceivingLocationUpdatesBg() = ignoringGoogleApiException {
+fun Context.stopReceivingLocationUpdatesBg() = ignoringApiAndSecurityException {
     fusedLocationProviderClient.removeLocationUpdates(intentToReceiveLocation())
     info(CC_PRIVATE) { "BG: asked to stop receiving location updates" }
 }
@@ -299,13 +301,15 @@ fun Context.stopReceivingAzimuthUpdates(locationState: LocationState) {
     sensorManager?.also { locationState.clearAzimuthListener(it) }
 }
 
-suspend fun Context.refreshLocation() = ignoringGoogleApiException {
+suspend fun Context.refreshLocation(callingFromBg: Boolean) = ignoringApiAndSecurityException {
     val timestamp = storedLocation.third
     val age = System.currentTimeMillis() - timestamp
     if (age <= 5 * MINUTE_IN_MILLIS) return
     val ageString = if (timestamp != 0L) "stale (${MILLISECONDS.toMinutes(age)} minutes old)" else "absent"
-    if (!canUseLocationBg()) {
-        info(CC_PRIVATE) { "Location is $ageString, can't refresh it due to lack of permissions/location settings" }
+    val groundString = if (callingFromBg) "background" else "foreground"
+    if (!canAccessLocation(callingFromBg)) {
+        info(CC_PRIVATE) { "Location is $ageString, can't refresh it from $groundString" +
+                " due to lack of permissions/location settings" }
         deleteLocation()
         return
     }
@@ -331,8 +335,13 @@ val Context.locationIfFresh: Triple<Double, Double, Long>?
         }
     }
 
-fun Context.appHasLocationPermission() =
+fun Context.appHasFgFineLocationPermission() =
     checkSelfPermission(this, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
+
+fun Context.appHasBgCoarseLocationPermission() =
+    checkSelfPermission(this, ACCESS_COARSE_LOCATION) == PERMISSION_GRANTED
+            && (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+                || checkSelfPermission(this, ACCESS_BACKGROUND_LOCATION) == PERMISSION_GRANTED)
 
 suspend fun Context.locationSettingsException(
     vararg locationRequests: LocationRequest
@@ -363,10 +372,12 @@ private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location
     ?.also { info { "Got response from getLastLocation()" } }
     ?: run { warn { "getLastLocation() returned null" }; null }
 
-private inline fun ignoringGoogleApiException(block: () -> Unit) {
+private inline fun ignoringApiAndSecurityException(block: () -> Unit) {
     try {
         block()
     } catch (e: ApiException) {
+        severe(e) { "Failed to complete a Location Service operation" }
+    } catch (e: SecurityException) {
         severe(e) { "Failed to complete a Location Service operation" }
     }
 }

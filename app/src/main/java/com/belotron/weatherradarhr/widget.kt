@@ -103,7 +103,7 @@ fun refreshWidgetsInForeground() {
         val logHead = "refreshWidgetsInForeground ${wDesc.name}"
         info(CC_PRIVATE) { logHead }
         appCoroScope.launch {
-            fetchImageAndUpdateWidget(onlyIfNew = false).also { lastModified_mmss ->
+            fetchImageAndUpdateWidget(callingFromBg = false, onlyIfNew = false).also { lastModified_mmss ->
                 logFetchResult(logHead, lastModified_mmss)
             }
         }
@@ -155,7 +155,7 @@ class RefreshImageService : JobService() {
             return if (wCtx.isWidgetInUse) {
                 appCoroScope.launch {
                     try {
-                        val lastModified_mmss = wCtx.fetchImageAndUpdateWidget(onlyIfNew = true)
+                        val lastModified_mmss = wCtx.fetchImageAndUpdateWidget(callingFromBg = true, onlyIfNew = true)
                         jobFinished(params, lastModified_mmss == null)
                         logFetchResult(logHead, lastModified_mmss)
                         if (lastModified_mmss != null) {
@@ -226,14 +226,14 @@ private class WidgetContext (
             updateRemoteViews(null)
             scheduleUpdateAge()
             appCoroScope.launch {
-                context.refreshLocation()
+                context.refreshLocation(callingFromBg = true)
                 try {
                     context.receiveLocationUpdatesBg()
                 } catch (t: Throwable) {
                     severe(CC_PRIVATE, t) { "$logHead: error setting up to receive location updates" }
                 }
                 try {
-                    val lastModified = fetchImageAndUpdateWidget(onlyIfNew = false)
+                    val lastModified = fetchImageAndUpdateWidget(callingFromBg = true, onlyIfNew = false)
                     if (lastModified != null) {
                         info(CC_PRIVATE) { "$logHead: success" }
                         scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
@@ -251,7 +251,7 @@ private class WidgetContext (
     }
 
     // Returns the Last-Modified timestamp's mm:ss part in seconds
-    suspend fun fetchImageAndUpdateWidget(onlyIfNew: Boolean): Long? {
+    suspend fun fetchImageAndUpdateWidget(callingFromBg: Boolean, onlyIfNew: Boolean): Long? {
         try {
             try {
                 val (lastModified_mmss, bitmap) =
@@ -263,7 +263,7 @@ private class WidgetContext (
                 val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
                 info(CC_PRIVATE) { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
                 writeImgAndTimestamp(tsBitmap)
-                context.refreshLocation()
+                context.refreshLocation(callingFromBg)
                 updateRemoteViews(tsBitmap)
                 return lastModified_mmss
             } catch (e: ImageFetchException) {
