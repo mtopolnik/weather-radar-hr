@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IntentService
 import android.app.PendingIntent
@@ -83,10 +84,8 @@ val locationRequestBg = LocationRequest().apply {
 }
 
 val Float.toDegrees get() = Math.toDegrees(this.toDouble()).toFloat()
-val Float.toRadians get() = Math.toRadians(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
 operator fun Location.component2() = longitude
-val Location.bearingAccuracyGuarded get() = if (Build.VERSION.SDK_INT >= 26) bearingAccuracyDegrees else 0f
 val Location.description
     get() = "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
             (if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else "")
@@ -147,6 +146,7 @@ class LocationState {
 
     private var azimuthListener: SensorEventListener? = null
 
+    @Suppress("UNUSED_PARAMETER")
     private fun <T : Any> invalidateIfGotLocation(prop: KProperty<*>, old: T, new: T) {
         if (location != null) imageBundles.forEach { it.invalidateImgView() }
     }
@@ -230,6 +230,7 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
 }
 
 suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringGoogleApiException {
+@SuppressLint("MissingPermission")
     fusedLocationProviderClient.apply {
         tryFetchLastLocation()?.also {
             info { "lastLocation: ${it.description}" }
@@ -249,6 +250,7 @@ fun Context.stopReceivingLocationUpdatesFg() = ignoringGoogleApiException {
 }
 
 suspend fun Context.receiveLocationUpdatesBg() = ignoringGoogleApiException {
+@SuppressLint("MissingPermission")
     with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
             info { "BG: lastLocation = ${it.description}" }
@@ -346,6 +348,7 @@ fun Fragment.startIntentResolveException(e: ResolvableApiException) =
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
 private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)
 
+@SuppressLint("MissingPermission")
 private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location? = lastLocation.await()
     ?.also { info { "Got response from getLastLocation()" } }
     ?: run { warn { "getLastLocation() returned null" }; null }
