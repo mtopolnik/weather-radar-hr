@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
@@ -295,6 +296,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             R.id.about -> ds.start {
                 showAboutDialogFragment(activity)
             }
+            R.id.privacy_policy -> startActivity(Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://morestina.net/vnr-privacy-policy.html")
+            ))
             R.id.rate_me -> activity.openAppRating()
             R.id.widget_log_enabled -> (!item.isChecked).also { newState ->
                 if (!newState) info(CC_PRIVATE) { "Log disabled" }
