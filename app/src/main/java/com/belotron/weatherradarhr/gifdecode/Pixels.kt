@@ -34,7 +34,7 @@ class IntArrayPixels(
     override val height = pixels.size / width
     override operator fun get(x: Int, y: Int) = pixels[width * y + x]
 
-    val decodeToGreyscale get() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
+    fun decodeToGreyscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
 }
 
 class BitmapPixels(

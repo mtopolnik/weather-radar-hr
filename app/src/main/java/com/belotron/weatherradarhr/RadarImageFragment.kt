@@ -411,7 +411,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         return imgDescs.map { desc ->
             val bundle = ds.imgBundles[desc.index]
             ds.start {
-                val coroScope = this
                 try {
                     val (lastModified, parsedGif) = try {
                         context.fetchGif(desc.url, fetchPolicy)
@@ -423,7 +422,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                         return@start
                     }
                     parsedGif.apply {
-                        assignTimestamps(coroScope, context, desc)
+                        assignTimestamps(context, desc)
                         sortAndDeduplicateFrames()
                         with(frames) {
                             while (size > desc.framesToKeep) {

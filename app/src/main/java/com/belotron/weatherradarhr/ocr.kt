@@ -22,9 +22,9 @@ object LradarOcr {
 
     fun ocrLradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
-        with(ocrDateTime(pixels)) {
-            debug { "ARSO OCRed date/time: $this" }
-            return toTimestamp
+        ocrDateTime(pixels).also {
+            debug { "ARSO OCRed date/time: $it" }
+            return it.toTimestamp
         }
     }
 
@@ -56,9 +56,9 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
-        with(ocrDateTime(pixels)) {
-            debug { "DHMZ OCRed date/time: $this" }
-            return toTimestamp
+        ocrDateTime(pixels).also {
+            debug { "DHMZ OCRed date/time: $it" }
+            return it.toTimestamp
         }
     }
 
@@ -66,7 +66,7 @@ object KradarOcr {
 
     private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.decodeToGreyscale } }
+            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.decodeToGreyscale() } }
         }
     }
 

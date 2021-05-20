@@ -12,13 +12,15 @@ import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.util.TreeSet
 
-suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Context, desc: ImgDescriptor) {
+suspend fun ParsedGif.assignTimestamps(context: Context, desc: ImgDescriptor) {
     val parsedGif = this
-    BitmapFreelists().also { allocator ->
+    val allocator = BitmapFreelists()
+    coroutineScope {
         (0 until frameCount).map { frameIndex ->
-            coroScope.async(Dispatchers.Default) {
+            async(Dispatchers.Default) {
                 context.decodeAndAssignTimestamp(parsedGif, frameIndex, desc, allocator)
             }
         }.forEachIndexed { i, it ->
@@ -27,13 +29,12 @@ suspend fun ParsedGif.assignTimestamps(coroScope: CoroutineScope, context: Conte
     }
 }
 
-
 private fun Context.decodeAndAssignTimestamp(
         parsedGif: ParsedGif, frameIndex: Int, desc: ImgDescriptor, allocator: Allocator
 ): Long {
     return try {
         GifDecoder(allocator, parsedGif).decodeFrame(frameIndex).let { decoder ->
-            desc.ocrTimestamp(decoder.asPixels()).also {
+            desc.ocrTimestamp(decoder.asPixels()).also { _ ->
                 decoder.dispose()
             }
         }
