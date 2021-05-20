@@ -3,12 +3,12 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 30
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
-        targetSdkVersion 29
         versionCode 111
+        targetSdkVersion 30
         versionName "2.2.5"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
