@@ -47,7 +47,4 @@ public interface Allocator {
      * Release the given array back to the pool.
      */
     void release(@NonNull int[] array);
-
-    /** Disposes the bitmaps in the freelists and lets go of all the held objects. */
-    void dispose();
 }
