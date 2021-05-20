@@ -71,14 +71,14 @@ object KradarOcr {
     }
 
     private fun ocrDateTime(img: Pixels): DateTime {
-        var x = 108
+        var x = 110
         val digits = IntArray(12) { 0 }
         var digitIndex = 0
-        while (x < 230 && digitIndex < 12) {
+        while (x < 240 && digitIndex < 12) {
             val digit = (0..9).find { isMatch(img, x, digitTemplates[it]) }
             if (digit != null) {
                 digits[digitIndex++] = digit
-                x += 7
+                x += 6
             } else {
                 x++
             }
@@ -96,7 +96,7 @@ object KradarOcr {
     }
 
     private fun isMatch(img: Pixels, imgX: Int, template: Pixels): Boolean {
-        val imgY = 2
+        val imgY = 5
         var totalDiff = 0
         (0 until template.height).forEach { y ->
             (0 until template.width).forEach { x ->
