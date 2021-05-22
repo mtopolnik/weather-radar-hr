@@ -307,16 +307,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         return true
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode != CODE_RESOLVE_API_EXCEPTION) return
-        if (resultCode == Activity.RESULT_OK) {
-            info { "ResolvableApiException is now resolved" }
-        } else {
-            warn { "ResolvableApiException resolution failed with code $resultCode" }
-            requireActivity().mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
-        }
-    }
-
     private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {
         val (bitmapW, bitmapH) = srcImgView.bitmapSize(PointF()) ?: return
         val focusInBitmapX = (focusX / srcImgView.width) * bitmapW

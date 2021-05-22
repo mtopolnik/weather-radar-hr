@@ -4,8 +4,8 @@ import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.IntentService
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.hardware.Sensor
@@ -39,7 +39,7 @@ import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
 
-const val CODE_RESOLVE_API_EXCEPTION = 14
+private const val ACTION_RECEIVE_LOCATION = "com.belotron.weatherradarhr.action.RECEIVE_LOCATION"
 const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
 private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
