@@ -15,7 +15,6 @@ import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View.GONE
 import android.view.View.INVISIBLE
 import android.widget.*
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
@@ -200,8 +199,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     override fun onResume() {
-        val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         info { "RadarImageFragment.onResume" }
+        val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         super.onResume()
         ensureCoroutineContext()
         possibleStateLoss = false
@@ -229,6 +228,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        info { "RadarImageFragment.onSaveInstanceState" }
         outState.recordSavingTime()
         possibleStateLoss = true
     }
@@ -259,8 +259,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     }
 
     override fun onStop() {
-        super.onStop()
         info { "RadarImageFragment.onStop" }
+        super.onStop()
         cancelCoroutineContext()
         possibleStateLoss = true
     }
