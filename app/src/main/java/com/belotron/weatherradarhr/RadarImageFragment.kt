@@ -99,7 +99,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             setOnSeekBarChangeListener(animationLooper)
             if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
                 with(layoutParams as FrameLayout.LayoutParams) {
-                    gravity = Gravity.BOTTOM or Gravity.RIGHT
+                    gravity = Gravity.BOTTOM or Gravity.END
                     rightMargin = resources.getDimensionPixelOffset(R.dimen.seekbar_landscape_right_margin)
                 }
             }
@@ -409,7 +409,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                             }
                         }
                     }
-                    bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.max() ?: 0
+                    bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                     with(animationLooper) {
                         receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
                         resume(context, rateMinsPerSec, freezeTimeMillis)
