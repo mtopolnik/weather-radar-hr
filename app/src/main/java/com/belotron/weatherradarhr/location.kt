@@ -278,7 +278,7 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ign
             locationState.location = it
         }
         LocationCallbackFg.locationState = locationState
-        requestLocationUpdates(locationRequestFg, LocationCallbackFg, null).await()
+        requestLocationUpdates(locationRequestFg, LocationCallbackFg, Looper.getMainLooper()).await()
         info(CC_PRIVATE) { "FG: started receiving location updates" }
     }
 }
@@ -451,7 +451,7 @@ private suspend fun <T> Task<T>.await(): T? {
 
 class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent?) {
-        val location = extractResult(intent)?.lastLocation ?: return
+        val location = intent?.let { extractResult(it) } ?.lastLocation ?: return
         info(CC_PRIVATE) { "Received location in the background: ${location.description}" }
         application?.storeLocation(location)
     }

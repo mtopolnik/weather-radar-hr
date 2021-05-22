@@ -18,10 +18,12 @@ import kotlin.coroutines.resume
 private const val TAG_ASK_PERMISSION: String = "ask_permission_fragment"
 
 suspend fun FragmentActivity.showFgLocationNotice() = suspendCancellableCoroutine<UserReaction> { cont ->
+    info { "showFgLocationNotice" }
     LocationNoticeDialogFragment(false, cont).show(supportFragmentManager, TAG_ASK_PERMISSION)
 }
 
 suspend fun FragmentActivity.showBgLocationNotice() = suspendCancellableCoroutine<UserReaction> { cont ->
+    info { "showBgLocationNotice" }
     LocationNoticeDialogFragment(true, cont).show(supportFragmentManager, TAG_ASK_PERMISSION)
 }
 
