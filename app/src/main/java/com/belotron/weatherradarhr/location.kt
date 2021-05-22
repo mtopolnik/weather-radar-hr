@@ -31,13 +31,10 @@ import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import com.google.android.gms.location.LocationServices.getSettingsClient
-import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
@@ -418,36 +415,6 @@ private inline fun ignoringApiAndSecurityException(block: () -> Unit) {
         severe(e) { "Failed to complete a Location Service operation" }
     }
 }
-
-private suspend fun <T> Task<T>.await(): T? {
-    // fast path
-    if (isComplete) {
-        val e = exception
-        if (e != null) {
-            throw e.apply { fillInStackTrace() }
-        }
-        if (isCanceled) {
-            throw CancellationException("Task $this was cancelled normally.")
-        }
-        return result
-    }
-
-    try {
-        return suspendCancellableCoroutine { cont ->
-            addOnCompleteListener {
-                val e = exception
-                when {
-                    e != null -> cont.resumeWithException(e)
-                    isCanceled -> cont.cancel()
-                    else -> cont.resume(result)
-                }
-            }
-        }
-    } catch (e: Throwable) {
-        throw e.apply { fillInStackTrace() }
-    }
-}
-
 
 class ReceiveLocationService : IntentService("Receive Location Updates") {
     override fun onHandleIntent(intent: Intent?) {
