@@ -176,30 +176,38 @@ class LocationState {
     suspend fun trackLocationEnablement(activity: Activity) {
         var prevLocationState: Boolean? = null
         while (true) {
-            val canAccessLocation = activity.canAccessLocation(fromBg = false)
-            if (canAccessLocation == prevLocationState) {
-                delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
-                continue
-            }
-            prevLocationState = canAccessLocation
-            if (canAccessLocation) {
-                info { "Location available" }
-                val locationState = this
-                with(activity) {
-                    refreshLocation(callingFromBg = false)
-                    receiveLocationUpdatesFg(locationState)
-                    receiveAzimuthUpdates(locationState)
-                    if (anyWidgetInUse()) {
-                        receiveLocationUpdatesBg()
-                    }
+            try {
+                val canAccessLocation = activity.canAccessLocation(fromBg = false)
+                if (canAccessLocation == prevLocationState) {
+                    delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
+                    continue
                 }
-            } else {
-                info { "Location not available" }
-                activity.deleteLocation()
-                location = null
+                prevLocationState = canAccessLocation
+                if (canAccessLocation) {
+                    info { "Allowed to receive location in the foreground" }
+                    val locationState = this
+                    with(activity) {
+                        refreshLocation(callingFromBg = false)
+                        receiveLocationUpdatesFg(locationState)
+                        receiveAzimuthUpdates(locationState)
+                        if (anyWidgetInUse()) {
+                            receiveLocationUpdatesBg()
+                        }
+                    }
+                } else {
+                    info { "Location not available" }
+                    activity.deleteLocation()
+                    location = null
+                }
+                redrawWidgetsInForeground()
+                delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
             }
-            redrawWidgetsInForeground()
-            delay(CHECK_LOCATION_ENABLED_PERIOD_MILLIS)
+            catch (e: CancellationException) {
+                throw e
+            }
+            catch (e: Exception) {
+                severe(e) { "Exception in trackLocationEnablement" }
+            }
         }
     }
 }
@@ -223,52 +231,60 @@ suspend fun Context.canAccessLocation(fromBg: Boolean) =
         appHasFgLocationPermission() && locationSettingsException(locationRequestFg) == null
 
 suspend fun RadarImageFragment.checkAndCorrectPermissionsAndSettings() {
-    with(context!!) {
-        if (!appHasFgLocationPermission()) {
-            warn { "FG: our app has no permission to access location" }
-            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
+    try {
+        with(context!!) {
             if (!appHasFgLocationPermission()) {
-                if (mainPrefs.shouldShowFgLocationNotice) {
-                    val userReaction = requireActivity().showFgLocationNotice()
-                    mainPrefs.applyUpdate { setShouldShowFgLocationNotice(false) }
-                    if (userReaction == PROCEED) {
+                warn { "FG: our app has no permission to access location" }
+                delay(WAIT_MILLISECONDS_BEFORE_ASKING)
+                if (!appHasFgLocationPermission()) {
+                    if (mainPrefs.shouldShowFgLocationNotice) {
+                        val userReaction = requireActivity().showFgLocationNotice()
+                        mainPrefs.applyUpdate { setShouldShowFgLocationNotice(false) }
+                        if (userReaction == PROCEED) {
+                            startIntentRequestLocationPermissionFg()
+                            return
+                        }
+                    } else {
                         startIntentRequestLocationPermissionFg()
                         return
                     }
-                } else {
-                    startIntentRequestLocationPermissionFg()
-                    return
                 }
-            }
-        } else if (anyWidgetInUse() && !appHasBgLocationPermission()) {
-            warn { "BG: our app has no permission to access coarse location" }
-            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-            if (anyWidgetInUse() && !appHasBgLocationPermission()) {
-                if (mainPrefs.shouldShowBgLocationNotice) {
-                    val userReaction = requireActivity().showBgLocationNotice()
-                    mainPrefs.applyUpdate { setShouldShowBgLocationNotice(false) }
-                    if (userReaction == PROCEED) {
+            } else if (anyWidgetInUse() && !appHasBgLocationPermission()) {
+                warn { "BG: our app has no permission to access coarse location" }
+                delay(WAIT_MILLISECONDS_BEFORE_ASKING)
+                if (anyWidgetInUse() && !appHasBgLocationPermission()) {
+                    if (mainPrefs.shouldShowBgLocationNotice) {
+                        val userReaction = requireActivity().showBgLocationNotice()
+                        mainPrefs.applyUpdate { setShouldShowBgLocationNotice(false) }
+                        if (userReaction == PROCEED) {
+                            startIntentRequestLocationPermissionBg()
+                            return
+                        }
+                    } else {
                         startIntentRequestLocationPermissionBg()
                         return
                     }
-                } else {
-                    startIntentRequestLocationPermissionBg()
-                    return
                 }
             }
+            if (locationSettingsException(locationRequestFg, locationRequestBg) == null) return
+            warn { "FG: ResolvableApiException for location request (probably location disabled)" }
+            if (!mainPrefs.shouldAskToEnableLocation) return
+            delay(WAIT_MILLISECONDS_BEFORE_ASKING)
+            locationSettingsException(locationRequestFg, locationRequestBg)
+                ?.let { it as? ResolvableApiException }
+                ?.also { startIntentResolveException(it) }
         }
-        if (locationSettingsException(locationRequestFg, locationRequestBg) == null) return
-        warn { "FG: ResolvableApiException for location request (probably location disabled)" }
-        if (!mainPrefs.shouldAskToEnableLocation) return
-        delay(WAIT_MILLISECONDS_BEFORE_ASKING)
-        locationSettingsException(locationRequestFg, locationRequestBg)
-            ?.let { it as? ResolvableApiException }
-            ?.also { startIntentResolveException(it) }
+    }
+    catch (e: CancellationException) {
+        throw e
+    }
+    catch (e: Exception) {
+        severe(e) { "Failed to check and correct permission settings" }
     }
 }
 
 @SuppressLint("MissingPermission")
-suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringApiAndSecurityException {
+suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ignoringException {
     fusedLocationProviderClient.apply {
         tryFetchLastLocation()?.also {
             info { "lastLocation: ${it.description}" }
@@ -280,7 +296,7 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ign
     }
 }
 
-fun Context.stopReceivingLocationUpdatesFg() = ignoringApiAndSecurityException {
+fun Context.stopReceivingLocationUpdatesFg() = ignoringException {
     if (LocationCallbackFg.locationState == null) return
     fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg)
     LocationCallbackFg.locationState = null
@@ -288,7 +304,7 @@ fun Context.stopReceivingLocationUpdatesFg() = ignoringApiAndSecurityException {
 }
 
 @SuppressLint("MissingPermission")
-suspend fun Context.receiveLocationUpdatesBg() = ignoringApiAndSecurityException {
+suspend fun Context.receiveLocationUpdatesBg() = ignoringException {
     with(fusedLocationProviderClient) {
         tryFetchLastLocation()?.also {
             info { "BG: lastLocation = ${it.description}" }
@@ -299,7 +315,7 @@ suspend fun Context.receiveLocationUpdatesBg() = ignoringApiAndSecurityException
     info(CC_PRIVATE) { "BG: started receiving location updates" }
 }
 
-fun Context.stopReceivingLocationUpdatesBg() = ignoringApiAndSecurityException {
+fun Context.stopReceivingLocationUpdatesBg() = ignoringException {
     fusedLocationProviderClient.removeLocationUpdates(intentToReceiveLocation())
     info(CC_PRIVATE) { "BG: asked to stop receiving location updates" }
 }
@@ -327,7 +343,7 @@ fun Context.stopReceivingAzimuthUpdates(locationState: LocationState) {
     sensorManager?.also { locationState.clearAzimuthListener(it) }
 }
 
-suspend fun Context.refreshLocation(callingFromBg: Boolean) = ignoringApiAndSecurityException {
+suspend fun Context.refreshLocation(callingFromBg: Boolean) = ignoringException {
     val timestamp = storedLocation.third
     val age = System.currentTimeMillis() - timestamp
     if (age <= 5 * MINUTE_IN_MILLIS) return
@@ -406,13 +422,17 @@ private suspend fun FusedLocationProviderClient.tryFetchLastLocation(): Location
     ?.also { info { "Got response from getLastLocation()" } }
     ?: run { warn { "getLastLocation() returned null" }; null }
 
-private inline fun ignoringApiAndSecurityException(block: () -> Unit) {
+private inline fun ignoringException(block: () -> Unit) {
     try {
         block()
     } catch (e: ApiException) {
         severe(e) { "Failed to complete a Location Service operation" }
     } catch (e: SecurityException) {
         severe(e) { "Failed to complete a Location Service operation" }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        severe(e) { "Location Service operation failed with an unexpected exception!" }
     }
 }
 
