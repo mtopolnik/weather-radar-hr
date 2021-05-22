@@ -321,7 +321,9 @@ fun Context.stopReceivingLocationUpdatesBg() = ignoringException {
 }
 
 private fun Context.intentToReceiveLocation() =
-    PendingIntent.getService(this, 0, Intent(this, ReceiveLocationService::class.java), 0)
+    PendingIntent.getBroadcast(this, 0,
+        Intent(this, LocationBroadcastReceiver::class.java).also { it.action = ACTION_RECEIVE_LOCATION },
+        PendingIntent.FLAG_UPDATE_CURRENT)
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val sensorManager = sensorManager ?: run {
@@ -436,11 +438,14 @@ private inline fun ignoringException(block: () -> Unit) {
     }
 }
 
-class ReceiveLocationService : IntentService("Receive Location Updates") {
-    override fun onHandleIntent(intent: Intent?) {
-        val location = intent?.let { extractResult(it) } ?.lastLocation ?: return
+class LocationBroadcastReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        info(CC_PRIVATE) { "LocationBroadcastReceiver.onReceive" }
+        intent?.action?.takeIf { it == ACTION_RECEIVE_LOCATION } ?: return
+        // implementation of extractResult explicitly returns null, contradicting the annotation:
+        val location = extractResult(intent)?.lastLocation ?: return
         info(CC_PRIVATE) { "Received location in the background: ${location.description}" }
-        application?.storeLocation(location)
+        context?.applicationContext?.storeLocation(location)
     }
 }
 
