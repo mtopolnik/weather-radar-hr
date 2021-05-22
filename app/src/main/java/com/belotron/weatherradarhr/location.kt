@@ -15,11 +15,12 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Build
+import android.os.Looper
 import android.text.format.DateUtils.*
 import android.view.Surface
+import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
-import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.UserReaction.PROCEED
 import com.google.android.gms.common.api.ApiException
@@ -41,7 +42,6 @@ import kotlin.math.atan2
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
 
-const val CODE_REQUEST_LOCATION = 13
 const val CODE_RESOLVE_API_EXCEPTION = 14
 const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
@@ -73,13 +73,13 @@ val kradarShape = MapShape(
     botImageY = 478
 )
 
-val locationRequestFg = LocationRequest().apply {
+val locationRequestFg: LocationRequest = LocationRequest.create().apply {
     interval = 1000
     fastestInterval = 10
     priority = PRIORITY_BALANCED_POWER_ACCURACY
 }
 
-val locationRequestBg = LocationRequest().apply {
+val locationRequestBg: LocationRequest = LocationRequest.create().apply {
     interval = MINUTE_IN_MILLIS
     fastestInterval = MINUTE_IN_MILLIS
     priority = PRIORITY_LOW_POWER
@@ -225,7 +225,7 @@ suspend fun Context.canAccessLocation(fromBg: Boolean) =
     else
         appHasFgLocationPermission() && locationSettingsException(locationRequestFg) == null
 
-suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
+suspend fun RadarImageFragment.checkAndCorrectPermissionsAndSettings() {
     with(context!!) {
         if (!appHasFgLocationPermission()) {
             warn { "FG: our app has no permission to access location" }
@@ -235,11 +235,11 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
                     val userReaction = requireActivity().showFgLocationNotice()
                     mainPrefs.applyUpdate { setShouldShowFgLocationNotice(false) }
                     if (userReaction == PROCEED) {
-                        startIntentRequestLocationPermission()
+                        startIntentRequestLocationPermissionFg()
                         return
                     }
                 } else {
-                    startIntentRequestLocationPermission()
+                    startIntentRequestLocationPermissionFg()
                     return
                 }
             }
@@ -251,11 +251,11 @@ suspend fun Fragment.checkAndCorrectPermissionsAndSettings() {
                     val userReaction = requireActivity().showBgLocationNotice()
                     mainPrefs.applyUpdate { setShouldShowBgLocationNotice(false) }
                     if (userReaction == PROCEED) {
-                        startIntentRequestLocationPermission()
+                        startIntentRequestLocationPermissionBg()
                         return
                     }
                 } else {
-                    startIntentRequestLocationPermission()
+                    startIntentRequestLocationPermissionBg()
                     return
                 }
             }
@@ -386,16 +386,20 @@ suspend fun Context.locationSettingsException(
     e
 }
 
-fun Fragment.startIntentRequestLocationPermission() = run {
-    val permissionsToAskFor =
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) arrayOf(ACCESS_COARSE_LOCATION)
-        else arrayOf(ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION)
-    requestPermissions(permissionsToAskFor, CODE_REQUEST_LOCATION)
+fun RadarImageFragment.startIntentRequestLocationPermissionFg() = startIntentRequestLocationPermission(true)
+
+fun RadarImageFragment.startIntentRequestLocationPermissionBg() = startIntentRequestLocationPermission(false)
+
+private fun RadarImageFragment.startIntentRequestLocationPermission(requestFg: Boolean) = run {
+    info { "startIntentRequestLocationPermission" }
+    val permissionToAskFor =
+        if (requestFg || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) ACCESS_COARSE_LOCATION
+        else ACCESS_BACKGROUND_LOCATION
+    permissionRequest.launch(permissionToAskFor)
 }
 
-fun Fragment.startIntentResolveException(e: ResolvableApiException) =
-    startIntentSenderForResult(e.resolution.intentSender, CODE_RESOLVE_API_EXCEPTION, null, 0, 0, 0, null)
-
+fun RadarImageFragment.startIntentResolveException(e: ResolvableApiException) =
+    resolveApiExceptionRequest.launch(IntentSenderRequest.Builder(e.resolution.intentSender).build())
 
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?
 private val Context.fusedLocationProviderClient get() = getFusedLocationProviderClient(this)

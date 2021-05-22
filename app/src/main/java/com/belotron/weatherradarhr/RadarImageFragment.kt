@@ -1,7 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
-import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
@@ -11,42 +9,24 @@ import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
-import android.view.GestureDetector
+import android.view.*
 import android.view.GestureDetector.SimpleOnGestureListener
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
-import android.view.View
 import android.view.View.GONE
 import android.view.View.INVISIBLE
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.ProgressBar
-import android.widget.ScrollView
-import android.widget.TextView
+import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.PermissionChecker
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
-import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
-import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
-import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
-import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
+import com.belotron.weatherradarhr.ImageBundle.Status.*
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import java.util.EnumSet
+import kotlinx.coroutines.*
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
@@ -54,6 +34,18 @@ private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 class RadarImageFragment : Fragment(), CoroutineScope {
 
     val ds = DisplayState()
+    val permissionRequest = registerForActivityResult(RequestPermission()) {
+        if (it) info { "User has granted us the location permission" }
+        else warn { "User hasn't granted us the location permission" }
+    }
+    val resolveApiExceptionRequest = registerForActivityResult(StartIntentSenderForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) {
+            info { "ResolvableApiException is now resolved" }
+        } else {
+            warn { "ResolvableApiException resolution failed with code ${it.resultCode}" }
+            requireActivity().mainPrefs.applyUpdate { setShouldAskToEnableLocation(false) }
+        }
+    }
     private val locationState = LocationState()
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
@@ -313,19 +305,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         }
         if (shouldHideActionBar) activity.supportActionBar?.hide()
         return true
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        if (requestCode != CODE_REQUEST_LOCATION) return
-        permissions.zip(grantResults.asList())
-            .find { (perm, _) -> perm == ACCESS_COARSE_LOCATION }
-            ?.also { (_, result) ->
-                if (result == PermissionChecker.PERMISSION_GRANTED) {
-                    info { "User has granted us the location permission" }
-                } else {
-                    warn { "User hasn't granted us the location permission (grant result: ${grantResults[0]})" }
-                }
-            }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
