@@ -206,7 +206,7 @@ class LocationState {
                 throw e
             }
             catch (e: Exception) {
-                severe(e) { "Exception in trackLocationEnablement" }
+                severe(CC_PRIVATE, e) { "Exception in trackLocationEnablement" }
             }
         }
     }
@@ -279,7 +279,7 @@ suspend fun RadarImageFragment.checkAndCorrectPermissionsAndSettings() {
         throw e
     }
     catch (e: Exception) {
-        severe(e) { "Failed to check and correct permission settings" }
+        severe(CC_PRIVATE, e) { "Failed to check and correct permission settings" }
     }
 }
 
@@ -428,13 +428,13 @@ private inline fun ignoringException(block: () -> Unit) {
     try {
         block()
     } catch (e: ApiException) {
-        severe(e) { "Failed to complete a Location Service operation" }
+        severe(CC_PRIVATE, e) { "Failed to complete a Location Service operation" }
     } catch (e: SecurityException) {
-        severe(e) { "Failed to complete a Location Service operation" }
+        severe(CC_PRIVATE, e) { "Failed to complete a Location Service operation" }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        severe(e) { "Location Service operation failed with an unexpected exception!" }
+        severe(CC_PRIVATE, e) { "Location Service operation failed with an unexpected exception!" }
     }
 }
 

@@ -166,8 +166,8 @@ public class GifDecoder {
             return this;
         } catch (ImgDecodeException e) {
             throw e;
-        } catch (Throwable t) {
-            throw new ImgDecodeException(t);
+        } catch (Exception e) {
+            throw new ImgDecodeException(e);
         }
     }
 

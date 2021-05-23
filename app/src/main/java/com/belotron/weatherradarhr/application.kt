@@ -3,16 +3,9 @@ package com.belotron.weatherradarhr
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Point
-import android.graphics.PointF
-import android.graphics.RectF
+import android.graphics.*
 import android.os.Bundle
-import android.text.format.DateUtils.DAY_IN_MILLIS
-import android.text.format.DateUtils.MINUTE_IN_MILLIS
-import android.text.format.DateUtils.SECOND_IN_MILLIS
-import android.text.format.DateUtils.getRelativeTimeSpanString
+import android.text.format.DateUtils.*
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -21,24 +14,10 @@ import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.getColor
-import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.BitmapPixels
-import com.belotron.weatherradarhr.gifdecode.GifDecoder
-import com.belotron.weatherradarhr.gifdecode.GifParser
-import com.belotron.weatherradarhr.gifdecode.ParsedGif
-import kotlinx.coroutines.CoroutineScope
+import com.belotron.weatherradarhr.gifdecode.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.launch
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.FileWriter
-import java.io.PrintWriter
+import java.io.*
 import java.text.DateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.HOURS
@@ -183,6 +162,8 @@ fun Bitmap.asPixels() = BitmapPixels(this)
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()
-} catch (t: Throwable) {
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
     null
 }

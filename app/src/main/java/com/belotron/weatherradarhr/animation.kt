@@ -12,6 +12,7 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.IO
 import java.text.DateFormat
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadFactory
@@ -126,7 +127,7 @@ class GifAnimator(
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
 
-    fun animate(isFullRange: Boolean): Job? {
+    fun animate(isFullRange: Boolean): Job {
         val frameCount = gifDecoder.frameCount
         val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - imgDesc.framesToKeep)
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
@@ -147,7 +148,7 @@ class GifAnimator(
                 }
                 val elapsedSinceFrameShown = NANOSECONDS.toMillis(System.nanoTime() - frameShownAt)
                 val targetDelay =
-                        if (lastFrameShown) Math.max(freezeTimeMillis, frameDelayMillis)
+                        if (lastFrameShown) max(freezeTimeMillis, frameDelayMillis)
                         else frameDelayMillis
                 val remainingDelay = targetDelay - elapsedSinceFrameShown
                 debug { "$elapsedSinceFrameShown ms since last frame, $remainingDelay ms till next frame" }

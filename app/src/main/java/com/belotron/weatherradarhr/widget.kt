@@ -27,6 +27,7 @@ import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.util.Calendar
@@ -161,8 +162,10 @@ class RefreshImageService : JobService() {
                         if (lastModified_mmss != null) {
                             wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified_mmss, wDesc.updatePeriodMinutes))
                         }
-                    } catch (t: Throwable) {
-                        severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        severe(CC_PRIVATE, e) { "$logHead: error in coroutine" }
                     } finally {
                         wDesc.refreshJobRunning = false
                     }
@@ -229,6 +232,8 @@ private class WidgetContext (
                 context.refreshLocation(callingFromBg = true)
                 try {
                     context.receiveLocationUpdatesBg()
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (t: Throwable) {
                     severe(CC_PRIVATE, t) { "$logHead: error setting up to receive location updates" }
                 }
@@ -241,6 +246,8 @@ private class WidgetContext (
                         info(CC_PRIVATE) { "$logHead: failed, scheduling to retry" }
                         scheduleWidgetUpdate(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (t: Throwable) {
                     severe(CC_PRIVATE, t) { "$logHead: error in coroutine" }
                 }

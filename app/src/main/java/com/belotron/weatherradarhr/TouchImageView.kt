@@ -453,7 +453,8 @@ class TouchImageView
             this.state = NONE
         } catch (e: CancellationException) {
             // The cancelling code already set another state, don't reset it
-        } catch (e: Throwable) {
+            throw e
+        } catch (e: Exception) {
             if (this.state == state) {
                 this.state = NONE
             }

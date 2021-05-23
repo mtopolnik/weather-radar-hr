@@ -3,9 +3,11 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -16,7 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.text.Charsets.UTF_8
 
-private const val DEFAULT_LAST_MODIFIED = "Thu, 01 Jan 1970 00:00:00 GMT"
+private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
@@ -24,6 +26,7 @@ private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
+private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW }
 
@@ -59,7 +62,7 @@ class Exchange<out T>(
             try {
                 loadCachedResult?.also { return it }
             } catch (e: Exception) {
-                severe(e) { "Error loading cached image for $url" }
+                severe(CC_PRIVATE, e) { "Error loading cached image for $url" }
             }
         }
         var conn: HttpURLConnection? = null
@@ -80,11 +83,11 @@ class Exchange<out T>(
                     loadCachedResult ?: Exchange(context, url, UP_TO_DATE, decode).proceed()
                 }
             }
-        } catch (t: Throwable) {
-            if (t is HttpErrorResponse) {
+        } catch (e: Exception) {
+            if (e is HttpErrorResponse) {
                 conn!!.logErrorResponse()
             } else {
-                severe(t) { "Error fetching $url" }
+                severe(CC_PRIVATE, e) { "Error fetching $url" }
             }
             throw ImageFetchException(
                     if (fetchPolicy == ONLY_IF_NEW) null
@@ -96,7 +99,7 @@ class Exchange<out T>(
 
     private fun HttpURLConnection.handleSuccessResponse(): Pair<Long, T> {
         val contentLength = getHeaderFieldInt("Content-Length", ESTIMATED_CONTENT_LENGTH)
-        val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED
+        val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR
         val fetchedLastModified = lastModifiedStr.parseLastModified()
         val responseBody = lazy { inputStream.use { it.readBytes() } }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
@@ -117,9 +120,9 @@ class Exchange<out T>(
                 }
             }
             Pair(parseLastModified_mmss(lastModifiedStr), parsedGif)
-        } catch (t: Throwable) {
-            severe(t) { "Failed to handle a successful image response for $url" }
-            throw t
+        } catch (e: Exception) {
+            severe(CC_PRIVATE) { "Failed to handle a successful image response for $url" }
+            throw e
         }
     }
 
@@ -146,7 +149,7 @@ class Exchange<out T>(
             try {
                 return decode(this)
             } catch (e: ImgDecodeException) {
-                severe { "Image parsing error" }
+                severe(CC_PRIVATE) { "Image parsing error" }
                 context.invalidateCache(url)
                 throw e
             }
@@ -156,7 +159,7 @@ class Exchange<out T>(
 
     private fun HttpURLConnection.logErrorResponse() {
         val responseBody = runOrNull { '\n' + String(inputStream.use { it.readBytes() }, UTF_8) } ?: ""
-        severe { "Failed to retrieve $url: $responseCode$responseBody" }
+        severe(CC_PRIVATE) { "Failed to retrieve $url: $responseCode$responseBody" }
     }
 
     private fun parseLastModified_mmss(lastModifiedStr: String): Long {
@@ -165,7 +168,7 @@ class Exchange<out T>(
         return 60L * parseInt(groups[1]) + parseInt(groups[2])
     }
 
-    private fun String.parseLastModified() = lastModifiedDateFormat.parse(this).time
+    private fun String.parseLastModified() = lastModifiedDateFormat.parse(this)?.time ?: defaultLastModified
 
     private fun cachedDataIn(url: String) = context.cacheFile(url).dataIn()
 
@@ -183,7 +186,7 @@ class Exchange<out T>(
                     throw IOException("Failed to rename $growingFile to ${cacheFile.name}")
                 }
             } catch (e: IOException) {
-                severe(e) { "Failed to write cached image to $growingFile" }
+                severe(CC_PRIVATE, e) { "Failed to write cached image to $growingFile" }
             }
         }
     }
@@ -194,10 +197,10 @@ fun Context.invalidateCache(url: String) {
         severe { "Invalidating cache for $url" }
         val cacheFile = cacheFile(url)
         if (!cacheFile.delete()) {
-            severe { "Failed to delete a broken cached image for $url" }
+            severe(CC_PRIVATE) { "Failed to delete a broken cached image for $url" }
             // At least write a stale last-modified date to prevent retry loops
             cacheFile.dataOut().use { cachedOut ->
-                cachedOut.writeUTF(DEFAULT_LAST_MODIFIED)
+                cachedOut.writeUTF(DEFAULT_LAST_MODIFIED_STR)
             }
         }
     }

@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.gifdecode.Allocator
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifDecoder
@@ -39,7 +40,7 @@ private fun Context.decodeAndAssignTimestamp(
             }
         }
     } catch (e: ImgDecodeException) {
-        severe { "Animated GIF decoding error" }
+        severe(CC_PRIVATE) { "Animated GIF decoding error" }
         invalidateCache(desc.url)
         throw e
     }

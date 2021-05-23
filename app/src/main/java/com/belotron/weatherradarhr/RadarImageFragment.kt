@@ -405,8 +405,10 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                         resume(context, rateMinsPerSec, freezeTimeMillis)
                     }
                     bundle.status = SHOWING
-                } catch (t: Throwable) {
-                    severe(t) { "Failed to load animated GIF ${desc.filename}" }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    severe(CC_PRIVATE, e) { "Failed to load animated GIF ${desc.filename}" }
                     bundle.status = BROKEN
                 }
             }
