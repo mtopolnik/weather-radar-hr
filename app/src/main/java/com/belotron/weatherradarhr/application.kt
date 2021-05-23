@@ -19,13 +19,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import java.io.*
 import java.text.DateFormat
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.HOURS
 import android.text.format.DateFormat as AndroidDateFormat
 
 private const val KEY_SAVED_AT = "instance-state-saved-at"
-
-val threadPool = Executors.newCachedThreadPool { task -> Thread(task, "weather-radar-pool") }.asCoroutineDispatcher()
 
 lateinit var appContext: Context
 lateinit var appCoroScope: CoroutineScope

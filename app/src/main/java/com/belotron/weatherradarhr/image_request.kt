@@ -23,6 +23,7 @@ private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
 
+private val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
@@ -47,7 +48,7 @@ suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Lon
  */
 private suspend fun <T> Context.fetchImg(
         url: String, fetchPolicy: FetchPolicy, decode: (ByteArray) -> T
-): Pair<Long, T?> = withContext(threadPool) {
+): Pair<Long, T?> = withContext(IO) {
     Exchange(this@fetchImg, url, fetchPolicy, decode).proceed()
 }
 
@@ -174,7 +175,7 @@ class Exchange<out T>(
 
     private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
         val growingFile = File(cacheFile.path + ".growing")
-        synchronized(threadPool) {
+        synchronized(CACHE_LOCK) {
             try {
                 val cachedLastModified = runOrNull { growingFile.dataIn().use { it.readUTF() }.parseLastModified() }
                 val fetchedLastModified = lastModifiedStr.parseLastModified()
@@ -193,8 +194,8 @@ class Exchange<out T>(
 }
 
 fun Context.invalidateCache(url: String) {
-    synchronized(threadPool) {
-        severe { "Invalidating cache for $url" }
+    synchronized(CACHE_LOCK) {
+        severe(CC_PRIVATE) { "Invalidating cache for $url" }
         val cacheFile = cacheFile(url)
         if (!cacheFile.delete()) {
             severe(CC_PRIVATE) { "Failed to delete a broken cached image for $url" }
