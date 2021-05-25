@@ -7,15 +7,17 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.lang.Integer.parseInt
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.text.Charsets.UTF_8
 
 private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
@@ -48,16 +50,40 @@ suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Lon
  */
 private suspend fun <T> Context.fetchImg(
         url: String, fetchPolicy: FetchPolicy, decode: (ByteArray) -> T
-): Pair<Long, T?> = withContext(IO) {
-    Exchange(this@fetchImg, url, fetchPolicy, decode).proceed()
+): Pair<Long, T?> {
+    val context = this
+    return coroutineScope {
+        val exchange = Exchange(context, this, url, fetchPolicy, decode)
+        val doneSignal = CompletableDeferred<Unit>()
+        launch {
+            try {
+                doneSignal.await()
+            } catch (e: CancellationException) {
+                val inputStream = exchange.inputStream ?: return@launch
+                info { "Request cancelled, closing connection to $url" }
+                withContext(NonCancellable + IO) {
+                    inputStream.close()
+                }
+            }
+        }
+        withContext(IO) {
+            exchange.proceed()
+        }.also {
+            doneSignal.complete(Unit)
+        }
+    }
 }
 
 class Exchange<out T>(
-        private val context: Context,
-        private val url: String,
-        private val fetchPolicy: FetchPolicy,
-        private val decode: (ByteArray) -> T
+    private val context: Context,
+    private val coroCtx: CoroutineScope,
+    private val url: String,
+    private val fetchPolicy: FetchPolicy,
+    private val decode: (ByteArray) -> T
 ) {
+    @Volatile
+    var inputStream: InputStream? = null
+
     fun proceed(): Pair<Long, T?> {
         if (fetchPolicy == PREFER_CACHED) {
             try {
@@ -72,18 +98,24 @@ class Exchange<out T>(
             val ifModifiedSince = loadCachedLastModified(url)
             ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
             conn.connect()
+            if (!coroCtx.isActive) {
+                throw CancellationException()
+            }
             return when {
-                conn.responseCode == 200 ->
+                conn.responseCode == 200 -> {
                     conn.handleSuccessResponse()
+                }
                 conn.responseCode != 304 ->
                     throw HttpErrorResponse()
                 fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                     Pair(0L, null)
                 else -> { // responseCode == 304, fetch from cache
                     info { "Not Modified since $ifModifiedSince: $url" }
-                    loadCachedResult ?: Exchange(context, url, UP_TO_DATE, decode).proceed()
+                    loadCachedResult ?: Exchange(context, coroCtx, url, UP_TO_DATE, decode).proceed()
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (e is HttpErrorResponse) {
                 conn!!.logErrorResponse()
@@ -102,7 +134,14 @@ class Exchange<out T>(
         val contentLength = getHeaderFieldInt("Content-Length", ESTIMATED_CONTENT_LENGTH)
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR
         val fetchedLastModified = lastModifiedStr.parseLastModified()
-        val responseBody = lazy { inputStream.use { it.readBytes() } }
+        val responseBody = lazy {
+            this@Exchange.inputStream = inputStream
+            inputStream.use { it.readBytes() }
+                .also {
+                    this@Exchange.inputStream = null
+                    if (!coroCtx.isActive) throw CancellationException()
+                }
+        }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
             val cachedIn = runOrNull { cachedDataIn(url.toExternalForm()) }

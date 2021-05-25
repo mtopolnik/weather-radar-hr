@@ -49,6 +49,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     private val fullScreenBundle = ImageBundle()
     private var stashedImgBundle = ImageBundle()
     private val animationLooper = AnimationLooper(ds)
+    private var reloadJob: Job? = null
 
     private var rootView: View? = null
     private var vGroupOverview: ViewGroup? = null
@@ -213,9 +214,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
             }
         } else {
-            val reloadJobs = startReloadAnimations(PREFER_CACHED)
+            startReloadAnimations(PREFER_CACHED)
             launch {
-                reloadJobs.forEach { it.join() }
+                reloadJob?.join()
                 (activity as AppCompatActivity).supportActionBar?.hide()
                 if (isTimeToReload) {
                     info { "Reloading animations" }
@@ -371,45 +372,50 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         }
     }
 
-    private fun startReloadAnimations(fetchPolicy: FetchPolicy): List<Job> {
+    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
         imgDescs.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
-        return imgDescs.map { desc ->
-            val bundle = ds.imgBundles[desc.index]
-            ds.start {
-                try {
-                    val (lastModified, parsedGif) = try {
-                        context.fetchGif(desc.url, fetchPolicy)
-                    } catch (e: ImageFetchException) {
-                        Pair(0L, e.cached as ParsedGif?)
-                    }
-                    if (parsedGif == null) {
-                        bundle.status = BROKEN
-                        return@start
-                    }
-                    parsedGif.apply {
-                        assignTimestamps(context, desc)
-                        sortAndDeduplicateFrames()
-                        with(frames) {
-                            while (size > desc.framesToKeep) {
-                                removeAt(0)
+        reloadJob?.cancel()
+        reloadJob = start {
+            supervisorScope {
+                for (desc in imgDescs) {
+                    val bundle = ds.imgBundles[desc.index]
+                    launch {
+                        try {
+                            val (lastModified, parsedGif) = try {
+                                context.fetchGif(desc.url, fetchPolicy)
+                            } catch (e: ImageFetchException) {
+                                Pair(0L, e.cached as ParsedGif?)
                             }
+                            if (parsedGif == null) {
+                                bundle.status = BROKEN
+                                return@launch
+                            }
+                            parsedGif.apply {
+                                assignTimestamps(context, desc)
+                                sortAndDeduplicateFrames()
+                                with(frames) {
+                                    while (size > desc.framesToKeep) {
+                                        removeAt(0)
+                                    }
+                                }
+                            }
+                            bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
+                            with(animationLooper) {
+                                receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
+                                resume(context, rateMinsPerSec, freezeTimeMillis)
+                            }
+                            bundle.status = SHOWING
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            severe(CC_PRIVATE, e) { "Failed to load animated GIF ${desc.filename}" }
+                            bundle.status = BROKEN
                         }
                     }
-                    bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
-                    with(animationLooper) {
-                        receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
-                        resume(context, rateMinsPerSec, freezeTimeMillis)
-                    }
-                    bundle.status = SHOWING
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    severe(CC_PRIVATE, e) { "Failed to load animated GIF ${desc.filename}" }
-                    bundle.status = BROKEN
                 }
             }
         }
