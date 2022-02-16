@@ -20,7 +20,8 @@
         android:usesCleartextTraffic="true"
     >
         <activity android:name=".MainActivity"
-                  android:label="@string/main_activity_title">
+                  android:label="@string/main_activity_title"
+                  android:exported="true">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <action android:name="android.intent.action.MAIN"/>
@@ -40,7 +41,8 @@
         </activity>
 
         <receiver android:name=".LradarWidgetProvider"
-                  android:label="@string/widget_slo">
+                  android:label="@string/widget_slo"
+                  android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
@@ -49,7 +51,8 @@
                 android:resource="@xml/lradar_widget_info"/>
         </receiver>
         <receiver android:name=".KradarWidgetProvider"
-                  android:label="@string/widget_hr">
+                  android:label="@string/widget_hr"
+                  android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
