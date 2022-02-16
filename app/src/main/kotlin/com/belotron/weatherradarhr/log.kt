@@ -77,11 +77,12 @@ inline fun severe(lazyMessage: () -> String) {
 fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
     if (!shouldLogPrivate(ccOption)) return
     val now = System.currentTimeMillis()
-    val stacktrace = exception?.let { e ->
-        ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
+    val exceptionMsg = exception?.let { e ->
+        ": $e.message"
+//        ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
     } ?: ""
-    logFile.writer().use {
-        it.println("${timeFormat.format(now)} $msg$stacktrace")
+    logFile.writer().use { w ->
+        w.println("${timeFormat.format(now)} $msg$exceptionMsg")
     }
 }
 
@@ -94,8 +95,6 @@ fun clearPrivateLog() {
     }
 }
 
-inline fun notLoggable(ccOption: CcOption, level: Int) = !(shouldLogPrivate(ccOption) || Log.isLoggable(LOGTAG, level))
+fun notLoggable(ccOption: CcOption, level: Int) = !(shouldLogPrivate(ccOption) || Log.isLoggable(LOGTAG, level))
 
-inline fun shouldLogPrivate(ccOption: CcOption): Boolean {
-    return ccOption == CC_PRIVATE && privateLogEnabled
-}
+fun shouldLogPrivate(ccOption: CcOption) = (ccOption == CC_PRIVATE && privateLogEnabled)
