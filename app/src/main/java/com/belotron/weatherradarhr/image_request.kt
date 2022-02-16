@@ -62,7 +62,9 @@ private suspend fun <T> Context.fetchImg(
                 val inputStream = exchange.inputStream ?: return@launch
                 info { "Request cancelled, closing connection to $url" }
                 withContext(NonCancellable + IO) {
-                    inputStream.close()
+                    try {
+                        inputStream.close()
+                    } catch (e: IOException) { }
                 }
             }
         }
