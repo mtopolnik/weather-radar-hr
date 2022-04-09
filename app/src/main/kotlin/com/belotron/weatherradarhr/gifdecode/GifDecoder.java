@@ -85,39 +85,39 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
     @ColorInt
     private final int[] outPixels;
 
-    private GifSequence frameSequence;
+    private GifSequence gifSequence;
 
     @Nullable
     private Boolean isFirstFrameTransparent;
 
-    public GifDecoder(@NonNull Allocator allocator, @NonNull GifSequence frameSequence) {
+    public GifDecoder(@NonNull Allocator allocator, @NonNull GifSequence gifSequence) {
         this.allocator = allocator;
-        this.frameSequence = frameSequence;
-        pixelCodes = allocator.obtainByteArray(frameSequence.width * frameSequence.height);
-        outPixels = allocator.obtainIntArray(frameSequence.width * frameSequence.height);
+        this.gifSequence = gifSequence;
+        pixelCodes = allocator.obtainByteArray(gifSequence.width * gifSequence.height);
+        outPixels = allocator.obtainIntArray(gifSequence.width * gifSequence.height);
     }
 
     @NonNull @Override
     public GifSequence getSequence() {
-        return frameSequence;
+        return gifSequence;
     }
 
     @Override
     public void dispose() {
-        frameSequence = null;
+        gifSequence = null;
         allocator.release(pixelCodes);
         allocator.release(outPixels);
         isFirstFrameTransparent = null;
     }
 
     public Pixels asPixels() {
-        return new IntArrayPixels(outPixels, frameSequence.width);
+        return new IntArrayPixels(outPixels, gifSequence.width);
     }
 
     public Bitmap decodeToBitmap(int frameIndex) {
         GifDecoder gifDecoder = decodeFrame(frameIndex);
         Bitmap result = gifDecoder.obtainBitmap();
-        result.setPixels(gifDecoder.outPixels, 0, gifDecoder.frameSequence.width, 0, 0, gifDecoder.frameSequence.width, gifDecoder.frameSequence.height);
+        result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width, gifDecoder.gifSequence.height);
         return result;
     }
 
@@ -130,17 +130,17 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         if (index < 0) {
             throw new ImgDecodeException("Asked to decode frame " + index);
         }
-        if (index >= frameSequence.getFrames().size()) {
+        if (index >= gifSequence.getFrames().size()) {
             throw new ImgDecodeException("Asked to decode frame " + index + ", but frame count is " +
-                    frameSequence.getFrames().size());
+                    gifSequence.getFrames().size());
         }
         try {
-            GifFrame currentFrame = frameSequence.getFrames().get(index);
+            GifFrame currentFrame = gifSequence.getFrames().get(index);
             int previousIndex = index - 1;
-            GifFrame previousFrame = previousIndex >= 0 ? frameSequence.getFrames().get(previousIndex) : null;
+            GifFrame previousFrame = previousIndex >= 0 ? gifSequence.getFrames().get(previousIndex) : null;
 
             // Set the appropriate color table.
-            act = currentFrame.lct != null ? currentFrame.lct : frameSequence.gct;
+            act = currentFrame.lct != null ? currentFrame.lct : gifSequence.gct;
             if (act == null) {
                 // No color table defined.
                 throw new ImgDecodeException("No valid color table found for frame #" + index);
@@ -183,8 +183,8 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
                 // Start with a canvas filled with the background color
                 @ColorInt int c = COLOR_TRANSPARENT_BLACK;
                 if (!currentFrame.transparency) {
-                    c = frameSequence.bgColor;
-                    if (currentFrame.lct != null && frameSequence.bgIndex == currentFrame.transIndex) {
+                    c = gifSequence.bgColor;
+                    if (currentFrame.lct != null && gifSequence.bgIndex == currentFrame.transIndex) {
                         c = COLOR_TRANSPARENT_BLACK;
                     }
                 } else if (currentFrame.index == 0) {
@@ -192,7 +192,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
                 }
                 // The area used by the graphic must be restored to the background color.
                 int downsampledIW = previousFrame.iw;
-                int gifWidth = frameSequence.width;
+                int gifWidth = gifSequence.width;
                 int topLeft = previousFrame.iy * gifWidth + previousFrame.ix;
                 int bottomLeft = topLeft + previousFrame.ih * gifWidth;
                 // Final location of blended pixels.
@@ -223,7 +223,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         int iw = frame.iw;
         // Copy each source line to the appropriate place in the destination.
         boolean isFirstFrame = frame.index == 0;
-        int width = this.frameSequence.width;
+        int width = this.gifSequence.width;
         int[] act = this.act;
         byte transparentColorIndex = -1;
         for (int i = 0; i < ih; i++) {
@@ -272,8 +272,8 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         int iy = frame.iy;
         int ih = frame.ih;
         int iw = frame.iw;
-        int gifHeight = frameSequence.height;
-        int gifWidth = frameSequence.width;
+        int gifHeight = gifSequence.height;
+        int gifWidth = gifSequence.width;
         for (int i = 0; i < ih; i++) {
             int line = i;
             if (frame.interlace) {
@@ -450,7 +450,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
     }
 
     private Bitmap obtainBitmap() {
-        Bitmap result = allocator.obtain(frameSequence.width, frameSequence.height, Bitmap.Config.ARGB_8888);
+        Bitmap result = allocator.obtain(gifSequence.width, gifSequence.height, Bitmap.Config.ARGB_8888);
         result.setHasAlpha(true);
         return result;
     }

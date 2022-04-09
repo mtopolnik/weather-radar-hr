@@ -5,15 +5,15 @@ import androidx.core.graphics.get
 import androidx.core.graphics.set
 import kotlin.math.min
 
-private const val ASCII_GREYSCALE = "@%#*+=-:. "
+private const val ASCII_GRAYSCALE = "@%#*+=-:. "
 private const val MAX_PIXEL_VALUE = (3 * 0xff)
 
-fun decodeRgbaToGrey(argb: Int): Int {
+fun decodeArgbToGray(argb: Int): Int {
     val byteMask = 0xff
-    val leftR = argb and byteMask
-    val leftG = argb shr 8 and byteMask
-    val leftB = argb shr 16 and byteMask
-    return leftR + leftG + leftB
+    val r = argb and byteMask
+    val g = argb shr 8 and byteMask
+    val b = argb shr 16 and byteMask
+    return r + g + b
 }
 
 interface Pixels {
@@ -22,13 +22,13 @@ interface Pixels {
     operator fun get(x: Int, y: Int): Int
 
     fun asciiPixel(x: Int, y: Int): Char {
-        return ASCII_GREYSCALE[
-                min(ASCII_GREYSCALE.length - 1,
-                        decodeRgbaToGrey(this[x, y]) * ASCII_GREYSCALE.length / MAX_PIXEL_VALUE)
+        return ASCII_GRAYSCALE[
+                min(ASCII_GRAYSCALE.length - 1,
+                        decodeArgbToGray(this[x, y]) * ASCII_GRAYSCALE.length / MAX_PIXEL_VALUE)
         ]
     }
 
-    fun convertToGreyscale()
+    fun convertToGrayscale()
 }
 
 class IntArrayPixels(
@@ -38,7 +38,7 @@ class IntArrayPixels(
     override val height = pixels.size / width
     override operator fun get(x: Int, y: Int) = pixels[width * y + x]
 
-    override fun convertToGreyscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
+    override fun convertToGrayscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeArgbToGray(it) }
 }
 
 class BitmapPixels(
@@ -48,10 +48,10 @@ class BitmapPixels(
     override val height = bitmap.height
     override operator fun get(x: Int, y: Int) = bitmap[x, y]
 
-    override fun convertToGreyscale() {
+    override fun convertToGrayscale() {
         for (y in 0..height) {
             for (x in 0..width) {
-                bitmap[x, y] = decodeRgbaToGrey(bitmap[x, y])
+                bitmap[x, y] = decodeArgbToGray(bitmap[x, y])
             }
         }
     }
