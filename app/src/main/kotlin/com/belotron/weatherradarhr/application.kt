@@ -147,13 +147,7 @@ fun File.writer(append: Boolean = true) = PrintWriter(FileWriter(this, append))
 
 fun ByteArray.parseGif() = GifParser.parse(this)
 
-fun ByteArray.pngToBitmap() = BitmapFactory.decodeByteArray(this, 0, size)!!
-
-private fun ParsedGif.decodeFrame0(): GifDecoder = GifDecoder(BitmapFreelists(), this).decodeFrame(0)
-
-fun ParsedGif.toBitmap(): Bitmap = decodeFrame0().toBitmap()
-
-fun ParsedGif.toPixels() = decodeFrame0().toPixels()
+fun ByteArray.decodeToBitmap() = BitmapFactory.decodeByteArray(this, 0, size)!!
 
 fun Bitmap.asPixels() = BitmapPixels(this)
 

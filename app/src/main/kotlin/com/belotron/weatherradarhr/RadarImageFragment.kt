@@ -23,7 +23,7 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.*
-import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import com.belotron.weatherradarhr.gifdecode.GifSequence
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.coroutines.CoroutineContext
@@ -385,16 +385,16 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     val bundle = ds.imgBundles[desc.index]
                     launch {
                         try {
-                            val (lastModified, parsedGif) = try {
-                                context.fetchGif(desc.url, fetchPolicy)
+                            val (lastModified, frameSequence) = try {
+                                context.fetchGif(desc.url, fetchPolicy, ByteArray::parseGif)
                             } catch (e: ImageFetchException) {
-                                Pair(0L, e.cached as ParsedGif?)
+                                Pair(0L, e.cached as GifSequence?)
                             }
-                            if (parsedGif == null) {
+                            if (frameSequence == null) {
                                 bundle.status = BROKEN
                                 return@launch
                             }
-                            parsedGif.apply {
+                            frameSequence.apply {
                                 assignTimestamps(context, desc)
                                 sortAndDeduplicateFrames()
                                 with(frames) {
@@ -405,7 +405,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                             }
                             bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(animationLooper) {
-                                receiveNewGif(desc, parsedGif, isOffline = lastModified == 0L)
+                                receiveNewFrames(desc, frameSequence, isOffline = lastModified == 0L)
                                 resume(context, rateMinsPerSec, freezeTimeMillis)
                             }
                             bundle.status = SHOWING

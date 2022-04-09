@@ -2,6 +2,7 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.IntDef;
+import com.belotron.weatherradarhr.Frame;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -12,7 +13,7 @@ import java.nio.ByteBuffer;
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
-public class GifFrame {
+public class GifFrame implements Frame {
     /**
      * GIF Disposal Method meaning take no action.
      * <p><b>GIF89a</b>: <i>No disposal specified.
@@ -43,6 +44,14 @@ public class GifFrame {
         this.index = index;
     }
 
+    @Override public long getTimestamp() {
+        return timestamp;
+    }
+
+    @Override public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
     /**
      * <p><b>GIF89a</b>:
      * <i>Indicates the way in which the graphic is to be treated after being displayed.</i></p>
@@ -64,7 +73,7 @@ public class GifFrame {
     int index;
 
     /** WeatherRadar-specific: OCR-ed timestamp of the image. */
-    public long timestamp;
+    private long timestamp;
 
     int ix, iy, iw, ih;
 

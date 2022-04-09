@@ -6,7 +6,7 @@ import android.graphics.BitmapFactory
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
-import com.belotron.weatherradarhr.gifdecode.ParsedGif
+import com.belotron.weatherradarhr.gifdecode.GifSequence
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
 import java.io.File
@@ -35,8 +35,10 @@ enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW }
 
 class ImageFetchException(val cached : Any?) : Exception()
 
-suspend fun Context.fetchGif(url: String, fetchPolicy: FetchPolicy): Pair<Long, ParsedGif?> =
-        fetchImg(url, fetchPolicy, ByteArray::parseGif)
+suspend fun Context.fetchGif(
+    url: String, fetchPolicy: FetchPolicy, decode: (ByteArray) -> FrameSequence<Frame>
+): Pair<Long, FrameSequence<Frame>?> =
+        fetchImg(url, fetchPolicy, decode)
 
 suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -147,7 +149,7 @@ class Exchange<out T>(
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
             val cachedIn = runOrNull { cachedDataIn(url.toExternalForm()) }
-            val parsedGif = if (cachedIn == null) {
+            val decodedImage = if (cachedIn == null) {
                 fetchContentAndUpdateCache(responseBody, lastModifiedStr)
             } else {
                 // These checks are repeated in updateCache(). While the response body is being
@@ -161,7 +163,7 @@ class Exchange<out T>(
                     cachedIn.use { it.readBytes() }.parseOrInvalidateImage
                 }
             }
-            Pair(parseLastModified_mmss(lastModifiedStr), parsedGif)
+            Pair(parseLastModified_mmss(lastModifiedStr), decodedImage)
         } catch (e: Exception) {
             severe(CC_PRIVATE) { "Failed to handle a successful image response for $url" }
             throw e

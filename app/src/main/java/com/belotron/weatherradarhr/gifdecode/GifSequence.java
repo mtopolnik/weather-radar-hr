@@ -2,6 +2,8 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
+import com.belotron.weatherradarhr.FrameDecoder;
+import com.belotron.weatherradarhr.FrameSequence;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,16 +16,22 @@ import java.util.List;
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
-public class ParsedGif {
+public class GifSequence implements FrameSequence<GifFrame> {
 
     /** Indicates that this header has no "Netscape" loop count. */
     private static final int NETSCAPE_LOOP_COUNT_DOES_NOT_EXIST = -1;
 
     @NonNull
-    public final List<GifFrame> frames = new ArrayList<>();
+    private final List<GifFrame> frames = new ArrayList<>();
 
-    public int getFrameCount() {
-        return frames.size();
+    @NonNull @Override
+    public List<GifFrame> getFrames() {
+        return frames;
+    }
+
+    @NonNull @Override
+    public FrameDecoder<GifFrame> intoDecoder(@NonNull Allocator allocator) {
+        return new GifDecoder(allocator, this);
     }
 
     @ColorInt

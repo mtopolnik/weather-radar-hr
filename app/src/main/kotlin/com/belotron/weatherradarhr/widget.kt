@@ -46,7 +46,6 @@ private const val LRADAR_CROP_Y_TOP = 40
 private const val KRADAR_CROP_Y_HEIGHT = 480
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
-@Suppress("MoveLambdaOutsideParentheses")
 private val widgetDescriptors = arrayOf(
         WidgetDescriptor("LRadar", "http://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
                 LradarWidgetProvider::class.java,

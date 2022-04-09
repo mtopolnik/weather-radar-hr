@@ -2,17 +2,11 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import android.graphics.Bitmap
-import com.belotron.weatherradarhr.gifdecode.IntArrayPixels
+import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.Pixels
-import com.belotron.weatherradarhr.gifdecode.decodeRgbaToGrey
-import java.util.Calendar
-import java.util.Calendar.DAY_OF_MONTH
-import java.util.Calendar.HOUR_OF_DAY
-import java.util.Calendar.MINUTE
-import java.util.Calendar.MONTH
-import java.util.Calendar.SECOND
-import java.util.Calendar.YEAR
-import java.util.TimeZone
+import com.belotron.weatherradarhr.gifdecode.decodeArgbToGray
+import java.util.*
+import java.util.Calendar.*
 import java.util.TimeZone.getTimeZone
 import kotlin.math.abs
 
@@ -52,7 +46,7 @@ object LradarOcr {
 }
 
 object KradarOcr {
-    @Volatile private var digitTemplates: List<IntArrayPixels> = emptyList()
+    @Volatile private var digitTemplates: List<Pixels> = emptyList()
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -66,7 +60,7 @@ object KradarOcr {
 
     private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.decodeToGreyscale() } }
+            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.convertToGrayscale() } }
         }
     }
 
@@ -100,7 +94,7 @@ object KradarOcr {
         var totalDiff = 0
         (0 until template.height).forEach { y ->
             (0 until template.width).forEach { x ->
-                totalDiff += abs(decodeRgbaToGrey(img[imgX + x, imgY + y]) - template[x, y])
+                totalDiff += abs(decodeArgbToGray(img[imgX + x, imgY + y]) - template[x, y])
                 if (totalDiff > 2000) {
                     return false
                 }
@@ -134,12 +128,12 @@ private fun asciiArt(img: Pixels, left: Int, top: Int, template: Pixels): String
  * the vertical stripe in `img` at `(imgX + rectX, imgY)`
  */
 private fun stripeEqual(img: Pixels, imgX: Int, imgY: Int, rect: Pixels, rectX: Int) =
-        (0 until rect.height).all { rectY -> img.get(imgX + rectX, imgY + rectY) == rect.get(rectX, rectY) }
+        (0 until rect.height).all { rectY -> img[imgX + rectX, imgY + rectY] == rect[rectX, rectY] }
 
 private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
 
-private fun Context.loadDigit(path: String, digit: Int): IntArrayPixels =
-        assets.open("$path/$digit.gif").use { it.readBytes() }.parseGif().toPixels()
+private fun Context.loadDigit(path: String, digit: Int): BitmapPixels =
+        assets.open("$path/$digit.gif").use { it.readBytes() }.decodeToBitmap().asPixels()
 
 class DateTime(
         copyFrom: DateTime? = null,

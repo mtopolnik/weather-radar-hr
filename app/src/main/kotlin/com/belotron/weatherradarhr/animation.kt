@@ -9,13 +9,10 @@ import android.os.Vibrator
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifDecoder
-import com.belotron.weatherradarhr.gifdecode.ParsedGif
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
 import java.text.DateFormat
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.TimeUnit.NANOSECONDS
@@ -25,7 +22,7 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 private val singleThread = ThreadPoolExecutor(0, 1, 2, SECONDS, ArrayBlockingQueue(1),
-        ThreadFactory { task -> Thread(task, "weather-radar-animation") }, DiscardOldestPolicy())
+    { task -> Thread(task, "weather-radar-animation") }, DiscardOldestPolicy())
         .asCoroutineDispatcher()
 
 private val linear = LinearInterpolator()
@@ -37,12 +34,12 @@ class AnimationLooper(
         private val ds: DisplayState
 ) : SeekBar.OnSeekBarChangeListener {
 
-    private val animators = arrayOfNulls<GifAnimator>(ds.imgBundles.size)
+    private val animators = arrayOfNulls<FrameAnimator>(ds.imgBundles.size)
     private val animatorJobs = arrayOfNulls<Job>(ds.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewGif(desc: ImgDescriptor, parsedGif: ParsedGif, isOffline: Boolean) {
-        animators[desc.index] = GifAnimator(ds.imgBundles, desc, parsedGif, isOffline)
+    fun receiveNewFrames(desc: ImgDescriptor, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
+        animators[desc.index] = FrameAnimator(ds.imgBundles, desc, frameSequence, isOffline)
     }
 
     fun resume(context: Context? = null, newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
@@ -54,9 +51,9 @@ class AnimationLooper(
         if (animators.all { it == null }) {
             return
         }
-        animators.filterNotNull().forEach {
-            newRateMinsPerSec?.also { _ -> it.rateMinsPerSec = newRateMinsPerSec }
-            newFreezeTimeMillis?.also { _ -> it.freezeTimeMillis = newFreezeTimeMillis }
+        animators.filterNotNull().forEach { animator ->
+            newRateMinsPerSec?.also { animator.rateMinsPerSec = it }
+            newFreezeTimeMillis?.also { animator.freezeTimeMillis = it }
         }
         if (ds.isTrackingTouch) {
             return
@@ -107,14 +104,14 @@ class AnimationLooper(
         }
     }
 
-    private fun GifAnimator?.hasSeekBar(seekBar: SeekBar?) = this?.imgBundle?.seekBar == seekBar
+    private fun FrameAnimator?.hasSeekBar(seekBar: SeekBar?) = this?.imgBundle?.seekBar == seekBar
 }
 
-class GifAnimator(
-        private val imgBundles: List<ImageBundle>,
-        private val imgDesc: ImgDescriptor,
-        private val parsedGif: ParsedGif,
-        private val isOffline: Boolean
+class FrameAnimator(
+    private val imgBundles: List<ImageBundle>,
+    private val imgDesc: ImgDescriptor,
+    frameSequence: FrameSequence<out Frame>,
+    private val isOffline: Boolean
 ) {
     var rateMinsPerSec: Int = 20
     var freezeTimeMillis: Int = 0
@@ -122,13 +119,13 @@ class GifAnimator(
 
     private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
-    private val gifDecoder = GifDecoder(allocator, parsedGif)
+    private val frameDecoder = frameSequence.intoDecoder(allocator)
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
 
     fun animate(isFullRange: Boolean): Job {
-        val frameCount = gifDecoder.frameCount
+        val frameCount = frameDecoder.frameCount
         val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - imgDesc.framesToKeep)
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return appCoroScope.start {
@@ -175,7 +172,7 @@ class GifAnimator(
         }
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
-        if (targetIndex == 0 || targetIndex == gifDecoder.frameCount - 1) {
+        if (targetIndex == 0 || targetIndex == frameDecoder.frameCount - 1) {
             val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
@@ -212,7 +209,7 @@ class GifAnimator(
         seekBar.also {
             val progressF = imgBundle.animationProgress / 100f
             seekBarAnimator = ObjectAnimator.ofInt(it, "progress", imgBundle.animationProgress, 100).apply {
-                duration = (gifDecoder.frameCount * frameDelayMillis * (1 - progressF)).roundToLong()
+                duration = (frameDecoder.frameCount * frameDelayMillis * (1 - progressF)).roundToLong()
                 interpolator = linear
                 start()
             }
@@ -221,25 +218,25 @@ class GifAnimator(
 
     private fun updateAgeText() {
         imgBundle.takeIf { it.status in ImageBundle.loadingOrShowing }?.textView?.setAgeText(
-                timestamp(parsedGif.frameCount - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
+                timestamp(frameDecoder.frameCount - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
     }
 
-    private fun timestamp(frameIndex: Int) = parsedGif.frames[frameIndex].timestamp
+    private fun timestamp(frameIndex: Int) = frameDecoder.sequence.frames[frameIndex].timestamp
 
     private suspend fun suspendDecodeFrame(frameIndex: Int, coroCtx: CoroutineDispatcher = IO) =
             withContext(coroCtx) {
-                synchronized (gifDecoder) {
-                    gifDecoder.decodeFrame(frameIndex).toBitmap()
+                synchronized (frameDecoder) {
+                    frameDecoder.decodeToBitmap(frameIndex)
                 }
             }
 
     private fun Bitmap.dispose() = allocator.release(this)
 
     private fun toFrameIndex(animationProgress: Int, startFrameIndex: Int) =
-            (animationProgress / 100f * (gifDecoder.frameCount - startFrameIndex - 1) + startFrameIndex)
+            (animationProgress / 100f * (frameDecoder.frameCount - startFrameIndex - 1) + startFrameIndex)
                     .roundToInt()
 
-    private fun toProgress(frameIndex: Int) = gifDecoder.frameCount.let { frameCount ->
+    private fun toProgress(frameIndex: Int) = frameDecoder.frameCount.let { frameCount ->
         if (frameCount == 1) 100
         else 100 * frameIndex / (frameCount - 1)
     }

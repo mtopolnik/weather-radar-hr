@@ -1,6 +1,8 @@
 package com.belotron.weatherradarhr.gifdecode
 
 import android.graphics.Bitmap
+import androidx.core.graphics.get
+import androidx.core.graphics.set
 import kotlin.math.min
 
 private const val ASCII_GREYSCALE = "@%#*+=-:. "
@@ -25,6 +27,8 @@ interface Pixels {
                         decodeRgbaToGrey(this[x, y]) * ASCII_GREYSCALE.length / MAX_PIXEL_VALUE)
         ]
     }
+
+    fun convertToGreyscale()
 }
 
 class IntArrayPixels(
@@ -34,7 +38,7 @@ class IntArrayPixels(
     override val height = pixels.size / width
     override operator fun get(x: Int, y: Int) = pixels[width * y + x]
 
-    fun decodeToGreyscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
+    override fun convertToGreyscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeRgbaToGrey(it) }
 }
 
 class BitmapPixels(
@@ -42,5 +46,13 @@ class BitmapPixels(
 ) : Pixels {
     override val width = bitmap.width
     override val height = bitmap.height
-    override operator fun get(x: Int, y: Int) = bitmap.getPixel(x, y)
+    override operator fun get(x: Int, y: Int) = bitmap[x, y]
+
+    override fun convertToGreyscale() {
+        for (y in 0..height) {
+            for (x in 0..width) {
+                bitmap[x, y] = decodeRgbaToGrey(bitmap[x, y])
+            }
+        }
+    }
 }

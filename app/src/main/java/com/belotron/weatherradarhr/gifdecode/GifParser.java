@@ -2,6 +2,8 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import com.belotron.weatherradarhr.Frame;
+import com.belotron.weatherradarhr.FrameSequence;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -11,7 +13,7 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 /**
- * A class responsible for creating {@link ParsedGif}s from data
+ * A class responsible for creating {@link GifSequence}s from data
  * representing animated GIFs.
  *
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
@@ -130,7 +132,7 @@ public class GifParser {
     @NonNull
     private final ByteBuffer rawData;
     @NonNull
-    private final ParsedGif parsedGif = new ParsedGif();
+    private final GifSequence gifSequence = new GifSequence();
     private GifFrame currentFrame;
     private int blockSize = 0;
 
@@ -141,15 +143,16 @@ public class GifParser {
     }
 
     @NonNull
-    public static ParsedGif parse(byte[] data) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static FrameSequence<Frame> parse(byte[] data) {
         GifParser parser = new GifParser(data);
         parser.readHeader();
         parser.readContents();
-        ParsedGif parsedGif = parser.parsedGif;
-        if (parsedGif.getFrameCount() == 0) {
+        GifSequence gifSequence = parser.gifSequence;
+        if (gifSequence.getFrames().size() == 0) {
             throw new ImgDecodeException("The GIF contains zero images");
         }
-        return parsedGif;
+        return (FrameSequence<Frame>) (FrameSequence) gifSequence;
     }
 
     /**
@@ -164,13 +167,13 @@ public class GifParser {
             throw new ImgDecodeException("Image data doesn't start with 'GIF'");
         }
         readLSD();
-        if (parsedGif.gctFlag) {
-            int[] gct = readColorTable(parsedGif.gctSize);
+        if (gifSequence.gctFlag) {
+            int[] gct = readColorTable(gifSequence.gctSize);
             if (gct == null) {
                 return;
             }
-            parsedGif.gct = gct;
-            parsedGif.bgColor = parsedGif.gct[parsedGif.bgIndex];
+            gifSequence.gct = gct;
+            gifSequence.bgColor = gifSequence.gct[gifSequence.bgIndex];
         }
     }
 
@@ -179,8 +182,8 @@ public class GifParser {
      */
     private void readLSD() {
         // Logical screen size.
-        parsedGif.width = readShort();
-        parsedGif.height = readShort();
+        gifSequence.width = readShort();
+        gifSequence.height = readShort();
         /*
          * Logical Screen Descriptor packed field:
          *      7 6 5 4 3 2 1 0
@@ -193,12 +196,12 @@ public class GifParser {
          * Size of Global Color Table  3 Bits
          */
         int packed = read();
-        parsedGif.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
-        parsedGif.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
+        gifSequence.gctFlag = (packed & LSD_MASK_GCT_FLAG) != 0;
+        gifSequence.gctSize = (int) Math.pow(2, (packed & LSD_MASK_GCT_SIZE) + 1);
         // Background color index.
-        parsedGif.bgIndex = read();
+        gifSequence.bgIndex = read();
         // Pixel aspect ratio
-        parsedGif.pixelAspect = read();
+        gifSequence.pixelAspect = read();
     }
 
     /**
@@ -243,7 +246,7 @@ public class GifParser {
                     // However if one did not exist, the current frame will be null
                     // and we must create it here. See issue #134.
                     if (currentFrame == null) {
-                        currentFrame = new GifFrame(parsedGif.getFrameCount());
+                        currentFrame = new GifFrame(gifSequence.getFrames().size());
                     }
                     readBitmap();
                     break;
@@ -252,7 +255,7 @@ public class GifParser {
                     switch (extensionLabel) {
                         case LABEL_GRAPHIC_CONTROL_EXTENSION:
                             // Start a new frame.
-                            currentFrame = new GifFrame(parsedGif.getFrameCount());
+                            currentFrame = new GifFrame(gifSequence.getFrames().size());
                             readGraphicControlExt();
                             break;
                         case LABEL_APPLICATION_EXTENSION:
@@ -368,7 +371,7 @@ public class GifParser {
         rawData.position(frameEndOffset);
         rawData.limit(rawData.capacity());
         // Add image to frame.
-        parsedGif.frames.add(currentFrame);
+        gifSequence.getFrames().add(currentFrame);
     }
 
     /**
@@ -381,7 +384,7 @@ public class GifParser {
                 // Loop count sub-block.
                 int b1 = ((int) block[1]) & MASK_INT_LOWEST_BYTE;
                 int b2 = ((int) block[2]) & MASK_INT_LOWEST_BYTE;
-                parsedGif.loopCount = (b2 << 8) | b1;
+                gifSequence.loopCount = (b2 << 8) | b1;
             }
         } while (blockSize > 0);
     }
