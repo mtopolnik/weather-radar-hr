@@ -9,19 +9,28 @@ interface Frame {
     var timestamp: Long
 }
 
-interface FrameSequence<T: Frame> {
+interface FrameSequence<T : Frame> {
     val frames: MutableList<T>
     fun intoDecoder(allocator: Allocator): FrameDecoder<T>
 }
 
-interface FrameDecoder<T: Frame> {
+interface FrameDecoder<T : Frame> {
     val sequence: FrameSequence<T>
-    fun decodeToBitmap(frameIndex: Int): Bitmap
-    fun decodeToPixels(frameIndex: Int): Pixels
+    fun decodeFrame(frameIndex: Int): Bitmap
+    fun release(bitmap: Bitmap)
     fun dispose()
 }
 
-val <T: Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
+val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
+
+fun <T : Frame> FrameDecoder<T>.assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
+    val bitmap = decodeFrame(frameIndex)
+    try {
+        sequence.frames[frameIndex].timestamp = ocrTimestamp(bitmap.asPixels())
+    } finally {
+        release(bitmap)
+    }
+}
 
 class PngFrame(
     val pngBytes: ByteArray,
@@ -30,29 +39,28 @@ class PngFrame(
 }
 
 class PngSequence(
-    override val frames: MutableList<PngFrame>
+    override val frames: MutableList<PngFrame>,
+    val frameWidth: Int,
+    val frameHeight: Int
 ) : FrameSequence<PngFrame> {
-    override fun intoDecoder(allocator: Allocator): FrameDecoder<PngFrame> = PngDecoder(allocator, this)
+    override fun intoDecoder(allocator: Allocator) = PngDecoder(allocator, this)
 }
 
 class PngDecoder(
     private val allocator: Allocator,
-    override val sequence: PngSequence
+    override val sequence: PngSequence,
 ) : FrameDecoder<PngFrame> {
-    private val width = 720
-    private val height = 751
 
-    override fun decodeToBitmap(frameIndex: Int): Bitmap {
+    override fun decodeFrame(frameIndex: Int): Bitmap {
         val frame = sequence.frames[frameIndex]
         return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
             inMutable = true
-            inBitmap = allocator.obtain(width, height, Bitmap.Config.ARGB_8888)
+            inBitmap = allocator.obtain(sequence.frameWidth, sequence.frameHeight, Bitmap.Config.ARGB_8888)
         })
     }
 
-    override fun decodeToPixels(frameIndex: Int): Pixels {
-        val frame = sequence.frames[frameIndex]
-        return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size).asPixels()
+    override fun release(bitmap: Bitmap) {
+        allocator.release(bitmap)
     }
 
     override fun dispose() {}

@@ -104,7 +104,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 }
             }
         }
-        imgDescs.forEachIndexed { i, desc ->
+        frameSequenceLoaders.forEachIndexed { i, desc ->
             val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
             val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
             radarList.addView(radarGroup)
@@ -375,18 +375,18 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
-        imgDescs.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
+        frameSequenceLoaders.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         reloadJob?.cancel()
         reloadJob = start {
             supervisorScope {
-                for (desc in imgDescs) {
-                    val bundle = ds.imgBundles[desc.index]
+                for (loader in frameSequenceLoaders) {
+                    val bundle = ds.imgBundles[loader.index]
                     launch {
                         try {
                             val (lastModified, frameSequence) = try {
-                                context.fetchGif(desc.url, fetchPolicy, ByteArray::parseGif)
+                                loader.fetchFrameSequence(context, fetchPolicy)
                             } catch (e: ImageFetchException) {
                                 Pair(0L, e.cached as GifSequence?)
                             }
@@ -395,24 +395,23 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                                 return@launch
                             }
                             frameSequence.apply {
-                                assignTimestamps(context, desc)
                                 sortAndDeduplicateFrames()
                                 with(frames) {
-                                    while (size > desc.framesToKeep) {
+                                    while (size > loader.framesToKeep) {
                                         removeAt(0)
                                     }
                                 }
                             }
                             bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(animationLooper) {
-                                receiveNewFrames(desc, frameSequence, isOffline = lastModified == 0L)
+                                receiveNewFrames(loader, frameSequence, isOffline = lastModified == 0L)
                                 resume(context, rateMinsPerSec, freezeTimeMillis)
                             }
                             bundle.status = SHOWING
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            severe(CC_PRIVATE, e) { "Failed to load animated GIF ${desc.filename}" }
+                            severe(CC_PRIVATE, e) { "Failed to load animation for ${loader.title}" }
                             bundle.status = BROKEN
                         }
                     }

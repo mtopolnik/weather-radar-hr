@@ -145,8 +145,6 @@ fun File.dataOut() = DataOutputStream(FileOutputStream(this))
 
 fun File.writer(append: Boolean = true) = PrintWriter(FileWriter(this, append))
 
-fun ByteArray.parseGif() = GifParser.parse(this)
-
 fun ByteArray.decodeToBitmap() = BitmapFactory.decodeByteArray(this, 0, size)!!
 
 fun Bitmap.asPixels() = BitmapPixels(this)

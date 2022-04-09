@@ -5,8 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
-import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.GifSequence
+import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
 import java.io.File
@@ -35,10 +36,11 @@ enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW }
 
 class ImageFetchException(val cached : Any?) : Exception()
 
-suspend fun Context.fetchGif(
-    url: String, fetchPolicy: FetchPolicy, decode: (ByteArray) -> FrameSequence<Frame>
-): Pair<Long, FrameSequence<Frame>?> =
-        fetchImg(url, fetchPolicy, decode)
+suspend fun fetchPngFrame(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, PngFrame?> =
+    context.fetchImg(url, fetchPolicy, ::PngFrame)
+
+suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, GifSequence?> =
+    context.fetchImg(url, fetchPolicy, GifParser::parse)
 
 suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }

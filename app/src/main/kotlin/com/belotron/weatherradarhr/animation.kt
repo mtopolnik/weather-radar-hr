@@ -38,7 +38,7 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(ds.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewFrames(desc: ImgDescriptor, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
+    fun receiveNewFrames(desc: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
         animators[desc.index] = FrameAnimator(ds.imgBundles, desc, frameSequence, isOffline)
     }
 
@@ -109,15 +109,15 @@ class AnimationLooper(
 
 class FrameAnimator(
     private val imgBundles: List<ImageBundle>,
-    private val imgDesc: ImgDescriptor,
+    private val frameSequenceDesc: FrameSequenceLoader,
     frameSequence: FrameSequence<out Frame>,
     private val isOffline: Boolean
 ) {
     var rateMinsPerSec: Int = 20
     var freezeTimeMillis: Int = 0
-    val imgBundle: ImageBundle get() = imgBundles[imgDesc.index]
+    val imgBundle: ImageBundle get() = imgBundles[frameSequenceDesc.index]
 
-    private val frameDelayMillis get() =  1000 * imgDesc.minutesPerFrame / rateMinsPerSec
+    private val frameDelayMillis get() =  1000 * frameSequenceDesc.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
     private val frameDecoder = frameSequence.intoDecoder(allocator)
     private var currFrame: Bitmap? = null
@@ -126,7 +126,7 @@ class FrameAnimator(
 
     fun animate(isFullRange: Boolean): Job {
         val frameCount = frameDecoder.frameCount
-        val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - imgDesc.framesToKeep)
+        val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - frameSequenceDesc.framesToKeep)
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return appCoroScope.start {
             updateAgeText()
@@ -226,7 +226,7 @@ class FrameAnimator(
     private suspend fun suspendDecodeFrame(frameIndex: Int, coroCtx: CoroutineDispatcher = IO) =
             withContext(coroCtx) {
                 synchronized (frameDecoder) {
-                    frameDecoder.decodeToBitmap(frameIndex)
+                    frameDecoder.decodeFrame(frameIndex)
                 }
             }
 

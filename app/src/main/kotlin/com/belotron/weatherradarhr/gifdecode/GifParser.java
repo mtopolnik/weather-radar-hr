@@ -1,9 +1,6 @@
 package com.belotron.weatherradarhr.gifdecode;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import com.belotron.weatherradarhr.Frame;
-import com.belotron.weatherradarhr.FrameSequence;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -143,8 +140,7 @@ public class GifParser {
     }
 
     @NonNull
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public static FrameSequence<Frame> parse(byte[] data) {
+    public static GifSequence parse(byte[] data) {
         GifParser parser = new GifParser(data);
         parser.readHeader();
         parser.readContents();
@@ -152,7 +148,7 @@ public class GifParser {
         if (gifSequence.getFrames().size() == 0) {
             throw new ImgDecodeException("The GIF contains zero images");
         }
-        return (FrameSequence<Frame>) (FrameSequence) gifSequence;
+        return gifSequence;
     }
 
     /**
@@ -168,11 +164,7 @@ public class GifParser {
         }
         readLSD();
         if (gifSequence.gctFlag) {
-            int[] gct = readColorTable(gifSequence.gctSize);
-            if (gct == null) {
-                return;
-            }
-            gifSequence.gct = gct;
+            gifSequence.gct = readColorTable(gifSequence.gctSize);
             gifSequence.bgColor = gifSequence.gct[gifSequence.bgIndex];
         }
     }
@@ -210,7 +202,6 @@ public class GifParser {
      * @param nColors int number of colors to read.
      * @return int array containing 256 colors (packed ARGB with full alpha).
      */
-    @Nullable
     private int[] readColorTable(int nColors) {
         try {
             int nBytes = 3 * nColors;
@@ -242,9 +233,9 @@ public class GifParser {
             switch (code) {
                 case IMAGE_SEPARATOR:
                     // The Graphic Control Extension is optional, but will always come first if it exists.
-                    // If one did exist, there will be a non-null current frame which we should use.
-                    // However if one did not exist, the current frame will be null
-                    // and we must create it here. See issue #134.
+                    // If one is present, there will be a non-null current frame which we should use.
+                    // However if one is not present, the current frame will be null and we must create it
+                    // here. See issue #134.
                     if (currentFrame == null) {
                         currentFrame = new GifFrame(gifSequence.getFrames().size());
                     }
@@ -272,8 +263,6 @@ public class GifParser {
                             }
                             break;
                         case LABEL_COMMENT_EXTENSION:
-                            skip();
-                            break;
                         case LABEL_PLAIN_TEXT_EXTENSION:
                             skip();
                             break;
@@ -285,8 +274,6 @@ public class GifParser {
                 case TRAILER:
                     // This block is a single-field block indicating the end of the GIF Data Stream.
                     break readLoop;
-                // Bad byte, but keep going and see what happens
-                case 0x00:
                 default:
                     throw new ImgDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
             }

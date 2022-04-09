@@ -49,28 +49,31 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIE
  * Programmers</em>, republished under the MIT Open Source License.
  *
  * @see <a href="http://show.docjava.com/book/cgij/exportToHTML/ip/gif/stills/GifDecoder.java.html">
- *     Original source</a>
+ * Original source</a>
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
 public class GifDecoder implements FrameDecoder<GifFrame> {
 
-    /** Dictionary size for decoding LZW compressed data. */
+    /**
+     * Dictionary size for decoding LZW compressed data.
+     */
     private static final int DICT_SIZE = 4 * 1024;
 
     private static final int NULL_CODE = -1;
 
     private static final int MASK_INT_LOWEST_BYTE = 0x000000FF;
 
-    @ColorInt
-    private static final int COLOR_TRANSPARENT_BLACK = 0x00000000;
+    @ColorInt private static final int COLOR_TRANSPARENT_BLACK = 0x00000000;
 
-    /** Active color table. Maximum size is 256, see GifHeaderParser.readColorTable */
-    @ColorInt
-    private int[] act;
+    /**
+     * Active color table. Maximum size is 256, see GifHeaderParser.readColorTable
+     */
+    @ColorInt private int[] act;
 
-    /** Private color table that can be modified if needed. */
-    @ColorInt
-    private final int[] pct = new int[256];
+    /**
+     * Private color table that can be modified if needed.
+     */
+    @ColorInt private final int[] pct = new int[256];
 
     private final Allocator allocator;
 
@@ -82,13 +85,11 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
 
     private final byte[] pixelCodes;
 
-    @ColorInt
-    private final int[] outPixels;
+    @ColorInt private final int[] outPixels;
 
     private GifSequence gifSequence;
 
-    @Nullable
-    private Boolean isFirstFrameTransparent;
+    @Nullable private Boolean isFirstFrameTransparent;
 
     public GifDecoder(@NonNull Allocator allocator, @NonNull GifSequence gifSequence) {
         this.allocator = allocator;
@@ -97,53 +98,51 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         outPixels = allocator.obtainIntArray(gifSequence.width * gifSequence.height);
     }
 
-    @NonNull @Override
-    public GifSequence getSequence() {
+    @NonNull @Override public GifSequence getSequence() {
         return gifSequence;
     }
 
-    @Override
-    public void dispose() {
+    @Override public void dispose() {
         gifSequence = null;
         allocator.release(pixelCodes);
         allocator.release(outPixels);
         isFirstFrameTransparent = null;
     }
 
+    @Override public void release(@NonNull Bitmap bitmap) {
+        allocator.release(bitmap);
+    }
+
     public Pixels asPixels() {
         return new IntArrayPixels(outPixels, gifSequence.width);
     }
 
-    public Bitmap decodeToBitmap(int frameIndex) {
-        GifDecoder gifDecoder = decodeFrame(frameIndex);
+    public Bitmap decodeFrame(int frameIndex) {
+        GifDecoder gifDecoder = gotoAndDecode(frameIndex);
         Bitmap result = gifDecoder.obtainBitmap();
-        result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width, gifDecoder.gifSequence.height);
+        result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width,
+                gifDecoder.gifSequence.height);
         return result;
     }
 
-    @NonNull @Override
-    public Pixels decodeToPixels(int frameIndex) {
-        return decodeFrame(frameIndex).asPixels();
-    }
-
-    public GifDecoder decodeFrame(int index) {
-        if (index < 0) {
-            throw new ImgDecodeException("Asked to decode frame " + index);
+    private GifDecoder gotoAndDecode(int frameIndex) {
+        if (frameIndex < 0) {
+            throw new ImgDecodeException("Asked to decode frame " + frameIndex);
         }
-        if (index >= gifSequence.getFrames().size()) {
-            throw new ImgDecodeException("Asked to decode frame " + index + ", but frame count is " +
+        if (frameIndex >= gifSequence.getFrames().size()) {
+            throw new ImgDecodeException("Asked to decode frame " + frameIndex + ", but frame count is " +
                     gifSequence.getFrames().size());
         }
         try {
-            GifFrame currentFrame = gifSequence.getFrames().get(index);
-            int previousIndex = index - 1;
+            GifFrame currentFrame = gifSequence.getFrames().get(frameIndex);
+            int previousIndex = frameIndex - 1;
             GifFrame previousFrame = previousIndex >= 0 ? gifSequence.getFrames().get(previousIndex) : null;
 
             // Set the appropriate color table.
             act = currentFrame.lct != null ? currentFrame.lct : gifSequence.gct;
             if (act == null) {
                 // No color table defined.
-                throw new ImgDecodeException("No valid color table found for frame #" + index);
+                throw new ImgDecodeException("No valid color table found for frame #" + frameIndex);
             }
 
             // Reset the transparent pixel in the color table
@@ -170,9 +169,8 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
      */
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
-            throw new ImgDecodeException(
-                    "The animated GIF contains a frame with the Restore To Previous frame disposal method" +
-                            " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
+            throw new ImgDecodeException("The animated GIF contains a frame with the Restore To Previous frame " +
+                    "disposal method" + " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
         }
 
         // fill in starting image contents based on last image's dispose code
@@ -266,8 +264,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         int iline = 0;
         boolean isFirstFrame = frame.index == 0;
         int[] act = this.act;
-        @Nullable
-        Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
+        @Nullable Boolean isFirstFrameTransparent = this.isFirstFrameTransparent;
         int ix = frame.ix;
         int iy = frame.iy;
         int ih = frame.ih;
@@ -353,7 +350,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         final int endOfInformation = clear + 1;
         final int npix = frame.iw * frame.ih;
         decoderLoop:
-        for (pi = 0; pi < npix;) {
+        for (pi = 0; pi < npix; ) {
             while (top > 0) {
                 // Pop a pixel off the pixel stack.
                 pixelCodes[pi++] = pixelStack[--top];
