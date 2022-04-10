@@ -4,7 +4,7 @@ import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.PendingIntent
+import android.app.PendingIntent.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -325,9 +325,11 @@ fun Context.stopReceivingLocationUpdatesBg() = ignoringException {
 }
 
 private fun Context.intentToReceiveLocation() =
-    PendingIntent.getBroadcast(this, 0,
-        Intent(this, LocationBroadcastReceiver::class.java).also { it.action = ACTION_RECEIVE_LOCATION },
-        PendingIntent.FLAG_UPDATE_CURRENT)
+        getBroadcast(this, 0,
+                Intent(this, LocationBroadcastReceiver::class.java).also { it.action = ACTION_RECEIVE_LOCATION },
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) FLAG_UPDATE_CURRENT or FLAG_IMMUTABLE
+                else FLAG_UPDATE_CURRENT)
+
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val sensorManager = sensorManager ?: run {
