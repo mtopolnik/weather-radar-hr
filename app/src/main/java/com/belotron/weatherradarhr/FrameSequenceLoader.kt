@@ -21,12 +21,13 @@ sealed class FrameSequenceLoader(
     val minutesPerFrame: Int,
     val mapShape: MapShape,
 ) {
-    val framesToKeep = ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
+    val correctFrameCount = ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
 
     abstract suspend fun fetchFrameSequence(
         context: Context,
         fetchPolicy: FetchPolicy
-    ): Pair<Long, FrameSequence<out Frame>?>
+    // Pair(isOffline, sequence)
+    ): Pair<Boolean, FrameSequence<out Frame>?>
 }
 
 class KradarSequenceLoader : FrameSequenceLoader(
@@ -39,34 +40,33 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
     override suspend fun fetchFrameSequence(
         context: Context, fetchPolicy: FetchPolicy
-    ): Pair<Long, FrameSequence<PngFrame>?> {
+    ): Pair<Boolean, PngSequence?> {
         val frames = mutableListOf<PngFrame>()
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator)
-        val indexOfFirstFrameAtServer = 26 - framesToKeep
+        val indexOfFirstFrameAtServer = 26 - correctFrameCount
         if (indexOfFirstFrameAtServer < 1) {
-            throw RuntimeException("Asked to keep too many frames, max is 25")
+            throw RuntimeException("Asked for too many frames, max is 25")
         }
-        var overallLastModified = 0L
+        var isOffline = false
         try {
-            for (i in 0.until(framesToKeep)) {
+            for (i in 0.until(correctFrameCount)) {
                 val url = urlTemplate.format(indexOfFirstFrameAtServer + i)
                 info { "Kradar fetch $url" }
-                val result = fetchPngFrame(
-                    context,
-                    url,
-                    fetchPolicy
-                )
-                val (lastModified, frame) = result
-                if (frame == null) {
-                    return Pair(0L, null)
+                val (lastModified, frame) = try {
+                    fetchPngFrame(context, url, fetchPolicy)
+                } catch (e: ImageFetchException) {
+                    isOffline = true
+                    Pair(0L, e.cached as PngFrame?)
                 }
-                overallLastModified = max(lastModified, overallLastModified)
+                if (frame == null) {
+                    return Pair(true, null)
+                }
                 frames.add(frame)
             }
             withContext(Default) {
-                for (i in 0.until(framesToKeep)) {
+                for (i in 0.until(correctFrameCount)) {
                     decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
                 }
             }
@@ -74,7 +74,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
             decoder.dispose()
         }
         info { "Kradar done fetchFrameSequence, frameCount = ${sequence.frames.size}" }
-        return Pair(overallLastModified, sequence)
+        return Pair(isOffline, sequence)
     }
 
     private fun newKradarSequence(frames: MutableList<PngFrame>) = PngSequence(frames, 720, 751)
@@ -90,11 +90,14 @@ class LradarSequenceLoader : FrameSequenceLoader(
 
     override suspend fun fetchFrameSequence(
             context: Context, fetchPolicy: FetchPolicy
-    ): Pair<Long, GifSequence?> {
-        val result = fetchGifSequence(context, url, fetchPolicy)
-        val (_, sequence) = result
+    ): Pair<Boolean, GifSequence?> {
+        val (lastModified, sequence) = try {
+            fetchGifSequence(context, url, fetchPolicy)
+        } catch (e: ImageFetchException) {
+            Pair(0L, e.cached as GifSequence?)
+        }
         if (sequence == null) {
-            return result
+            return Pair(true, null)
         }
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator)
@@ -119,10 +122,10 @@ class LradarSequenceLoader : FrameSequenceLoader(
         sequence.frames.apply {
             clear()
             addAll(sortedFrames)
-            while (size > framesToKeep) {
+            while (size > correctFrameCount) {
                 removeAt(0)
             }
         }
-        return result
+        return Pair(lastModified == 0L, sequence)
     }
 }

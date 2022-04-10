@@ -130,7 +130,7 @@ class FrameAnimator(
 
     fun animate(isFullRange: Boolean): Job {
         val frameCount = frameDecoder.frameCount
-        val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - frameSequenceDesc.framesToKeep)
+        val startFrameIndex = if (isFullRange) 0 else max(0, frameCount - frameSequenceDesc.correctFrameCount)
         currFrameIndex = toFrameIndex(imgBundle.animationProgress, startFrameIndex)
         return appCoroScope.start {
             updateAgeText()
