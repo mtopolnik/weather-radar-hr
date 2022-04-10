@@ -31,6 +31,8 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.doOnLayout
+import androidx.core.view.doOnPreDraw
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -100,9 +102,13 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
         vGroupOverview = rootView.findViewById<ViewGroup>(R.id.overview).also {
-            val w = it.layoutParams.width
-            val h = it.layoutParams.height
-            it.layoutParams.width = min(w, (1.25 * h).roundToInt())
+            it.doOnLayout { view ->
+                val w = view.measuredWidth
+                val h = view.measuredHeight
+                val adjustedWidth = min(w, (1.25 * h).roundToInt())
+                view.layoutParams.width = adjustedWidth
+                view.requestLayout()
+            }
         }
         vGroupFullScreen = rootView.findViewById(R.id.zoomed)
         fullScreenBundle.restoreViews(
@@ -140,8 +146,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             ds.imgBundles[i].restoreViews(
                     viewGroup = viewGroup,
                     textView = textView.apply {
-                        GestureDetector(activity, MainViewListener(i, imgView)).also {
-                            setOnTouchListener { _, e -> it.onTouchEvent(e); true }
+                        GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
+                            setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
                         }
                     },
                     imgView = imgView.apply {
@@ -334,7 +340,8 @@ class RadarImageFragment : Fragment(), CoroutineScope {
 
     private fun enterFullScreen(index: Int, srcImgView: ImageView, focusX: Float, focusY: Float) {
         val (bitmapW, bitmapH) = srcImgView.bitmapSize(PointF()) ?: return
-        val focusInBitmapX = (focusX / srcImgView.width) * bitmapW
+        val viewWidth = srcImgView.width
+        val focusInBitmapX = (focusX / viewWidth) * bitmapW
         val focusInBitmapY = (focusY / srcImgView.height) * bitmapH
         val (imgOnScreenX, imgOnScreenY) = IntArray(2).also { srcImgView.getLocationInWindow(it) }
 
@@ -348,7 +355,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             start {
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitBitmapMeasured()
-                    animateZoomEnter(imgOnScreenX, imgOnScreenY, focusInBitmapX, focusInBitmapY)
+                    animateZoomEnter(imgOnScreenX, imgOnScreenY, viewWidth, focusInBitmapX, focusInBitmapY)
                 }
                 seekBar?.startAnimateEnter()
             }

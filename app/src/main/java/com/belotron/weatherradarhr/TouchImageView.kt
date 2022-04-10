@@ -86,10 +86,11 @@ class TouchImageView
 
     private lateinit var scaleType: ImageView.ScaleType
 
-    // Initial coordinates of the image inside the view,
+    // Initial coordinates and scale of the image inside the view,
     // when entering the full screen view
-    private var fromImgX: Int = 0
-    private var fromImgY: Int = 0
+    private var startImgX: Int = 0
+    private var startImgY: Int = 0
+    private var startScale: Float = 0f
 
     // Current size of our view
     private var viewWidth = 0
@@ -190,7 +191,9 @@ class TouchImageView
      * bitmapFocusX,Y are the coordinates of the double-tap event in bitmap's
      * coordinate system.
      */
-    suspend fun animateZoomEnter(startImgX: Int, startImgY: Int, bitmapFocusX: Float, bitmapFocusY: Float) {
+    suspend fun animateZoomEnter(
+            startImgX: Int, startImgY: Int, startImgWidth: Int, bitmapFocusX: Float, bitmapFocusY: Float
+    ) {
         val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
 
         fun targetImgCoord(viewSize: Int, bitmapSize: Float, bitmapFocus: Float, targetScale: Float): Float {
@@ -205,12 +208,13 @@ class TouchImageView
         val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
         loadMatrix()
         val fitWidthScale = viewWidth.toFloat() / bitmapW
+        startScale = startImgWidth.toFloat()  / bitmapW
         val toScale = max(fitWidthScale, viewHeight.toFloat() / bitmapH)
-        fromImgX = startImgX - screenX
-        fromImgY = startImgY - screenY
-        zoomAnimator(fitWidthScale, toScale,
-                fromImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale),
-                fromImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale))
+        this.startImgX = startImgX - screenX
+        this.startImgY = startImgY - screenY
+        zoomAnimator(startScale, toScale,
+                this.startImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale),
+                this.startImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale))
             .run()
 
     }
@@ -218,11 +222,11 @@ class TouchImageView
     suspend fun animateZoomExit() {
         loadMatrix()
         val initialScale = m[MSCALE_X]
-        val targetScale = (viewWidth.toFloat() / drawable!!.intrinsicWidth)
+        val targetScale = startScale
         val initialTransX = m[MTRANS_X]
         val initialTransY = m[MTRANS_Y]
-        val targetTransX = fromImgX.toFloat()
-        val targetTransY = fromImgY.toFloat()
+        val targetTransX = startImgX.toFloat()
+        val targetTransY = startImgY.toFloat()
         zoomAnimator(initialScale, targetScale, initialTransX, targetTransX, initialTransY, targetTransY).run()
     }
 

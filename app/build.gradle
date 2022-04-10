@@ -32,6 +32,7 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinx_coroutines_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:$kotlinx_coroutines_version"
     implementation "androidx.appcompat:appcompat:1.4.1"
+    implementation "androidx.core:core-ktx:1.7.0"
     implementation "androidx.fragment:fragment-ktx:1.4.1"
     implementation "androidx.preference:preference-ktx:1.2.0"
     implementation 'com.google.android.gms:play-services-location:19.0.1'
