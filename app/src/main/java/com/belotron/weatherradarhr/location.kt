@@ -25,12 +25,16 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.UserReaction.PROCEED
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.*
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
 import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import com.google.android.gms.location.LocationServices.getSettingsClient
+import com.google.android.gms.location.LocationSettingsRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await

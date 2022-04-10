@@ -2,8 +2,7 @@ package com.belotron.weatherradarhr.gifdecode
 
 import android.graphics.Bitmap
 import com.belotron.weatherradarhr.debug
-import java.util.ArrayDeque
-import java.util.Queue
+import java.util.*
 
 private val emptyByteArray = ByteArray(0)
 private val emptyIntArray = IntArray(0)

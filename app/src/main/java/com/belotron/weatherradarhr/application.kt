@@ -3,7 +3,11 @@ package com.belotron.weatherradarhr
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Point
+import android.graphics.PointF
+import android.graphics.RectF
 import android.os.Bundle
 import android.text.format.DateUtils.*
 import android.view.View
@@ -14,10 +18,20 @@ import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.getColor
-import com.belotron.weatherradarhr.gifdecode.*
-import kotlinx.coroutines.*
+import com.belotron.weatherradarhr.gifdecode.BitmapPixels
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
-import java.io.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.FileWriter
+import java.io.PrintWriter
 import java.text.DateFormat
 import java.util.concurrent.TimeUnit.HOURS
 import android.text.format.DateFormat as AndroidDateFormat

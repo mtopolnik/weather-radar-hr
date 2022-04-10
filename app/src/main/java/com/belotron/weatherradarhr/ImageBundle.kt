@@ -6,12 +6,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
-import com.belotron.weatherradarhr.ImageBundle.Status.BROKEN
-import com.belotron.weatherradarhr.ImageBundle.Status.HIDDEN
-import com.belotron.weatherradarhr.ImageBundle.Status.LOADING
-import com.belotron.weatherradarhr.ImageBundle.Status.SHOWING
-import com.belotron.weatherradarhr.ImageBundle.Status.UNKNOWN
-import java.util.EnumSet
+import com.belotron.weatherradarhr.ImageBundle.Status.*
+import java.util.*
 
 class ImageBundle {
     enum class Status {

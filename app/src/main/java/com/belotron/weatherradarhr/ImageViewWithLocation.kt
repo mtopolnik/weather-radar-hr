@@ -10,11 +10,8 @@ import android.graphics.Paint.Style.STROKE
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
-import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_HIGH
-import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_LOW
-import android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+import android.hardware.SensorManager.*
 import android.util.AttributeSet
-import android.widget.ImageView
 import androidx.appcompat.widget.AppCompatImageView
 import java.lang.Math.PI
 import java.lang.Math.sin

@@ -8,8 +8,14 @@ import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.io.InputStream

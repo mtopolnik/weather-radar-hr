@@ -4,7 +4,6 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import com.belotron.weatherradarhr.FrameDecoder;
 import com.belotron.weatherradarhr.FrameSequence;
-import kotlin.jvm.functions.Function1;
 
 import java.util.ArrayList;
 import java.util.List;

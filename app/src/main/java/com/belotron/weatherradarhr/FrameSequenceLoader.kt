@@ -1,7 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.content.Context
-import com.belotron.weatherradarhr.gifdecode.*
+import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.GifSequence
+import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlin.math.ceil
 
 private const val ANIMATION_COVERS_MINUTES = 95

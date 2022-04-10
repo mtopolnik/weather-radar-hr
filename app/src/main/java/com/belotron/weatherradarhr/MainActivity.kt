@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 

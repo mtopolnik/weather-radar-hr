@@ -7,10 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
-import android.content.Intent.ACTION_VIEW
-import android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
-import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-import android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+import android.content.Intent.*
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.DAY_IN_MILLIS

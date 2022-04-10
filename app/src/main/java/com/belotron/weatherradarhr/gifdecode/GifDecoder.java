@@ -23,6 +23,10 @@ package com.belotron.weatherradarhr.gifdecode;
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_PREVIOUS;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
+
 import android.graphics.Bitmap;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
@@ -32,10 +36,6 @@ import kotlin.jvm.functions.Function1;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_BACKGROUND;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_PREVIOUS;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 /**
  * Reads frame data from a GIF image source and decodes it into individual

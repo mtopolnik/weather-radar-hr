@@ -5,8 +5,6 @@ import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.CcOption.NO_CC
 import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.text.SimpleDateFormat
 
 var privateLogEnabled = false

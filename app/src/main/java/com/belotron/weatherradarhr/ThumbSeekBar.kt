@@ -10,7 +10,6 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
-import android.widget.SeekBar
 import androidx.appcompat.widget.AppCompatSeekBar
 
 

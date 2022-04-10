@@ -17,9 +17,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.PersistableBundle
-import android.text.format.DateUtils.HOUR_IN_MILLIS
-import android.text.format.DateUtils.MINUTE_IN_MILLIS
-import android.text.format.DateUtils.formatElapsedTime
+import android.text.format.DateUtils.*
 import android.widget.RemoteViews
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
@@ -30,8 +28,7 @@ import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.IOException
-import java.util.Calendar
-import java.util.TimeZone
+import java.util.*
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 

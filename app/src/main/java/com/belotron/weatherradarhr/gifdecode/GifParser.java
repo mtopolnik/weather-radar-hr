@@ -1,13 +1,13 @@
 package com.belotron.weatherradarhr.gifdecode;
 
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
+import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
+
 import androidx.annotation.NonNull;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
-import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 /**
  * A class responsible for creating {@link GifSequence}s from data
