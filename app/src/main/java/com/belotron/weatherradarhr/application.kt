@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Point
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Bundle
 import android.text.format.DateUtils.*
@@ -169,4 +170,23 @@ inline fun <T> runOrNull(block: () -> T) = try {
     throw e
 } catch (e: Exception) {
     null
+}
+
+fun Rect.reset(): Rect {
+    set(0, 0, 0, 0)
+    return this
+}
+
+fun View.isDescendantOf(that: View): Boolean {
+    if (this === that) {
+        return true
+    }
+    var currParent: View? = parent as? View
+    while (currParent != null) {
+        if (currParent === that) {
+            return true
+        }
+        currParent = currParent.parent as? View
+    }
+    return false
 }
