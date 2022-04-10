@@ -44,7 +44,7 @@ private const val KRADAR_CROP_Y_HEIGHT = 480
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 private val widgetDescriptors = arrayOf(
-        WidgetDescriptor("LRadar", "http://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
+        WidgetDescriptor("LRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
                 LradarWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
                 lradarShape,
@@ -56,7 +56,7 @@ private val widgetDescriptors = arrayOf(
                             isOffline,
                             bitmap.crop(0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
-        WidgetDescriptor("KRadar", "http://vrijeme.hr/kompozit-stat.png", 10,
+        WidgetDescriptor("KRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
                 KradarWidgetProvider::class.java,
                 R.drawable.kradar_widget_preview,
                 kradarShape,

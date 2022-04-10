@@ -69,10 +69,11 @@ class LradarSequenceLoader : FrameSequenceLoader(
     minutesPerFrame = 5,
     mapShape = lradarShape,
 ) {
+    private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
+
     override suspend fun fetchFrameSequence(
         context: Context, fetchPolicy: FetchPolicy
     ): Pair<Long, GifSequence?> {
-        val url = "http://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
         val result = fetchGifSequence(context, url, fetchPolicy)
         val (_, sequence) = result
         if (sequence == null) {

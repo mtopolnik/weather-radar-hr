@@ -17,7 +17,6 @@
         android:theme="@style/AppTheme"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
-        android:usesCleartextTraffic="true"
     >
         <activity android:name=".MainActivity"
                   android:label="@string/main_activity_title"
