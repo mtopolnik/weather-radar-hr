@@ -412,19 +412,11 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                             val (lastModified, frameSequence) = try {
                                 loader.fetchFrameSequence(context, fetchPolicy)
                             } catch (e: ImageFetchException) {
-                                Pair(0L, e.cached as GifSequence?)
+                                Pair(0L, e.cached as FrameSequence<out Frame>?)
                             }
                             if (frameSequence == null) {
                                 bundle.status = BROKEN
                                 return@launch
-                            }
-                            frameSequence.apply {
-                                sortAndDeduplicateFrames()
-                                with(frames) {
-                                    while (size > loader.framesToKeep) {
-                                        removeAt(0)
-                                    }
-                                }
                             }
                             bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(animationLooper) {
