@@ -12,7 +12,8 @@ import kotlin.math.abs
 
 object LradarOcr {
 
-    @Volatile private var digitTemplates: List<Pixels> = emptyList()
+    @Volatile
+    private var digitTemplates: List<Pixels> = emptyList()
 
     fun ocrLradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -22,11 +23,9 @@ object LradarOcr {
         }
     }
 
-    fun ocrLradarTimestamp(bitmap: Bitmap) = ocrLradarTimestamp(bitmap.asPixels())
-
     private fun initDigitPixelses() {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("lradar")
+            digitTemplates = appContext.loadDigits("lradar", "gif")
         }
     }
 
@@ -46,7 +45,8 @@ object LradarOcr {
 }
 
 object KradarOcr {
-    @Volatile private var digitTemplates: List<Pixels> = emptyList()
+    @Volatile
+    private var digitTemplates: List<Pixels> = emptyList()
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
@@ -56,11 +56,9 @@ object KradarOcr {
         }
     }
 
-    fun ocrKradarTimestamp(bitmap: Bitmap) = ocrKradarTimestamp(bitmap.asPixels())
-
     private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("kradar").apply { forEach { it.convertToGrayscale() } }
+            digitTemplates = appContext.loadDigits("kradar", "png")
         }
     }
 
@@ -68,7 +66,7 @@ object KradarOcr {
         var x = 110
         val digits = IntArray(12) { 0 }
         var digitIndex = 0
-        while (x < 240 && digitIndex < 12) {
+        while (x < 260 && digitIndex < 12) {
             val digit = (0..9).find { isMatch(img, x, digitTemplates[it]) }
             if (digit != null) {
                 digits[digitIndex++] = digit
@@ -90,11 +88,12 @@ object KradarOcr {
     }
 
     private fun isMatch(img: Pixels, imgX: Int, template: Pixels): Boolean {
-        val imgY = 5
+        val imgY = 6
         var totalDiff = 0
+//        info { "art\n" + asciiArt(img, imgX, imgY, template) }
         (0 until template.height).forEach { y ->
             (0 until template.width).forEach { x ->
-                totalDiff += abs(decodeArgbToGray(img[imgX + x, imgY + y]) - template[x, y])
+                totalDiff += abs(decodeArgbToGray(img[imgX + x, imgY + y]) - decodeArgbToGray(template[x, y]))
                 if (totalDiff > 2000) {
                     return false
                 }
@@ -130,10 +129,10 @@ private fun asciiArt(img: Pixels, left: Int, top: Int, template: Pixels): String
 private fun stripeEqual(img: Pixels, imgX: Int, imgY: Int, rect: Pixels, rectX: Int) =
         (0 until rect.height).all { rectY -> img[imgX + rectX, imgY + rectY] == rect[rectX, rectY] }
 
-private fun Context.loadDigits(path: String) = (0..9).map { loadDigit(path, it) }
+private fun Context.loadDigits(path: String, suffix: String) = (0..9).map { loadDigit(path, suffix, it) }
 
-private fun Context.loadDigit(path: String, digit: Int): BitmapPixels =
-        assets.open("$path/$digit.gif").use { it.readBytes() }.decodeToBitmap().asPixels()
+private fun Context.loadDigit(path: String, suffix: String, digit: Int): BitmapPixels =
+        assets.open("$path/$digit.$suffix").use { it.readBytes() }.decodeToBitmap().asPixels()
 
 class DateTime(
         copyFrom: DateTime? = null,

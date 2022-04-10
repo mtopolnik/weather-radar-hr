@@ -10,9 +10,9 @@ private const val MAX_PIXEL_VALUE = (3 * 0xff)
 
 fun decodeArgbToGray(argb: Int): Int {
     val byteMask = 0xff
-    val r = argb and byteMask
+    val r = argb shr 16 and byteMask
     val g = argb shr 8 and byteMask
-    val b = argb shr 16 and byteMask
+    val b = argb and byteMask
     return r + g + b
 }
 
@@ -27,8 +27,6 @@ interface Pixels {
                         decodeArgbToGray(this[x, y]) * ASCII_GRAYSCALE.length / MAX_PIXEL_VALUE)
         ]
     }
-
-    fun convertToGrayscale()
 }
 
 class IntArrayPixels(
@@ -37,8 +35,6 @@ class IntArrayPixels(
 ) : Pixels {
     override val height = pixels.size / width
     override operator fun get(x: Int, y: Int) = pixels[width * y + x]
-
-    override fun convertToGrayscale() = pixels.forEachIndexed { i, it -> pixels[i] = decodeArgbToGray(it) }
 }
 
 class BitmapPixels(
@@ -47,12 +43,4 @@ class BitmapPixels(
     override val width = bitmap.width
     override val height = bitmap.height
     override operator fun get(x: Int, y: Int) = bitmap[x, y]
-
-    override fun convertToGrayscale() {
-        for (y in 0..height) {
-            for (x in 0..width) {
-                bitmap[x, y] = decodeArgbToGray(bitmap[x, y])
-            }
-        }
-    }
 }

@@ -30,7 +30,7 @@ public class GifSequence implements FrameSequence<GifFrame> {
     }
 
     @NonNull @Override
-    public FrameDecoder<GifFrame> intoDecoder(@NonNull Allocator allocator) {
+    public GifDecoder intoDecoder(@NonNull Allocator allocator) {
         return new GifDecoder(allocator, this);
     }
 

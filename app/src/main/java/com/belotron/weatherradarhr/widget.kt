@@ -52,7 +52,7 @@ private val widgetDescriptors = arrayOf(
                 cropTop = LRADAR_CROP_Y_TOP,
                 toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
-                            ocrLradarTimestamp(bitmap),
+                            ocrLradarTimestamp(bitmap.asPixels()),
                             isOffline,
                             bitmap.crop(0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
             )}),
@@ -64,7 +64,7 @@ private val widgetDescriptors = arrayOf(
                 cropTop = 0,
                 toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
-                            ocrKradarTimestamp(bitmap),
+                            ocrKradarTimestamp(bitmap.asPixels()),
                             isOffline,
                             bitmap.crop(0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
 )
