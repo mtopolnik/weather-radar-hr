@@ -62,16 +62,16 @@ val lradarShape = MapShape(
 )
 
 val kradarShape = MapShape(
-    topLat = 48.06,
-    botLat = 43.44,
-    topLeftLon = 13.05,
-    botLeftLon = 13.15,
-    topRightLon = 19.84,
-    botRightLon = 19.74,
+    topLat = 47.8,
+    botLat = 41.52,
+    topLeftLon = 11.73,
+    botLeftLon = 11.75,
+    topRightLon = 20.63,
+    botRightLon = 20.54,
     leftImageX = 1,
-    rightImageX = 478,
+    rightImageX = 718,
     topImageY = 1,
-    botImageY = 478
+    botImageY = 718
 )
 
 val locationRequestFg: LocationRequest = LocationRequest.create().apply {
