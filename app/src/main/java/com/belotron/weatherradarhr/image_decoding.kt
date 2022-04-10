@@ -17,20 +17,12 @@ interface FrameSequence<T : Frame> {
 interface FrameDecoder<T : Frame> {
     val sequence: FrameSequence<T>
     fun decodeFrame(frameIndex: Int): Bitmap
+    fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long)
     fun release(bitmap: Bitmap)
     fun dispose()
 }
 
 val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
-
-fun <T : Frame> FrameDecoder<T>.assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
-    val bitmap = decodeFrame(frameIndex)
-    try {
-        sequence.frames[frameIndex].timestamp = ocrTimestamp(bitmap.asPixels())
-    } finally {
-        release(bitmap)
-    }
-}
 
 class PngFrame(
     val pngBytes: ByteArray,
@@ -57,6 +49,14 @@ class PngDecoder(
             inMutable = true
             inBitmap = allocator.obtain(sequence.frameWidth, sequence.frameHeight, Bitmap.Config.ARGB_8888)
         })
+    }
+    override fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
+        val bitmap = decodeFrame(frameIndex)
+        try {
+            sequence.frames[frameIndex].timestamp = ocrTimestamp(bitmap.asPixels())
+        } finally {
+            release(bitmap)
+        }
     }
 
     override fun release(bitmap: Bitmap) {

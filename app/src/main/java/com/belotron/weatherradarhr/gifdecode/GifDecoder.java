@@ -28,6 +28,7 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.belotron.weatherradarhr.FrameDecoder;
+import kotlin.jvm.functions.Function1;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -113,16 +114,20 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         allocator.release(bitmap);
     }
 
-    public Pixels asPixels() {
-        return new IntArrayPixels(outPixels, gifSequence.width);
-    }
-
     public Bitmap decodeFrame(int frameIndex) {
         GifDecoder gifDecoder = gotoAndDecode(frameIndex);
         Bitmap result = gifDecoder.obtainBitmap();
         result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width,
                 gifDecoder.gifSequence.height);
         return result;
+    }
+
+    @Override
+    public void assignTimestamp(int frameIndex, @NonNull Function1<? super Pixels, Long> ocrTimestamp) {
+        gotoAndDecode(frameIndex);
+        gifSequence.getFrames()
+                   .get(frameIndex)
+                   .setTimestamp(ocrTimestamp.invoke(new IntArrayPixels(outPixels, gifSequence.width)));
     }
 
     private GifDecoder gotoAndDecode(int frameIndex) {

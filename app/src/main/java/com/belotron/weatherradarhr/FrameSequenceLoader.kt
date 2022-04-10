@@ -36,6 +36,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator)
         val indexOfFirstFrameAtServer = 26 - framesToKeep
+        val timestampOfFrame0 = System.currentTimeMillis() - framesToKeep * minutesPerFrame * 60_000
         try {
             for (i in 0.until(framesToKeep)) {
                 val result = fetchPngFrame(
@@ -48,7 +49,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     return Pair(0L, null)
                 }
                 frames.add(frame)
-                decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
+                decoder.assignTimestamp(i) { timestampOfFrame0 + i * minutesPerFrame * 60_000 }
+//                    KradarOcr::ocrKradarTimestamp
             }
         } finally {
             decoder.dispose()

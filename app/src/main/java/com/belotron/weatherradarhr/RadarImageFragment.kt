@@ -27,6 +27,8 @@ import com.belotron.weatherradarhr.gifdecode.GifSequence
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
@@ -79,7 +81,11 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
         val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         this.rootView = rootView
-        vGroupOverview = rootView.findViewById(R.id.overview)
+        vGroupOverview = rootView.findViewById<ViewGroup>(R.id.overview).also {
+            val w = it.layoutParams.width
+            val h = it.layoutParams.height
+            it.layoutParams.width = min(w, (1.25 * h).roundToInt())
+        }
         vGroupFullScreen = rootView.findViewById(R.id.zoomed)
         fullScreenBundle.restoreViews(
                 viewGroup = rootView.findViewById(R.id.vg_zoomed),
