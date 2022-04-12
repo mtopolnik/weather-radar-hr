@@ -40,7 +40,10 @@ private const val UPDATE_AGE_PERIOD_MINUTES = 3
 private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
-private const val LRADAR_CROP_Y_TOP = 40
+private const val LRADAR_CROP_X_LEFT = 10
+private const val LRADAR_CROP_Y_TOP = 49
+private const val LRADAR_CROP_WIDTH = 800
+private const val LRADAR_CROP_HEIGHT = 600
 private const val KRADAR_CROP_Y_HEIGHT = 719
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
@@ -55,7 +58,8 @@ private val widgetDescriptors = arrayOf(
                     TimestampedBitmap(
                             ocrLradarTimestamp(bitmap.asPixels()),
                             isOffline,
-                            bitmap.crop(0, LRADAR_CROP_Y_TOP, bitmap.width, bitmap.height - LRADAR_CROP_Y_TOP)
+                            bitmap.crop(LRADAR_CROP_X_LEFT, LRADAR_CROP_Y_TOP,
+                                    LRADAR_CROP_WIDTH, LRADAR_CROP_HEIGHT)
             )}),
         WidgetDescriptor("KRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
                 KradarWidgetProvider::class.java,
