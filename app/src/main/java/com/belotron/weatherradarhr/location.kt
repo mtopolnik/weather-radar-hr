@@ -327,8 +327,7 @@ fun Context.stopReceivingLocationUpdatesBg() = ignoringException {
 private fun Context.intentToReceiveLocation() =
         getBroadcast(this, 0,
                 Intent(this, LocationBroadcastReceiver::class.java).also { it.action = ACTION_RECEIVE_LOCATION },
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) FLAG_UPDATE_CURRENT or FLAG_IMMUTABLE
-                else FLAG_UPDATE_CURRENT)
+                FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) FLAG_MUTABLE else 0))
 
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {

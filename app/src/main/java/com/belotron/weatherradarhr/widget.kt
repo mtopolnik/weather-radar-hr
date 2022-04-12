@@ -16,6 +16,7 @@ import android.graphics.Bitmap.createBitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Build
 import android.os.PersistableBundle
 import android.text.format.DateUtils.*
 import android.widget.RemoteViews
@@ -40,7 +41,7 @@ private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
 private const val LRADAR_CROP_Y_TOP = 40
-private const val KRADAR_CROP_Y_HEIGHT = 480
+private const val KRADAR_CROP_Y_HEIGHT = 719
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 private val widgetDescriptors = arrayOf(
@@ -407,7 +408,8 @@ private fun Context.intentLaunchMainActivity(): PendingIntent {
         component = ComponentName(packageName, MainActivity::class.java.name)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return PendingIntent.getActivity(this, 0, launchIntent, 0)
+    return PendingIntent.getActivity(this, 0, launchIntent,
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0))
 }
 
 private fun logFetchResult(logHead: String, lastModified_mmss: Long?) {
