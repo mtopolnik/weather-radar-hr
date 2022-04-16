@@ -27,7 +27,9 @@ import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -270,7 +272,9 @@ private class WidgetContext (
                 }
                 val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
                 info(CC_PRIVATE) { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
-                writeImgAndTimestamp(tsBitmap)
+                withContext(IO) {
+                    writeImgAndTimestamp(tsBitmap)
+                }
                 context.refreshLocation(callingFromBg)
                 updateRemoteViews(tsBitmap)
                 return lastModified_mmss
