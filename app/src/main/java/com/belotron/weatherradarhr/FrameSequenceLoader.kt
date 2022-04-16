@@ -91,10 +91,12 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         var fetchPolicy = fetchPolicy
         try {
-            val timestamp0InCache = timestampInCache(0)
+            val timestamp0InCache = withContext(IO) { timestampInCache(0) }
             val timestamp0 = fetchFrame(0, fetchPolicy).let { frame ->
                 frames.add(frame)
-                decoder.assignTimestamp(0, KradarOcr::ocrKradarTimestamp)
+                withContext(Default) {
+                    decoder.assignTimestamp(0, KradarOcr::ocrKradarTimestamp)
+                }
                 frame.timestamp
             }
             // Reuse cached images by renaming them to the expected new URLs
@@ -158,13 +160,11 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 1.until(correctFrameCount).map { i ->
                     async(IO) { fetchFrame(i, fetchPolicy) }
                 }.forEach {
-                    val frame = it.await()
-                    frames.add(frame)
-                    decoder.assignTimestamp(frames.size - 1, KradarOcr::ocrKradarTimestamp)
+                    frames.add(it.await())
                 }
             }
             withContext(Default) {
-                for (i in 0.until(correctFrameCount)) {
+                for (i in 1.until(correctFrameCount)) {
                     decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
                 }
                 // HR images are sometimes out of order, sort them by timestamp
