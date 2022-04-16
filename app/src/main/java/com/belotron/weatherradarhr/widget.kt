@@ -263,7 +263,7 @@ private class WidgetContext (
         try {
             try {
                 val (lastModified_mmss, bitmap) =
-                        context.fetchBitmap(wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
+                        fetchBitmap(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
                 if (bitmap == null) {
                     // This may happen only with `onlyIfNew == true`
                     return null

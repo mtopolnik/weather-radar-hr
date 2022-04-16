@@ -32,7 +32,6 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnLayout
-import androidx.core.view.doOnPreDraw
 import androidx.fragment.app.Fragment
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
@@ -406,14 +405,14 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
-        frameSequenceLoaders.map { ds.imgBundles[it.index] }.forEach { it.status = LOADING }
+        frameSequenceLoaders.map { ds.imgBundles[it.positionInUI] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         reloadJob?.cancel()
         reloadJob = start {
             supervisorScope {
                 for (loader in frameSequenceLoaders) {
-                    val bundle = ds.imgBundles[loader.index]
+                    val bundle = ds.imgBundles[loader.positionInUI]
                     launch {
                         try {
                             val (isOffline, frameSequence) = loader.fetchFrameSequence(context, fetchPolicy)

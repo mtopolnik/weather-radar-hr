@@ -1,25 +1,26 @@
 package com.belotron.weatherradarhr
 
 import android.content.Context
+import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.Dispatchers.Default
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.util.*
 import kotlin.math.ceil
-import kotlin.math.max
 
 private const val ANIMATION_COVERS_MINUTES = 95
 
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 sealed class FrameSequenceLoader(
-    val index: Int,
-    val title: String,
-    val minutesPerFrame: Int,
-    val mapShape: MapShape,
+        val positionInUI: Int,
+        val title: String,
+        val minutesPerFrame: Int,
+        val mapShape: MapShape,
 ) {
     val correctFrameCount = ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
 
@@ -30,17 +31,22 @@ sealed class FrameSequenceLoader(
     ): Pair<Boolean, FrameSequence<out Frame>?>
 }
 
+class NullFrameException: Exception()
+
 class KradarSequenceLoader : FrameSequenceLoader(
-    index = 0,
-    title = "HR",
-    minutesPerFrame = 5,
-    mapShape = kradarShape,
+        positionInUI = 0,
+        title = "HR",
+        minutesPerFrame = 5,
+        mapShape = kradarShape,
 ) {
     private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
 
     override suspend fun fetchFrameSequence(
         context: Context, fetchPolicy: FetchPolicy
     ): Pair<Boolean, PngSequence?> {
+        // This function would not behave properly for these two fetch policies:
+        assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
+        assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_CACHED" }
         val frames = mutableListOf<PngFrame>()
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
@@ -50,26 +56,117 @@ class KradarSequenceLoader : FrameSequenceLoader(
             throw RuntimeException("Asked for too many frames, max is 25")
         }
         var isOffline = false
+
+        fun urlForFrameIndex(i: Int) = urlTemplate.format(indexOfFirstFrameAtServer + i)
+
+        suspend fun fetchFrame(index: Int, fetchPolicy: FetchPolicy): PngFrame {
+            val url = urlForFrameIndex(index)
+            info { "Kradar fetch $url" }
+            val (lastModified, frame) = try {
+                fetchPngFrame(context, url, fetchPolicy)
+            } catch (e: ImageFetchException) {
+                isOffline = true
+                val cached = e.cached ?: throw IOException("Fetch error, missing from cache")
+                Pair(0L, cached as PngFrame)
+            }
+            if (frame == null) {
+                throw NullFrameException()
+            }
+            frames.add(frame)
+            decoder.assignTimestamp(index, KradarOcr::ocrKradarTimestamp)
+            return frame
+        }
+
+        fun timestampInCache(index: Int): Long? {
+            val url = urlForFrameIndex(index)
+            val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
+            val frame = nullableFrame ?: return null
+            frames.add(frame)
+            decoder.assignTimestamp(frames.size - 1, KradarOcr::ocrKradarTimestamp)
+            frames.removeLast()
+            return frame.timestamp
+        }
+
+        var fetchPolicy = fetchPolicy
         try {
-            for (i in 0.until(correctFrameCount)) {
-                val url = urlTemplate.format(indexOfFirstFrameAtServer + i)
-                info { "Kradar fetch $url" }
-                val (lastModified, frame) = try {
-                    fetchPngFrame(context, url, fetchPolicy)
-                } catch (e: ImageFetchException) {
-                    isOffline = true
-                    Pair(0L, e.cached as PngFrame?)
+            val timestamp0InCache = timestampInCache(0)
+            val timestamp0 = fetchFrame(0, fetchPolicy).timestamp
+
+            // Reuse cached images by renaming them to the expected new URLs
+            // after DHMZ posts a new image and renames the previous images
+            withContext(IO) {
+                if (timestamp0InCache == null || timestamp0InCache >= timestamp0) {
+                    info { "timestamp0inCache == null || timestamp0InCache >= timestamp0" }
+                    return@withContext
                 }
-                if (frame == null) {
-                    return Pair(true, null)
+                synchronized (CACHE_LOCK) {
+                    val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second)).apply {
+                        add(Pair(0, timestamp0InCache))
+                    }
+                    info { "Collecting cached timestamps" }
+                    for (i in 1.until(correctFrameCount)) {
+                        val timestamp = timestampInCache(i) ?: return@withContext
+                        sortedByTimestamp.add(Pair(i, timestamp))
+                    }
+                    if (sortedByTimestamp.size != correctFrameCount) {
+                        info { "Cached timestamps have duplicates" }
+                        return@withContext
+                    }
+                    val urlsHaveDisorder =
+                            sortedByTimestamp.mapIndexed { indexToBe, (indexNow, _) -> indexToBe != indexNow }
+                            .any { it }
+                    if (urlsHaveDisorder) {
+                        info { "URLs have disorder" }
+                        sortedByTimestamp.forEach { (index, _) ->
+                            val urlNow = urlForFrameIndex(index)
+                            context.renameCached(urlNow, "$urlNow.tmp")
+                        }
+                        sortedByTimestamp.forEachIndexed { indexToBe, (indexNow, _) ->
+                            val tmpName = "${urlForFrameIndex(indexNow)}.tmp"
+                            context.renameCached(tmpName, urlForFrameIndex(indexToBe))
+                        }
+                    }
+                    info { "Looking for timestamp0 in cached timestamps" }
+                    val indexOfNewTimestamp0 =
+                            sortedByTimestamp.indexOfFirst { (_, timestamp) -> timestamp == timestamp0 }
+                                    .takeIf { it > 0 }
+                                    ?: return@withContext
+                    info { "indexOfTimestamp0 == $indexOfNewTimestamp0, indexOfFirstFrameAtServer == $indexOfFirstFrameAtServer" }
+                    for ((index, _) in sortedByTimestamp) {
+                        if (index < indexOfNewTimestamp0) {
+                            try {
+                                context.deleteCached(urlForFrameIndex(index))
+                            } catch (e: IOException) {
+                                warn { e.message ?: "<reason missing>" }
+                                return@withContext
+                            }
+                        } else {
+                            val indexToBe = index - indexOfNewTimestamp0
+                            info { "Reusing image $index as $indexToBe" }
+                            context.renameCached(urlForFrameIndex(index), urlForFrameIndex(indexToBe))
+                        }
+                    }
                 }
-                frames.add(frame)
+                fetchPolicy = PREFER_CACHED
+            }
+            for (i in 1.until(correctFrameCount)) {
+                fetchFrame(i, fetchPolicy)
             }
             withContext(Default) {
                 for (i in 0.until(correctFrameCount)) {
                     decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
                 }
+                // HR images are sometimes out of order, sort them by timestamp
+                val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
+                    addAll(sequence.frames)
+                }
+                sequence.frames.apply {
+                    clear()
+                    addAll(sortedFrames)
+                }
             }
+        } catch (e: NullFrameException) {
+            return Pair(true, null)
         } finally {
             decoder.dispose()
         }
@@ -81,10 +178,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
 }
 
 class LradarSequenceLoader : FrameSequenceLoader(
-    index = 1,
-    title = "SLO",
-    minutesPerFrame = 5,
-    mapShape = lradarShape,
+        positionInUI = 1,
+        title = "SLO",
+        minutesPerFrame = 5,
+        mapShape = lradarShape,
 ) {
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
@@ -116,12 +213,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
             decoder.dispose()
         }
         // SLO animated gif has repeated frames at the end, remove the duplicates
-        val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
-            addAll(sequence.frames)
-        }
         sequence.frames.apply {
-            clear()
-            addAll(sortedFrames)
             while (size > correctFrameCount) {
                 removeAt(0)
             }

@@ -11,6 +11,7 @@ import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
@@ -32,13 +33,13 @@ private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
 
-private val CACHE_LOCK = Object()
+val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
 private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
 
-enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW }
+enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
 class ImageFetchException(val cached : Any?) : Exception()
 
@@ -48,8 +49,12 @@ suspend fun fetchPngFrame(context: Context, url: String, fetchPolicy: FetchPolic
 suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, GifSequence?> =
     context.fetchImg(url, fetchPolicy, GifParser::parse)
 
-suspend fun Context.fetchBitmap(url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
-        fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
+        context.fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+
+fun fetchPngFromCache(context: Context, url: String): Pair<Long, PngFrame?> =
+    Exchange(context, GlobalScope, url, ONLY_CACHED, ::PngFrame).proceed()
+
 
 /**
  * The returned object may be `null` only with the [ONLY_IF_NEW] fetch
@@ -87,11 +92,11 @@ private suspend fun <T> Context.fetchImg(
 }
 
 class Exchange<out T>(
-    private val context: Context,
-    private val coroCtx: CoroutineScope,
-    private val url: String,
-    private val fetchPolicy: FetchPolicy,
-    private val decode: (ByteArray) -> T
+        private val context: Context,
+        private val coroScope: CoroutineScope,
+        private val url: String,
+        private val fetchPolicy: FetchPolicy,
+        private val decode: (ByteArray) -> T
 ) {
     @Volatile
     var inputStream: InputStream? = null
@@ -99,10 +104,14 @@ class Exchange<out T>(
     fun proceed(): Pair<Long, T?> {
         if (fetchPolicy == PREFER_CACHED) {
             try {
-                loadCachedResult?.also { return it }
+                loadCachedResult()?.also { return it }
             } catch (e: Exception) {
                 severe(CC_PRIVATE, e) { "Error loading cached image for $url" }
             }
+        }
+        if (fetchPolicy == ONLY_CACHED) {
+            loadCachedResult()?.also { return it }
+            return Pair(0L, null)
         }
         var conn: HttpURLConnection? = null
         try {
@@ -110,7 +119,7 @@ class Exchange<out T>(
             val ifModifiedSince = loadCachedLastModified(url)
             ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
             conn.connect()
-            if (!coroCtx.isActive) {
+            if (!coroScope.isActive) {
                 throw CancellationException()
             }
             return when {
@@ -123,7 +132,7 @@ class Exchange<out T>(
                     Pair(0L, null)
                 else -> { // responseCode == 304, fetch from cache
                     info { "Not Modified since $ifModifiedSince: $url" }
-                    loadCachedResult ?: Exchange(context, coroCtx, url, UP_TO_DATE, decode).proceed()
+                    loadCachedResult() ?: Exchange(context, coroScope, url, UP_TO_DATE, decode).proceed()
                 }
             }
         } catch (e: CancellationException) {
@@ -136,7 +145,7 @@ class Exchange<out T>(
             }
             throw ImageFetchException(
                     if (fetchPolicy == ONLY_IF_NEW) null
-                    else runOrNull { loadCachedImage })
+                    else runOrNull { loadCachedImage() })
         } finally {
             conn?.disconnect()
         }
@@ -151,7 +160,7 @@ class Exchange<out T>(
             inputStream.use { it.readBytes() }
                 .also {
                     this@Exchange.inputStream = null
-                    if (!coroCtx.isActive) throw CancellationException()
+                    if (!coroScope.isActive) throw CancellationException()
                 }
         }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
@@ -187,12 +196,12 @@ class Exchange<out T>(
         }
     }
 
-    private val loadCachedResult: Pair<Long, T>? = runOrNull {
+    private fun loadCachedResult(): Pair<Long, T>? = runOrNull {
         val (lastModifiedStr, imgBytes) = cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
         Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage)
     }
 
-    private val loadCachedImage: T? = runOrNull {
+    private fun loadCachedImage(): T? = runOrNull {
         cachedDataIn(url).use { it.readUTF(); it.readBytes() }
     }?.parseOrInvalidateImage
 
@@ -228,7 +237,7 @@ class Exchange<out T>(
         val growingFile = File(cacheFile.path + ".growing")
         synchronized(CACHE_LOCK) {
             try {
-                val cachedLastModified = runOrNull { growingFile.dataIn().use { it.readUTF() }.parseLastModified() }
+                val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
                 val fetchedLastModified = lastModifiedStr.parseLastModified()
                 cachedLastModified?.takeIf { it >= fetchedLastModified }?.also {
                     return
@@ -254,6 +263,25 @@ fun Context.invalidateCache(url: String) {
             cacheFile.dataOut().use { cachedOut ->
                 cachedOut.writeUTF(DEFAULT_LAST_MODIFIED_STR)
             }
+        }
+    }
+}
+
+fun Context.deleteCached(url: String) {
+    synchronized(CACHE_LOCK) {
+        val cacheFile = cacheFile(url)
+        if (!cacheFile.delete()) {
+            throw IOException("Failed to delete $cacheFile")
+        }
+    }
+}
+
+fun Context.renameCached(urlNow: String, urlToBe: String) {
+    synchronized(CACHE_LOCK) {
+        val cacheFileNow = cacheFile(urlNow)
+        val cacheFileToBe = cacheFile(urlToBe)
+        if (!cacheFileNow.renameTo(cacheFileToBe)) {
+            severe(CC_PRIVATE) { "Failed to rename $cacheFileNow to $cacheFileToBe" }
         }
     }
 }

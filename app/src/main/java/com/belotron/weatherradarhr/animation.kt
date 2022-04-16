@@ -43,7 +43,7 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewFrames(desc: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
-        animators[desc.index] = FrameAnimator(ds.imgBundles, desc, frameSequence, isOffline)
+        animators[desc.positionInUI] = FrameAnimator(ds.imgBundles, desc, frameSequence, isOffline)
     }
 
     fun resume(context: Context? = null, newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null) {
@@ -119,7 +119,7 @@ class FrameAnimator(
 ) {
     var rateMinsPerSec: Int = 20
     var freezeTimeMillis: Int = 0
-    val imgBundle: ImageBundle get() = imgBundles[frameSequenceDesc.index]
+    val imgBundle: ImageBundle get() = imgBundles[frameSequenceDesc.positionInUI]
 
     private val frameDelayMillis get() =  1000 * frameSequenceDesc.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
