@@ -240,7 +240,10 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val isAnimationShowing = ds.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.mainPrefs) {
-                animationLooper.resume(activity, rateMinsPerSec, freezeTimeMillis)
+                animationLooper.resume(activity,
+                        newCorrectFrameCount = null,
+                        newRateMinsPerSec = rateMinsPerSec,
+                        newFreezeTimeMillis = freezeTimeMillis)
             }
         } else {
             startReloadAnimations(PREFER_CACHED)
@@ -415,7 +418,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     val bundle = ds.imgBundles[loader.positionInUI]
                     launch {
                         try {
-                            val (isOffline, frameSequence) = loader.fetchFrameSequence(context, fetchPolicy)
+                            val correctFrameCount = loader.correctFrameCount(context)
+                            val (isOffline, frameSequence) = loader.fetchFrameSequence(
+                                    context, correctFrameCount, fetchPolicy)
                             if (frameSequence == null) {
                                 bundle.status = BROKEN
                                 return@launch
@@ -423,7 +428,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                             bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(animationLooper) {
                                 receiveNewFrames(loader, frameSequence, isOffline)
-                                resume(context, rateMinsPerSec, freezeTimeMillis)
+                                resume(context, correctFrameCount, rateMinsPerSec, freezeTimeMillis)
                             }
                             bundle.status = SHOWING
                         } catch (e: CancellationException) {

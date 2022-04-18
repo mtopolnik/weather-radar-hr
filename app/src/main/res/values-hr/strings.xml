@@ -80,4 +80,5 @@
         trenutni odziv nakon osvježavanja, server je javio da nema noviju sliku.
         Ako je server nedostupan, u naslovu iznad slike pisat će “Offline”.
     </string>
+    <string name="animation_covers_minutes">Time covered by the animation</string>
 </resources>

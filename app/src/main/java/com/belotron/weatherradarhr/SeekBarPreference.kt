@@ -62,7 +62,7 @@ constructor(context: Context, attrs: AttributeSet)
             it.progress = value - min
             it.setOnSeekBarChangeListener(this)
         }
-        summaryView = holder.findViewById(android.R.id.summary) as TextView
+        summaryView = summary as TextView
     }
 
     override fun onGetDefaultValue(a: TypedArray, index: Int): Any {

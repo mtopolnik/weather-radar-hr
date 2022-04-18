@@ -10,6 +10,7 @@ import java.lang.Math.max
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
+private const val KEY_ANIMATION_MINUTES = "animation_covers_minutes"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
 private const val KEY_SHOULD_SHOW_FG_LOCATION_NOTICE = "should_show_fg_location_notice"
 private const val KEY_SHOULD_SHOW_BG_LOCATION_NOTICE = "should_show_bg_location_notice"
@@ -21,6 +22,7 @@ private const val KEY_LOCATION_LONGITUDE = "location_longitude"
 private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 
 const val DEFAULT_ANIMATION_RATE = 85
+const val DEFAULT_ANIMATION_MINUTES = 90
 const val DEFAULT_FREEZE_TIME = 1500
 
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
@@ -30,6 +32,8 @@ val Context.localPrefs: SharedPreferences get() = getSharedPreferences(NAME_LOCA
 val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
 val SharedPreferences.freezeTimeMillis: Int get() = getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME)
+
+val SharedPreferences.animationCoversMinutes: Int get() = getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES)
 
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =

@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.content.Context
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
+import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import kotlinx.coroutines.Dispatchers.Default
@@ -15,8 +16,6 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.ceil
 
-private const val ANIMATION_COVERS_MINUTES = 95
-
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 sealed class FrameSequenceLoader(
@@ -25,12 +24,14 @@ sealed class FrameSequenceLoader(
         val minutesPerFrame: Int,
         val mapShape: MapShape,
 ) {
-    val correctFrameCount = ceil(ANIMATION_COVERS_MINUTES.toDouble() / minutesPerFrame).toInt()
+    fun correctFrameCount(context: Context): Int =
+            ceil(context.mainPrefs.animationCoversMinutes.toDouble() / minutesPerFrame).toInt()
 
+    // Returns Pair(isOffline, sequence)
     abstract suspend fun fetchFrameSequence(
-        context: Context,
-        fetchPolicy: FetchPolicy
-    // Pair(isOffline, sequence)
+            context: Context,
+            correctFrameCount: Int,
+            fetchPolicy: FetchPolicy
     ): Pair<Boolean, FrameSequence<out Frame>?>
 }
 
@@ -45,11 +46,11 @@ class KradarSequenceLoader : FrameSequenceLoader(
     private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
 
     override suspend fun fetchFrameSequence(
-        context: Context, fetchPolicy: FetchPolicy
+            context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, PngSequence?> {
-        // This function would not behave properly for these two fetch policies:
+        // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
-        assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_CACHED" }
+        assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_IF_NEW" }
         val frames = mutableListOf<PngFrame>()
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
@@ -197,7 +198,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
     override suspend fun fetchFrameSequence(
-            context: Context, fetchPolicy: FetchPolicy
+            context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, GifSequence?> {
         val (lastModified, sequence) = try {
             fetchGifSequence(context, url, fetchPolicy)
@@ -224,7 +225,12 @@ class LradarSequenceLoader : FrameSequenceLoader(
             decoder.dispose()
         }
         // SLO animated gif has repeated frames at the end, remove the duplicates
+        val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
+            addAll(sequence.frames)
+        }
         sequence.frames.apply {
+            clear()
+            addAll(sortedFrames)
             while (size > correctFrameCount) {
                 removeAt(0)
             }

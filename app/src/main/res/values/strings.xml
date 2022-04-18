@@ -11,6 +11,7 @@
     <string name="privacy_policy_menu_item">Privacy Policy</string>
     <string name="rateme_menu_item">Rate on Play Store</string>
     <string name="refresh">Refresh</string>
+    <string name="animation_covers_minutes">Time covered by the animation</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
     <string name="widget_log">Application Log</string>
