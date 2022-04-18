@@ -168,7 +168,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 for (i in 1.until(correctFrameCount)) {
                     decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
                 }
-                // HR images are sometimes out of order, sort them by timestamp
                 val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
                     addAll(sequence.frames)
                 }
@@ -231,9 +230,6 @@ class LradarSequenceLoader : FrameSequenceLoader(
         sequence.frames.apply {
             clear()
             addAll(sortedFrames)
-            while (size > correctFrameCount) {
-                removeAt(0)
-            }
         }
         return Pair(lastModified == 0L, sequence)
     }
