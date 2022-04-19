@@ -44,6 +44,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
         mapShape = kradarShape,
 ) {
     private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
+    private val lowestIndexAtServer = 1
+    private val highestIndexAtServer = 25
 
     override suspend fun fetchFrameSequence(
             context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
@@ -55,17 +57,15 @@ class KradarSequenceLoader : FrameSequenceLoader(
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator)
-        val indexOfFirstFrameAtServer = 26 - correctFrameCount
-        if (indexOfFirstFrameAtServer < 1) {
+        val indexOfFrameZeroAtServer = highestIndexAtServer - (correctFrameCount - 1)
+        if (indexOfFrameZeroAtServer < 1) {
             throw RuntimeException("Asked for too many frames, max is 25")
         }
 
         val isOffline = AtomicBoolean(false)
 
-        fun urlForFrameIndex(i: Int) = urlTemplate.format(indexOfFirstFrameAtServer + i)
-
-        suspend fun fetchFrame(index: Int, fetchPolicy: FetchPolicy): PngFrame {
-            val url = urlForFrameIndex(index)
+        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame {
+            val url = urlTemplate.format(indexAtServer)
             info { "Kradar fetch $url" }
             val (lastModified, frame) = try {
                 fetchPngFrame(context, url, fetchPolicy)
@@ -80,8 +80,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
             return frame
         }
 
-        fun timestampInCache(index: Int): Long? {
-            val url = urlForFrameIndex(index)
+        fun timestampInCache(indexAtServer: Int): Long? {
+            val url = urlTemplate.format(indexAtServer)
             val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
             val frame = nullableFrame ?: return null
             frames.add(frame)
@@ -91,83 +91,98 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         var fetchPolicy = fetchPolicy
+        info { "Requested fetch policy $fetchPolicy" }
         try {
-            val timestamp0InCache = withContext(IO) { timestampInCache(0) }
-            val timestamp0 = fetchFrame(0, fetchPolicy).let { frame ->
+            val tempIndexOfMostRecentCached = -1
+            val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
+            if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
+                context.renameCached(urlTemplate.format(highestIndexAtServer),
+                        urlTemplate.format(tempIndexOfMostRecentCached))
+            }
+            val mostRecentFrameAtServer = fetchFrame(highestIndexAtServer, fetchPolicy).also { frame ->
                 frames.add(frame)
                 withContext(Default) {
                     decoder.assignTimestamp(0, KradarOcr::ocrKradarTimestamp)
                 }
-                frame.timestamp
+                frames.clear()
             }
+
             // Reuse cached images by renaming them to the expected new URLs
             // after DHMZ posts a new image and renames the previous images
             withContext(IO) {
-                if (timestamp0InCache == null || timestamp0InCache >= timestamp0) {
-                    info { "timestamp0inCache == null || timestamp0InCache >= timestamp0" }
+                val mostRecentTimestampAtServer = mostRecentFrameAtServer.timestamp
+                if (mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestampAtServer) {
+                    info { "mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
+                    return@withContext
+                }
+                val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestampAtServer - mostRecentTimestampInCache
+                val millisInMinute = 60_000
+                val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
+                        (minutesPerFrame * millisInMinute)
+                if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
+                    info { "There are no cached frames to reuse" }
                     return@withContext
                 }
                 synchronized (CACHE_LOCK) {
-                    val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second)).apply {
-                        add(Pair(0, timestamp0InCache))
-                    }
+                    val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second))
                     info { "Collecting cached DHMZ timestamps" }
-                    for (i in 1.until(correctFrameCount)) {
-                        val timestamp = timestampInCache(i) ?: return@withContext
-                        sortedByTimestamp.add(Pair(i, timestamp))
-                    }
-                    if (sortedByTimestamp.size != correctFrameCount) {
-                        info { "Cached DHMZ timestamps have duplicates" }
-                        return@withContext
-                    }
-                    val urlsHaveDisorder =
-                            sortedByTimestamp.mapIndexed { indexToBe, (indexNow, _) -> indexToBe != indexNow }
-                            .any { it }
-                    if (urlsHaveDisorder) {
-                        info { "DHMZ URLs have disorder" }
-                        sortedByTimestamp.forEach { (index, _) ->
-                            val urlNow = urlForFrameIndex(index)
-                            context.renameCached(urlNow, "$urlNow.tmp")
+                    run {
+                        var addedCount = 0
+                        for (i in (highestIndexAtServer - 1).downTo(lowestIndexAtServer)) {
+                            val timestamp = timestampInCache(i) ?: continue
+                            addedCount += 1
+                            sortedByTimestamp.add(Pair(i, timestamp))
                         }
-                        sortedByTimestamp.forEachIndexed { indexToBe, (indexNow, _) ->
-                            val tmpName = "${urlForFrameIndex(indexNow)}.tmp"
-                            context.renameCached(tmpName, urlForFrameIndex(indexToBe))
+                        if (sortedByTimestamp.size < addedCount) {
+                            info { "Cached DHMZ timestamps have duplicates" }
+                            return@withContext
                         }
                     }
-                    val indexOfNewTimestamp0 =
-                            sortedByTimestamp.indexOfFirst { (_, timestamp) -> timestamp == timestamp0 }
-                                    .takeIf { it > 0 }
-                                    ?: return@withContext
-                    info { "DHMZ indexOfTimestamp0 == $indexOfNewTimestamp0, " +
-                            "indexOfFirstFrameAtServer == $indexOfFirstFrameAtServer" }
-                    for ((index, _) in sortedByTimestamp) {
-                        if (index < indexOfNewTimestamp0) {
-                            try {
-                                context.deleteCached(urlForFrameIndex(index))
-                            } catch (e: IOException) {
-                                warn { e.message ?: "<reason missing>" }
+                    run {
+                        var previousIndex = -1
+                        for ((indexAtServer, _) in sortedByTimestamp) {
+                            if (previousIndex == -1) {
+                                previousIndex = indexAtServer
+                            } else if (indexAtServer < previousIndex) {
+                                info { "DHMZ frames aren't ordered by timestamp" }
                                 return@withContext
                             }
+                        }
+                    }
+                    sortedByTimestamp.add(Pair(tempIndexOfMostRecentCached, mostRecentTimestampInCache))
+                    for ((indexAtServer, _) in sortedByTimestamp) {
+                        val indexAtServerSoFar = if (indexAtServer == tempIndexOfMostRecentCached)
+                            highestIndexAtServer else indexAtServer
+                        val indexAtServerToBe = indexAtServerSoFar - indexShift
+                        val urlNow = urlTemplate.format(indexAtServer)
+                        if (indexAtServerToBe < 1) {
+                            try {
+                                info { "Deleting cached DHMZ image $indexAtServer" }
+                                context.deleteCached(urlNow)
+                            } catch (e: IOException) {
+                                warn { "Failed to delete $urlNow in cache: " + e.message ?: "<reason missing>" }
+                            }
                         } else {
-                            val indexToBe = index - indexOfNewTimestamp0
-                            info { "Reusing DHMZ image $index as $indexToBe" }
-                            context.renameCached(urlForFrameIndex(index), urlForFrameIndex(indexToBe))
+                            val urlToBe = urlTemplate.format(indexAtServerToBe)
+                            info { "Reusing DHMZ image $indexAtServer as $indexAtServerToBe" }
+                            context.renameCached(urlNow, urlToBe)
                         }
                     }
                 }
                 fetchPolicy = PREFER_CACHED
             }
             coroutineScope {
-                1.until(correctFrameCount).map { i ->
+                indexOfFrameZeroAtServer.until(highestIndexAtServer).map { i ->
                     async(IO) { fetchFrame(i, fetchPolicy) }
                 }.forEach {
                     frames.add(it.await())
                 }
             }
             withContext(Default) {
-                for (i in 1.until(correctFrameCount)) {
+                for (i in 0.until(frames.size)) {
                     decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
                 }
+                frames.add(mostRecentFrameAtServer)
                 val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
                     addAll(sequence.frames)
                 }
@@ -185,7 +200,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         return Pair(isOffline.get(), sequence)
     }
 
-    private fun newKradarSequence(frames: MutableList<PngFrame>) = PngSequence(frames, 720, 751)
+    private fun newKradarSequence(frames: MutableList<PngFrame>) = PngSequence(frames)
 }
 
 class LradarSequenceLoader : FrameSequenceLoader(

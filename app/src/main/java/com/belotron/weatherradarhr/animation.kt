@@ -245,9 +245,7 @@ class FrameAnimator(
     }
 
     private fun adjustedFrameIndex(correctFrameIndex: Int): Int {
-        val adjustedIndex = correctFrameIndex - (correctFrameCount - frameDecoder.frameCount)
-        info { "adjustedIndex $adjustedIndex" }
-        return max(0, adjustedIndex)
+        return max(0, correctFrameIndex - (correctFrameCount - frameDecoder.frameCount))
     }
 
     private fun toProgress(frameIndex: Int) = correctFrameCount.let { frameCount ->
