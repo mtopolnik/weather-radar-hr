@@ -32,8 +32,6 @@ class PngFrame(
 
 class PngSequence(
     override val frames: MutableList<PngFrame>,
-    val frameWidth: Int,
-    val frameHeight: Int
 ) : FrameSequence<PngFrame> {
     override fun intoDecoder(allocator: Allocator) = PngDecoder(allocator, this)
 }
@@ -45,9 +43,11 @@ class PngDecoder(
 
     override fun decodeFrame(frameIndex: Int): Bitmap {
         val frame = sequence.frames[frameIndex]
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
+        BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, opts)
         return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
             inMutable = true
-            inBitmap = allocator.obtain(sequence.frameWidth, sequence.frameHeight, Bitmap.Config.ARGB_8888)
+            inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
         })
     }
     override fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
