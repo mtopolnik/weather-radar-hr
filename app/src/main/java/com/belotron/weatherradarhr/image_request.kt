@@ -165,7 +165,7 @@ class Exchange<out T>(
         }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
-            val cachedIn = runOrNull { cachedDataIn(url.toExternalForm()) }
+            val cachedIn = runOrNull { context.cachedDataIn(url.toExternalForm()) }
             val decodedImage = if (cachedIn == null) {
                 fetchContentAndUpdateCache(responseBody, lastModifiedStr)
             } else {
@@ -197,12 +197,12 @@ class Exchange<out T>(
     }
 
     private fun loadCachedResult(): Pair<Long, T>? = runOrNull {
-        val (lastModifiedStr, imgBytes) = cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
+        val (lastModifiedStr, imgBytes) = context.cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
         Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage)
     }
 
     private fun loadCachedImage(): T? = runOrNull {
-        cachedDataIn(url).use { it.readUTF(); it.readBytes() }
+        context.cachedDataIn(url).use { it.readUTF(); it.readBytes() }
     }?.parseOrInvalidateImage
 
     private val ByteArray.parseOrInvalidateImage: T
@@ -216,7 +216,7 @@ class Exchange<out T>(
             }
         }
 
-    private fun loadCachedLastModified(url: String) = runOrNull { cachedDataIn(url).use { it.readUTF() } }
+    private fun loadCachedLastModified(url: String) = runOrNull { context.cachedDataIn(url).use { it.readUTF() } }
 
     private fun HttpURLConnection.logErrorResponse() {
         val responseBody = runOrNull { '\n' + String(inputStream.use { it.readBytes() }, UTF_8) } ?: ""
@@ -230,8 +230,6 @@ class Exchange<out T>(
     }
 
     private fun String.parseLastModified() = lastModifiedDateFormat.parse(this)?.time ?: defaultLastModified
-
-    private fun cachedDataIn(url: String) = context.cacheFile(url).dataIn()
 
     private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
         val growingFile = File(cacheFile.path + ".growing")
@@ -252,6 +250,8 @@ class Exchange<out T>(
         }
     }
 }
+
+private fun Context.cachedDataIn(url: String) = cacheFile(url).dataIn()
 
 fun Context.invalidateCache(url: String) {
     synchronized(CACHE_LOCK) {
@@ -282,6 +282,16 @@ fun Context.renameCached(urlNow: String, urlToBe: String) {
         val cacheFileToBe = cacheFile(urlToBe)
         if (!cacheFileNow.renameTo(cacheFileToBe)) {
             severe(CC_PRIVATE) { "Failed to rename $cacheFileNow to $cacheFileToBe" }
+        }
+    }
+}
+
+fun Context.copyCached(fromUrl: String, toUrl: String) {
+    synchronized(CACHE_LOCK) {
+        cachedDataIn(fromUrl).use { inputStream ->
+            cacheFile(toUrl).dataOut().use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
         }
     }
 }

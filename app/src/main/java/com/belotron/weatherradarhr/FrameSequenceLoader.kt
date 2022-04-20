@@ -96,7 +96,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
             val tempIndexOfMostRecentCached = -1
             val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
             if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
-                context.renameCached(urlTemplate.format(highestIndexAtServer),
+                context.copyCached(urlTemplate.format(highestIndexAtServer),
                         urlTemplate.format(tempIndexOfMostRecentCached))
             }
             val mostRecentFrameAtServer = fetchFrame(highestIndexAtServer, fetchPolicy).also { frame ->
