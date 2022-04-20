@@ -38,6 +38,7 @@ private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
 private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
+private val LimitedIO = IO.limitedParallelism(4)
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
@@ -83,7 +84,7 @@ private suspend fun <T> Context.fetchImg(
                 }
             }
         }
-        withContext(IO) {
+        withContext(LimitedIO) {
             exchange.proceed()
         }.also {
             doneSignal.complete(Unit)
