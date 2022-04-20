@@ -141,12 +141,11 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     run {
                         var previousIndex = -1
                         for ((indexAtServer, _) in sortedByTimestamp) {
-                            if (previousIndex == -1) {
-                                previousIndex = indexAtServer
-                            } else if (indexAtServer < previousIndex) {
+                            if (indexAtServer < previousIndex) {
                                 info { "DHMZ frames aren't ordered by timestamp" }
                                 return@withContext
                             }
+                            previousIndex = indexAtServer
                         }
                     }
                     sortedByTimestamp.add(Pair(tempIndexOfMostRecentCached, mostRecentTimestampInCache))
@@ -173,7 +172,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
             coroutineScope {
                 indexOfFrameZeroAtServer.until(highestIndexAtServer).map { i ->
-                    async(IO) { fetchFrame(i, fetchPolicy) }
+                    async { fetchFrame(i, fetchPolicy) }
                 }.forEach {
                     frames.add(it.await())
                 }
