@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.*
@@ -172,7 +173,22 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
             coroutineScope {
                 indexOfFrameZeroAtServer.until(highestIndexAtServer).map { i ->
-                    async { fetchFrame(i, fetchPolicy) }
+                    async {
+                        var attempt = 0
+                        while (true) {
+                            attempt += 1
+                            try {
+                                return@async fetchFrame(i, fetchPolicy)
+                            } catch (e: Exception) {
+                                if (attempt == 5) {
+                                    throw e
+                                }
+                                delay(1_000)
+                            }
+                        }
+                        @Suppress("ThrowableNotThrown", "UNREACHABLE_CODE")
+                        throw RuntimeException("unreachable")
+                    }
                 }.forEach {
                     frames.add(it.await())
                 }

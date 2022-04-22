@@ -80,7 +80,9 @@ private suspend fun <T> Context.fetchImg(
                 withContext(NonCancellable + IO) {
                     try {
                         inputStream.close()
-                    } catch (e: IOException) { }
+                    } catch (e: Exception) {
+                        severe(e) { "Error on asynchronous inputStream.close()" }
+                    }
                 }
             }
         }
@@ -148,7 +150,11 @@ class Exchange<out T>(
                     if (fetchPolicy == ONLY_IF_NEW) null
                     else runOrNull { loadCachedImage() })
         } finally {
-            conn?.disconnect()
+            try {
+                conn?.disconnect()
+            } catch (e: Exception) {
+                severe(e) { "Error when closing connection" }
+            }
         }
     }
 
