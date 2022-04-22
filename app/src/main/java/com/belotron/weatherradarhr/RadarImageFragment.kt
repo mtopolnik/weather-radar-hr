@@ -418,9 +418,9 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                     val bundle = ds.imgBundles[loader.positionInUI]
                     launch {
                         try {
-                            val correctFrameCount = loader.correctFrameCount(context)
+                            val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
                             val (isOffline, frameSequence) = loader.fetchFrameSequence(
-                                    context, correctFrameCount, fetchPolicy)
+                                    context, animationCoversMinutes, fetchPolicy)
                             if (frameSequence == null) {
                                 bundle.status = BROKEN
                                 return@launch
@@ -428,6 +428,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                             bundle.animationProgress = ds.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(animationLooper) {
                                 receiveNewFrames(loader, frameSequence, isOffline)
+                                val correctFrameCount = loader.correctFrameCount(animationCoversMinutes)
                                 resume(context, correctFrameCount, rateMinsPerSec, freezeTimeMillis)
                             }
                             bundle.status = SHOWING

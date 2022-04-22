@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.*
@@ -19,19 +20,21 @@ import kotlin.math.ceil
 
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
+const val MILLIS_IN_MINUTE = 60_000
+
 sealed class FrameSequenceLoader(
         val positionInUI: Int,
         val title: String,
         val minutesPerFrame: Int,
         val mapShape: MapShape,
 ) {
-    fun correctFrameCount(context: Context): Int =
-            ceil(context.mainPrefs.animationCoversMinutes.toDouble() / minutesPerFrame).toInt()
+    fun correctFrameCount(animationCoversMinutes: Int): Int =
+            ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt()
 
     // Returns Pair(isOffline, sequence)
     abstract suspend fun fetchFrameSequence(
             context: Context,
-            correctFrameCount: Int,
+            animationCoversMinutes: Int,
             fetchPolicy: FetchPolicy
     ): Pair<Boolean, FrameSequence<out Frame>?>
 }
@@ -49,7 +52,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
     private val highestIndexAtServer = 25
 
     override suspend fun fetchFrameSequence(
-            context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
+            context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, PngSequence?> {
         // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
@@ -58,6 +61,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator)
+        val correctFrameCount = correctFrameCount(animationCoversMinutes)
         val indexOfFrameZeroAtServer = highestIndexAtServer - (correctFrameCount - 1)
         if (indexOfFrameZeroAtServer < 1) {
             throw RuntimeException("Asked for too many frames, max is 25")
@@ -100,23 +104,23 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 context.copyCached(urlTemplate.format(highestIndexAtServer),
                         urlTemplate.format(tempIndexOfMostRecentCached))
             }
-            val mostRecentFrameAtServer = fetchFrame(highestIndexAtServer, fetchPolicy).also { frame ->
+            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy).also { frame ->
                 frames.add(frame)
                 withContext(Default) {
                     decoder.assignTimestamp(0, KradarOcr::ocrKradarTimestamp)
                 }
                 frames.clear()
             }
+            val mostRecentTimestamp = mostRecentFrame.timestamp
 
             // Reuse cached images by renaming them to the expected new URLs
             // after DHMZ posts a new image and renames the previous images
             withContext(IO) {
-                val mostRecentTimestampAtServer = mostRecentFrameAtServer.timestamp
-                if (mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestampAtServer) {
+                if (mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestamp) {
                     info { "mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
                     return@withContext
                 }
-                val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestampAtServer - mostRecentTimestampInCache
+                val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
                 val millisInMinute = 60_000
                 val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
                         (minutesPerFrame * millisInMinute)
@@ -194,17 +198,20 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 }
             }
             withContext(Default) {
-                for (i in 0.until(frames.size)) {
-                    decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp)
+                coroutineScope {
+                    for (i in 0.until(frames.size)) {
+                        launch { decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp) }
+                    }
                 }
-                frames.add(mostRecentFrameAtServer)
                 val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
                     addAll(sequence.frames)
+                    add(mostRecentFrame)
                 }
-                sequence.frames.apply {
-                    clear()
-                    addAll(sortedFrames)
-                }
+                frames.clear()
+                val oldestAcceptableTimestamp =
+                        mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE
+                sortedFrames.dropWhile { it.timestamp < oldestAcceptableTimestamp }
+                        .forEach { frames.add(it) }
             }
         } catch (e: NullFrameException) {
             return Pair(true, null)
