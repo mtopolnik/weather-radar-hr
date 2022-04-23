@@ -41,8 +41,13 @@ class PngDecoder(
     override val sequence: PngSequence,
 ) : FrameDecoder<PngFrame> {
 
-    override fun decodeFrame(frameIndex: Int): Bitmap {
-        val frame = sequence.frames[frameIndex]
+    override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex])
+
+    override fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
+        assignTimestamp(sequence.frames[frameIndex], ocrTimestamp)
+    }
+
+    fun decodeFrame(frame: PngFrame): Bitmap {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
         BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, opts)
         return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
@@ -50,10 +55,11 @@ class PngDecoder(
             inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
         })
     }
-    override fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
-        val bitmap = decodeFrame(frameIndex)
+
+    fun assignTimestamp(frame: PngFrame, ocrTimestamp: (Pixels) -> Long) {
+        val bitmap = decodeFrame(frame)
         try {
-            sequence.frames[frameIndex].timestamp = ocrTimestamp(bitmap.asPixels())
+            frame.timestamp = ocrTimestamp(bitmap.asPixels())
         } finally {
             release(bitmap)
         }

@@ -21,6 +21,8 @@ import kotlin.math.ceil
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 const val MILLIS_IN_MINUTE = 60_000
+const val SLEEP_MILLIS_BEFORE_RETRYING = 1_500L
+const val ATTEMPTS_BEFORE_GIVING_UP = 5
 
 sealed class FrameSequenceLoader(
         val positionInUI: Int,
@@ -39,7 +41,7 @@ sealed class FrameSequenceLoader(
     ): Pair<Boolean, FrameSequence<out Frame>?>
 }
 
-class NullFrameException: Exception()
+class NullFrameException: Exception("Failed to fetch, missing from cache")
 
 class KradarSequenceLoader : FrameSequenceLoader(
         positionInUI = 0,
@@ -57,6 +59,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
         assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_IF_NEW" }
+        val rawFrames = mutableListOf<PngFrame?>()
         val frames = mutableListOf<PngFrame>()
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
@@ -69,20 +72,41 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         val isOffline = AtomicBoolean(false)
 
-        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame {
+        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame? {
             val url = urlTemplate.format(indexAtServer)
             info { "Kradar fetch $url" }
-            val (lastModified, frame) = try {
-                fetchPngFrame(context, url, fetchPolicy)
-            } catch (e: ImageFetchException) {
-                isOffline.set(true)
-                val cached = e.cached ?: throw IOException("Fetch error, missing from cache")
-                Pair(0L, cached as PngFrame)
+            var attempt = 0
+            while (true) {
+                attempt += 1
+                try {
+                    val (lastModified, frame) = try {
+                        fetchPngFrame(context, url, fetchPolicy)
+                    } catch (e: ImageFetchException) {
+                        isOffline.set(true)
+                        val cached = e.cached ?: throw NullFrameException()
+                        val frame = cached as PngFrame
+                        try {
+                            decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                        } catch (e: Exception) {
+                            withContext(IO) {
+                                synchronized (CACHE_LOCK) {
+                                    context.invalidateCache(url)
+                                }
+                            }
+                        }
+                        Pair(0L, frame)
+                    }
+                    if (frame == null) {
+                        throw NullFrameException()
+                    }
+                    return frame
+                } catch (e: Exception) {
+                    if (attempt == ATTEMPTS_BEFORE_GIVING_UP) {
+                        return null
+                    }
+                    delay(SLEEP_MILLIS_BEFORE_RETRYING)
+                }
             }
-            if (frame == null) {
-                throw NullFrameException()
-            }
-            return frame
         }
 
         fun timestampInCache(indexAtServer: Int): Long? {
@@ -104,12 +128,14 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 context.copyCached(urlTemplate.format(highestIndexAtServer),
                         urlTemplate.format(tempIndexOfMostRecentCached))
             }
-            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy).also { frame ->
-                frames.add(frame)
-                withContext(Default) {
-                    decoder.assignTimestamp(0, KradarOcr::ocrKradarTimestamp)
+            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy).let { frame ->
+                if (frame == null) {
+                    throw NullFrameException()
                 }
-                frames.clear()
+                withContext(Default) {
+                    decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                }
+                frame
             }
             val mostRecentTimestamp = mostRecentFrame.timestamp
 
@@ -178,40 +204,63 @@ class KradarSequenceLoader : FrameSequenceLoader(
             coroutineScope {
                 indexOfFrameZeroAtServer.until(highestIndexAtServer).map { i ->
                     async {
-                        var attempt = 0
-                        while (true) {
-                            attempt += 1
-                            try {
-                                return@async fetchFrame(i, fetchPolicy)
-                            } catch (e: Exception) {
-                                if (attempt == 5) {
-                                    throw e
-                                }
-                                delay(1_000)
-                            }
-                        }
-                        @Suppress("ThrowableNotThrown", "UNREACHABLE_CODE")
-                        throw RuntimeException("unreachable")
+                        fetchFrame(i, fetchPolicy)
                     }
                 }.forEach {
-                    frames.add(it.await())
+                    rawFrames.add(it.await())
                 }
             }
             withContext(Default) {
                 coroutineScope {
-                    for (i in 0.until(frames.size)) {
-                        launch { decoder.assignTimestamp(i, KradarOcr::ocrKradarTimestamp) }
+                    rawFrames.forEachIndexed { i, frame ->
+                        if (frame == null) {
+                            return@forEachIndexed
+                        }
+                        launch {
+                            try {
+                                decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                            } catch (e: Exception) {
+                                rawFrames[i] = null
+                            }
+                        }
                     }
                 }
-                val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
-                    addAll(sequence.frames)
-                    add(mostRecentFrame)
+                for (i in 0.until(rawFrames.size)) {
+                    if (rawFrames[i] != null) {
+                        continue
+                    }
+                    val prevFrame = (i - 1).downTo(0).map { rawFrames[it] }.find { it != null }
+                    if (prevFrame != null) {
+                        rawFrames[i] = prevFrame
+                    } else {
+                        val nextFrame = (i + 1).until(rawFrames.size).map { rawFrames[it] }.find { it != null }
+                        if (nextFrame != null) {
+                            rawFrames[i] = nextFrame
+                        } else {
+                            rawFrames[i] = mostRecentFrame
+                        }
+                    }
                 }
-                frames.clear()
+                rawFrames.map { frame ->
+                    if (frame == null) {
+                        throw NullFrameException() // the logic above should prevent this from being possible
+                    }
+                    frame
+                }.forEach {
+                    frames.add(it)
+                }
+                frames.add(mostRecentFrame)
+                frames.sortWith(compareBy(PngFrame::timestamp))
                 val oldestAcceptableTimestamp =
                         mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE
-                sortedFrames.dropWhile { it.timestamp < oldestAcceptableTimestamp }
-                        .forEach { frames.add(it) }
+                dropOutdated@{
+                    val iter = frames.iterator()
+                    while (iter.hasNext()) {
+                        if (iter.next().timestamp < oldestAcceptableTimestamp) {
+                            iter.remove()
+                        }
+                    }
+                }
             }
         } catch (e: NullFrameException) {
             return Pair(true, null)
@@ -255,7 +304,11 @@ class LradarSequenceLoader : FrameSequenceLoader(
             }
         } catch (e: ImgDecodeException) {
             severe(CcOption.CC_PRIVATE) { "Animated GIF decoding error" }
-            context.invalidateCache(url)
+            withContext(IO) {
+                synchronized (CACHE_LOCK) {
+                    context.invalidateCache(url)
+                }
+            }
             throw e
         } finally {
             decoder.dispose()
