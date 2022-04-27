@@ -25,36 +25,36 @@ const val SLEEP_MILLIS_BEFORE_RETRYING = 1_500L
 const val ATTEMPTS_BEFORE_GIVING_UP = 5
 
 sealed class FrameSequenceLoader(
-        val positionInUI: Int,
-        val title: String,
-        val minutesPerFrame: Int,
-        val mapShape: MapShape,
+    val positionInUI: Int,
+    val title: String,
+    val minutesPerFrame: Int,
+    val mapShape: MapShape,
 ) {
     fun correctFrameCount(animationCoversMinutes: Int): Int =
         ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt() + 1
 
     // Returns Pair(isOffline, sequence)
     abstract suspend fun fetchFrameSequence(
-            context: Context,
-            animationCoversMinutes: Int,
-            fetchPolicy: FetchPolicy
+        context: Context,
+        animationCoversMinutes: Int,
+        fetchPolicy: FetchPolicy
     ): Pair<Boolean, FrameSequence<out Frame>?>
 }
 
-class NullFrameException: Exception("Failed to fetch, missing from cache")
+class NullFrameException : Exception("Failed to fetch, missing from cache")
 
 class KradarSequenceLoader : FrameSequenceLoader(
-        positionInUI = 0,
-        title = "HR",
-        minutesPerFrame = 5,
-        mapShape = kradarShape,
+    positionInUI = 0,
+    title = "HR",
+    minutesPerFrame = 5,
+    mapShape = kradarShape,
 ) {
     private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
     private val lowestIndexAtServer = 1
     private val highestIndexAtServer = 25
 
     override suspend fun fetchFrameSequence(
-            context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
+        context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, PngSequence?> {
         // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
@@ -89,7 +89,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             decoder.assignTimestamp(frame)
                         } catch (e: Exception) {
                             withContext(IO) {
-                                synchronized (CACHE_LOCK) {
+                                synchronized(CACHE_LOCK) {
                                     context.invalidateCache(url)
                                 }
                             }
@@ -123,8 +123,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
             val tempIndexOfMostRecentCached = -1
             val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
             if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
-                context.copyCached(urlTemplate.format(highestIndexAtServer),
-                        urlTemplate.format(tempIndexOfMostRecentCached))
+                context.copyCached(
+                    urlTemplate.format(highestIndexAtServer),
+                    urlTemplate.format(tempIndexOfMostRecentCached)
+                )
             }
             val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy).let { frame ->
                 if (frame == null) {
@@ -273,15 +275,16 @@ class KradarSequenceLoader : FrameSequenceLoader(
 }
 
 class LradarSequenceLoader : FrameSequenceLoader(
-        positionInUI = 1,
-        title = "SLO",
-        minutesPerFrame = 5,
-        mapShape = lradarShape,
+    positionInUI = 1,
+    title = "SLO",
+    minutesPerFrame = 5,
+    mapShape = lradarShape,
+    ocrTimestamp = LradarOcr::ocrLradarTimestamp
 ) {
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
     override suspend fun fetchFrameSequence(
-            context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
+        context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, GifSequence?> {
         val (lastModified, sequence) = try {
             fetchGifSequence(context, url, fetchPolicy)
@@ -303,7 +306,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
         } catch (e: ImgDecodeException) {
             severe(CcOption.CC_PRIVATE) { "Animated GIF decoding error" }
             withContext(IO) {
-                synchronized (CACHE_LOCK) {
+                synchronized(CACHE_LOCK) {
                     context.invalidateCache(url)
                 }
             }
