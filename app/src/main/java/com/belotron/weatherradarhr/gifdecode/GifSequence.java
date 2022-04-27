@@ -4,6 +4,7 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import com.belotron.weatherradarhr.FrameDecoder;
 import com.belotron.weatherradarhr.FrameSequence;
+import kotlin.jvm.functions.Function1;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +31,8 @@ public class GifSequence implements FrameSequence<GifFrame> {
     }
 
     @NonNull @Override
-    public GifDecoder intoDecoder(@NonNull Allocator allocator) {
-        return new GifDecoder(allocator, this);
+    public GifDecoder intoDecoder(@NonNull Allocator allocator, Function1<? super Pixels, Long> ocrTimestamp) {
+        return new GifDecoder(allocator, this, ocrTimestamp);
     }
 
     @ColorInt

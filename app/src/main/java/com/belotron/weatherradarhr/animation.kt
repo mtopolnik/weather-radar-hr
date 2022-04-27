@@ -127,7 +127,7 @@ class FrameAnimator(
 
     private val frameDelayMillis get() =  1000 * frameSeqLoader.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
-    private val frameDecoder = frameSequence.intoDecoder(allocator)
+    private val frameDecoder = frameSequence.intoDecoder(allocator, frameSeqLoader.ocrTimestamp)
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null

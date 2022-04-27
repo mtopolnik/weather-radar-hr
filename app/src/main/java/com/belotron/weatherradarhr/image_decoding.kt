@@ -11,13 +11,13 @@ interface Frame {
 
 interface FrameSequence<T : Frame> {
     val frames: MutableList<T>
-    fun intoDecoder(allocator: Allocator): FrameDecoder<T>
+    fun intoDecoder(allocator: Allocator, ocrTimestamp: (Pixels) -> Long): FrameDecoder<T>
 }
 
 interface FrameDecoder<T : Frame> {
     val sequence: FrameSequence<T>
     fun decodeFrame(frameIndex: Int): Bitmap
-    fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long)
+    fun assignTimestamp(frameIndex: Int)
     fun release(bitmap: Bitmap)
     fun dispose()
 }
@@ -33,18 +33,20 @@ class PngFrame(
 class PngSequence(
     override val frames: MutableList<PngFrame>,
 ) : FrameSequence<PngFrame> {
-    override fun intoDecoder(allocator: Allocator) = PngDecoder(allocator, this)
+    override fun intoDecoder(allocator: Allocator, ocrTimestamp: (Pixels) -> Long) =
+        PngDecoder(allocator, this, ocrTimestamp)
 }
 
 class PngDecoder(
     private val allocator: Allocator,
     override val sequence: PngSequence,
+    private val ocrTimestamp: (Pixels) -> Long
 ) : FrameDecoder<PngFrame> {
 
     override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex])
 
-    override fun assignTimestamp(frameIndex: Int, ocrTimestamp: (Pixels) -> Long) {
-        assignTimestamp(sequence.frames[frameIndex], ocrTimestamp)
+    override fun assignTimestamp(frameIndex: Int) {
+        assignTimestamp(sequence.frames[frameIndex])
     }
 
     fun decodeFrame(frame: PngFrame): Bitmap {
@@ -56,7 +58,7 @@ class PngDecoder(
         })
     }
 
-    fun assignTimestamp(frame: PngFrame, ocrTimestamp: (Pixels) -> Long) {
+    fun assignTimestamp(frame: PngFrame) {
         val bitmap = decodeFrame(frame)
         try {
             frame.timestamp = ocrTimestamp(bitmap.asPixels())

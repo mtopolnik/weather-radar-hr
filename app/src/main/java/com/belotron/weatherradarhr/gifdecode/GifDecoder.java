@@ -53,7 +53,8 @@ import java.util.Arrays;
  * Original source</a>
  * @see <a href="https://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF 89a Specification</a>
  */
-public class GifDecoder implements FrameDecoder<GifFrame> {
+public class GifDecoder implements FrameDecoder<GifFrame>
+{
 
     /**
      * Dictionary size for decoding LZW compressed data.
@@ -85,16 +86,20 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
     private final byte[] pixelStack = new byte[DICT_SIZE + 1];
 
     private final byte[] pixelCodes;
-
     @ColorInt private final int[] outPixels;
-
-    private GifSequence gifSequence;
-
     @Nullable private Boolean isFirstFrameTransparent;
 
-    public GifDecoder(@NonNull Allocator allocator, @NonNull GifSequence gifSequence) {
+    private GifSequence gifSequence;
+    private final Function1<? super Pixels, Long> ocrTimestamp;
+
+    public GifDecoder(
+        @NonNull Allocator allocator,
+        @NonNull GifSequence gifSequence,
+        @NonNull Function1<? super Pixels, Long> ocrTimestamp
+    ) {
         this.allocator = allocator;
         this.gifSequence = gifSequence;
+        this.ocrTimestamp = ocrTimestamp;
         pixelCodes = allocator.obtainByteArray(gifSequence.width * gifSequence.height);
         outPixels = allocator.obtainIntArray(gifSequence.width * gifSequence.height);
     }
@@ -118,12 +123,12 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         GifDecoder gifDecoder = gotoAndDecode(frameIndex);
         Bitmap result = gifDecoder.obtainBitmap();
         result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width,
-                gifDecoder.gifSequence.height);
+            gifDecoder.gifSequence.height);
         return result;
     }
 
     @Override
-    public void assignTimestamp(int frameIndex, @NonNull Function1<? super Pixels, Long> ocrTimestamp) {
+    public void assignTimestamp(int frameIndex) {
         gotoAndDecode(frameIndex);
         gifSequence.getFrames()
                    .get(frameIndex)
@@ -136,7 +141,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
         }
         if (frameIndex >= gifSequence.getFrames().size()) {
             throw new ImgDecodeException("Asked to decode frame " + frameIndex + ", but frame count is " +
-                    gifSequence.getFrames().size());
+                gifSequence.getFrames().size());
         }
         try {
             GifFrame currentFrame = gifSequence.getFrames().get(frameIndex);
@@ -175,7 +180,7 @@ public class GifDecoder implements FrameDecoder<GifFrame> {
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
         if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
             throw new ImgDecodeException("The animated GIF contains a frame with the Restore To Previous frame " +
-                    "disposal method" + " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
+                "disposal method" + " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
         }
 
         // fill in starting image contents based on last image's dispose code

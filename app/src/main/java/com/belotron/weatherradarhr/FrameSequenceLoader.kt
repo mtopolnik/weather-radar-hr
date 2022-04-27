@@ -63,7 +63,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         val frames = mutableListOf<PngFrame>()
         val sequence = newKradarSequence(frames)
         val allocator = BitmapFreelists()
-        val decoder = sequence.intoDecoder(allocator)
+        val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
         val correctFrameCount = correctFrameCount(animationCoversMinutes)
         val indexOfFrameZeroAtServer = highestIndexAtServer - (correctFrameCount - 1)
         if (indexOfFrameZeroAtServer < 1) {
@@ -86,7 +86,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         val cached = e.cached ?: throw NullFrameException()
                         val frame = cached as PngFrame
                         try {
-                            decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                            decoder.assignTimestamp(frame)
                         } catch (e: Exception) {
                             withContext(IO) {
                                 synchronized (CACHE_LOCK) {
@@ -113,9 +113,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
             val url = urlTemplate.format(indexAtServer)
             val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
             val frame = nullableFrame ?: return null
-            frames.add(frame)
-            decoder.assignTimestamp(frames.size - 1, KradarOcr::ocrKradarTimestamp)
-            frames.removeLast()
+            decoder.assignTimestamp(frame)
             return frame.timestamp
         }
 
@@ -133,7 +131,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     throw NullFrameException()
                 }
                 withContext(Default) {
-                    decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                    decoder.assignTimestamp(frame)
                 }
                 frame
             }
@@ -294,12 +292,12 @@ class LradarSequenceLoader : FrameSequenceLoader(
             return Pair(true, null)
         }
         val allocator = BitmapFreelists()
-        val decoder = sequence.intoDecoder(allocator)
+        val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
         try {
             val frames = sequence.frames
             withContext(Default) {
                 (0 until frames.size).forEach { frameIndex ->
-                    decoder.assignTimestamp(frameIndex, LradarOcr::ocrLradarTimestamp)
+                    decoder.assignTimestamp(frameIndex)
                 }
             }
         } catch (e: ImgDecodeException) {
