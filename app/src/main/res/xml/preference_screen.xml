@@ -7,7 +7,7 @@
             android:title="@string/animation_covers_minutes"
             android:summary="%d min"
             android:defaultValue="90"
-            belotron:min="10"
+            belotron:min="5"
             belotron:max="120"
     />
     <com.belotron.weatherradarhr.SeekBarPreference

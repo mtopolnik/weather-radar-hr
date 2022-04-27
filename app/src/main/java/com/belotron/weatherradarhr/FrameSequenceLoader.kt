@@ -31,7 +31,7 @@ sealed class FrameSequenceLoader(
         val mapShape: MapShape,
 ) {
     fun correctFrameCount(animationCoversMinutes: Int): Int =
-            ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt()
+        ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt() + 1
 
     // Returns Pair(isOffline, sequence)
     abstract suspend fun fetchFrameSequence(
