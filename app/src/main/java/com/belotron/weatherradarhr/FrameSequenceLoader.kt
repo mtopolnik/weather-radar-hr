@@ -6,6 +6,7 @@ import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
@@ -14,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.ceil
@@ -29,6 +31,7 @@ sealed class FrameSequenceLoader(
     val title: String,
     val minutesPerFrame: Int,
     val mapShape: MapShape,
+    val ocrTimestamp: (Pixels) -> Long
 ) {
     fun correctFrameCount(animationCoversMinutes: Int): Int =
         ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt() + 1
@@ -48,6 +51,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
     title = "HR",
     minutesPerFrame = 5,
     mapShape = kradarShape,
+    ocrTimestamp = KradarOcr::ocrKradarTimestamp
 ) {
     private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
     private val lowestIndexAtServer = 1
@@ -61,7 +65,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_IF_NEW" }
         val rawFrames = mutableListOf<PngFrame?>()
         val frames = mutableListOf<PngFrame>()
-        val sequence = newKradarSequence(frames)
+        val sequence = PngSequence(frames)
         val allocator = BitmapFreelists()
         val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
         val correctFrameCount = correctFrameCount(animationCoversMinutes)
@@ -142,19 +146,23 @@ class KradarSequenceLoader : FrameSequenceLoader(
             // Reuse cached images by renaming them to the expected new URLs
             // after DHMZ posts a new image and renames the previous images
             withContext(IO) {
-                if (mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestamp) {
-                    info { "mostRecentTimestampInCache == null || mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
+                if (mostRecentTimestampInCache == null) {
+                    info { "mostRecentTimestampInCache == null" }
                     return@withContext
                 }
                 val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
+                if (diffBetweenMostRecentAtServerAndInCache <= 0) {
+                    info { "mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
+                    return@withContext
+                }
                 val millisInMinute = 60_000
                 val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
                         (minutesPerFrame * millisInMinute)
                 if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
-                    info { "There are no cached frames to reuse" }
+                    info { "There are no cached frames to rename" }
                     return@withContext
                 }
-                synchronized (CACHE_LOCK) {
+                synchronized(CACHE_LOCK) {
                     val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second))
                     info { "Collecting cached DHMZ timestamps" }
                     run {
@@ -212,14 +220,14 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
             withContext(Default) {
                 coroutineScope {
-                    rawFrames.forEachIndexed { i, frame ->
-                        if (frame == null) {
-                            return@forEachIndexed
-                        }
+                    rawFrames.filterNotNull().forEachIndexed { i, frame ->
                         launch {
                             try {
-                                decoder.assignTimestamp(frame, KradarOcr::ocrKradarTimestamp)
+                                decoder.assignTimestamp(frame)
                             } catch (e: Exception) {
+                                synchronized(CACHE_LOCK) {
+                                    context.invalidateCache(urlTemplate.format(i))
+                                }
                                 rawFrames[i] = null
                             }
                         }
@@ -250,15 +258,18 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     frames.add(it)
                 }
                 frames.add(mostRecentFrame)
+                val dstTransition = dstTransitionStatus(mostRecentTimestamp)
+                if (dstTransition != DstTransition.SUMMER_TO_WINTER) {
+                    return@withContext
+                }
                 frames.sortWith(compareBy(PngFrame::timestamp))
                 val oldestAcceptableTimestamp =
-                        mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE
-                dropOutdated@{
-                    val iter = frames.iterator()
-                    while (iter.hasNext()) {
-                        if (iter.next().timestamp < oldestAcceptableTimestamp) {
-                            iter.remove()
-                        }
+                    mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
+                            if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
+                val iter = frames.iterator()
+                while (iter.hasNext()) {
+                    if (iter.next().timestamp < oldestAcceptableTimestamp) {
+                        iter.remove()
                     }
                 }
             }
@@ -270,8 +281,65 @@ class KradarSequenceLoader : FrameSequenceLoader(
         info { "Kradar done fetchFrameSequence, frameCount = ${sequence.frames.size}" }
         return Pair(isOffline.get(), sequence)
     }
+}
 
-    private fun newKradarSequence(frames: MutableList<PngFrame>) = PngSequence(frames)
+private val dateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
+
+private fun dstTransitionStatus(timestamp: Long): DstTransition {
+    val tz = TimeZone.getTimeZone("Europe/Zagreb")!!
+    val cal = Calendar.getInstance(tz)
+    cal.timeInMillis = timestamp
+    val isInDangerZone = run {
+        val compareCal = Calendar.getInstance(tz)
+        compareCal.timeInMillis = timestamp
+        compareCal.set(Calendar.HOUR_OF_DAY, 2)
+        compareCal.set(Calendar.MINUTE, 0)
+        compareCal.set(Calendar.SECOND, 0)
+        compareCal.set(Calendar.MILLISECOND, 0)
+        val isAfter2am = cal > compareCal
+        compareCal.set(Calendar.HOUR_OF_DAY, 5)
+        val isBefore5am = cal < compareCal
+        println("${dateFormat.format(cal.time)} $isAfter2am $isBefore5am")
+        isAfter2am && isBefore5am
+    }
+    if (!isInDangerZone) {
+        return DstTransition.NONE
+    }
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    val midnightIsSummerTime = cal.get(Calendar.DST_OFFSET) != 0
+    cal.set(Calendar.HOUR_OF_DAY, 12)
+    val noonIsSummerTime = cal.get(Calendar.DST_OFFSET) != 0
+    return when (Pair(midnightIsSummerTime, noonIsSummerTime)) {
+        Pair(false, false) -> DstTransition.NONE
+        Pair(false, true) -> DstTransition.WINTER_TO_SUMMER
+        Pair(true, true) -> DstTransition.NONE
+        Pair(true, false) -> DstTransition.SUMMER_TO_WINTER
+        else -> throw RuntimeException("unreachable")
+    }
+}
+
+private enum class DstTransition {
+    NONE,
+    WINTER_TO_SUMMER,
+    SUMMER_TO_WINTER,
+}
+
+fun main() {
+    val tz = TimeZone.getTimeZone("Europe/Zagreb")!!
+    val cal = Calendar.getInstance(tz)
+    cal.set(Calendar.YEAR, 2022)
+    cal.set(Calendar.MONTH, Calendar.MARCH)
+    cal.set(Calendar.DAY_OF_MONTH, 27)
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 1)
+    cal.set(Calendar.MILLISECOND, 0)
+
+    for (i in 1..24) {
+        val status = dstTransitionStatus(cal.timeInMillis)
+        println("${dateFormat.format(cal.time)} $status")
+        cal.add(Calendar.HOUR_OF_DAY, 1)
+    }
 }
 
 class LradarSequenceLoader : FrameSequenceLoader(
