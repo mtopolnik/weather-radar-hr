@@ -78,10 +78,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame? {
             val url = urlTemplate.format(indexAtServer)
-            info { "Kradar fetch $url" }
             var attempt = 0
             while (true) {
                 attempt += 1
+                info { "Kradar fetch $url, attempt $attempt" }
                 try {
                     val (lastModified, frame) = try {
                         fetchPngFrame(context, url, fetchPolicy)
@@ -220,7 +220,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
             withContext(Default) {
                 coroutineScope {
-                    rawFrames.filterNotNull().forEachIndexed { i, frame ->
+                    rawFrames.forEachIndexed { i, frame ->
+                        if (frame == null) {
+                            return@forEachIndexed
+                        }
                         launch {
                             try {
                                 decoder.assignTimestamp(frame)
@@ -259,7 +262,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 }
                 frames.add(mostRecentFrame)
                 val dstTransition = dstTransitionStatus(mostRecentTimestamp)
-                if (dstTransition != DstTransition.SUMMER_TO_WINTER) {
+                if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
                     return@withContext
                 }
                 frames.sortWith(compareBy(PngFrame::timestamp))
