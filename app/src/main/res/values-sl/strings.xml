@@ -11,7 +11,8 @@
     <string name="rateme_menu_item">Oceni v trgovini Play</string>
     <string name="settings">Nastavitve</string>
     <string name="refresh">Osveži</string>
-    <string name="animation_covers_minutes">Obdobje, ki ga zajema animacija</string>
+    <string name="animation_covers_minutes">Obdobje, ki ga zajema animacija*</string>
+    <string name="note_on_animation_length">* ARSO izdaja 90 minut animacije</string>
     <string name="animation_rate">Hitrost animacije</string>
     <string name="widget_log">Diagnostični dnevnik aplikacije</string>
     <string name="widget_log_enabled">Vklopljeno</string>

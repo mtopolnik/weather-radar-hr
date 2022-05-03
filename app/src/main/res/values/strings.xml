@@ -5,13 +5,14 @@
     <string name="img_unavailable">Image currently unavailable.</string>
     <string name="widget_slo">Radar SLO</string>
     <string name="widget_hr">Radar HR</string>
-    <string name="settings">Settings</string>
     <string name="help">Help and Tips</string>
     <string name="about">About</string>
+    <string name="settings">Settings</string>
+    <string name="refresh">Refresh</string>
     <string name="privacy_policy_menu_item">Privacy Policy</string>
     <string name="rateme_menu_item">Rate on Play Store</string>
-    <string name="refresh">Refresh</string>
-    <string name="animation_covers_minutes">Time covered by the animation</string>
+    <string name="animation_covers_minutes">Time covered by the animation*</string>
+    <string name="note_on_animation_length">* Slovenian agency publishes 90 minutes of animation</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
     <string name="widget_log">Application Log</string>
