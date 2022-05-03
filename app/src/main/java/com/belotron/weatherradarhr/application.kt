@@ -3,12 +3,14 @@ package com.belotron.weatherradarhr
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils.*
 import android.view.View
@@ -163,6 +165,10 @@ fun File.writer(append: Boolean = true) = PrintWriter(FileWriter(this, append))
 fun ByteArray.decodeToBitmap() = BitmapFactory.decodeByteArray(this, 0, size)!!
 
 fun Bitmap.asPixels() = BitmapPixels(this)
+
+fun Resources.getColorVnr(id: Int) =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) getColor(id, null)
+    else getColor(id)
 
 inline fun <T> runOrNull(block: () -> T) = try {
     block()

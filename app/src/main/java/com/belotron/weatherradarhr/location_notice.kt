@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.TextView
 import androidx.fragment.app.DialogFragment
@@ -34,7 +33,7 @@ class LocationNoticeDialogFragment(
     @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val activity = requireActivity()
-        val rootView = LayoutInflater.from(activity).inflate(R.layout.location_notice, null).apply {
+        val rootView = layoutInflater.inflate(R.layout.location_notice, null).apply {
             findViewById<TextView>(R.id.location_notice_text).setText(
                 if (isForBg) R.string.location_notice_bg else R.string.location_notice_fg)
             findViewById<Button>(R.id.location_notice_proceed).setOnClickListener {

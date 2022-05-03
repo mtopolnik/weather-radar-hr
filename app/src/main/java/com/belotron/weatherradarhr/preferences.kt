@@ -5,7 +5,6 @@ import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import android.location.Location
 import androidx.preference.PreferenceManager
-import java.lang.Math.max
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
@@ -33,12 +32,13 @@ val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSha
 val Context.localPrefs: SharedPreferences get() = getSharedPreferences(NAME_LOCAL_PREFS, MODE_PRIVATE)
 
 val SharedPreferences.rateMinsPerSec: Int get() =
-    max(MIN_ANIMATION_RATE, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
+    MIN_ANIMATION_RATE.coerceAtLeast(getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
-val SharedPreferences.freezeTimeMillis: Int get() = max(MIN_FREEZE_TIME, getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME))
+val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeast(
+    getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME))
 
 val SharedPreferences.animationCoversMinutes: Int get() =
-    max(MIN_ANIMATION_MINUTES, getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
+    MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =

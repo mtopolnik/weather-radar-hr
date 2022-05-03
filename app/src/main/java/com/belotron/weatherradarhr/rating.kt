@@ -33,6 +33,7 @@ fun FragmentActivity.openRateMeDialog() {
     RateMeDialogFragment().show(supportFragmentManager, TAG_RATE_ME)
 }
 
+@SuppressLint("QueryPermissionsNeeded") // Play Store is visible automatically
 fun Context.openAppRating() {
     val rateIntent = Intent(ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
     packageManager.queryIntentActivities(rateIntent, 0)

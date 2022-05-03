@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr
 
 import android.content.Context
-import android.graphics.Bitmap
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import com.belotron.weatherradarhr.gifdecode.decodeArgbToGray

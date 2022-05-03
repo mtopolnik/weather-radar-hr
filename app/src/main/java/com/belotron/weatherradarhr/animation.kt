@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
@@ -179,10 +180,16 @@ class FrameAnimator(
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
         if (targetIndex == 0 || targetIndex == correctFrameCount - 1) {
-            val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
             } else {
+                @Suppress("DEPRECATION")
                 vibrator.vibrate(20)
             }
         }

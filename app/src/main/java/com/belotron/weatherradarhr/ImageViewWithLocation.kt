@@ -44,12 +44,12 @@ open class ImageViewWithLocation
 
     private val locdotRadius = resources.getDimension(R.dimen.locdot_radius)
     private val flashlightRange = resources.getDimension(R.dimen.locdot_flashlight_range)
-    private val ourColor = resources.getColor(R.color.locdot)
+    private val ourColor = resources.getColorVnr(R.color.locdot)
     private val dotPaint = Paint().apply { color = ourColor }
     private val flashlightPaint = Paint()
     private val borderThickness = resources.getDimension(R.dimen.locdot_border_thickness)
     private val whiteBorderPaint = Paint().apply {
-        color = resources.getColor(android.R.color.white)
+        color = resources.getColorVnr(android.R.color.white)
         style = STROKE
         strokeWidth = borderThickness
     }

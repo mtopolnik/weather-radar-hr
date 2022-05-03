@@ -480,11 +480,14 @@ private class OrientationListener(
         //
         // The `sense` variable tells whether to use the chosen axis as-is or
         // with the opposite sense (e.g., x points left when opposite).
-        val (matrixColumn, sense) = when (val rotation = activity.windowManager.defaultDisplay.rotation) {
+        val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) activity.display
+            else activity.windowManager.defaultDisplay
+        val (matrixColumn, sense) = when (val rotation = display?.rotation) {
             Surface.ROTATION_0 -> Pair(0, 1)
             Surface.ROTATION_90 -> Pair(1, -1)
             Surface.ROTATION_180 -> Pair(0, -1)
             Surface.ROTATION_270 -> Pair(1, 1)
+            null -> Pair(0, 1)
             else -> error("Invalid screen rotation value: $rotation")
         }
         val easting = sense * rotationMatrix[matrixColumn]

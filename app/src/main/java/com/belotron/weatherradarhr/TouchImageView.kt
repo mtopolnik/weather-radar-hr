@@ -104,7 +104,7 @@ class TouchImageView
     private val scaleDetector: ScaleGestureDetector
     private val gestureDetector: GestureDetector
     private var flingJob: Job? = null
-    private var userTouchListener: View.OnTouchListener? = null
+    private var userTouchListener: OnTouchListener? = null
     private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
     init {
@@ -181,7 +181,7 @@ class TouchImageView
         }
     }
 
-    override fun setOnTouchListener(l: View.OnTouchListener) {
+    override fun setOnTouchListener(l: OnTouchListener) {
         userTouchListener = l
     }
 
@@ -484,7 +484,7 @@ class TouchImageView
         }
     }
 
-    private inner class PrivateOnTouchListener : View.OnTouchListener {
+    private inner class PrivateOnTouchListener : OnTouchListener {
 
         private val initialPoint = PointF()
         private val initialMatrix = Matrix()
