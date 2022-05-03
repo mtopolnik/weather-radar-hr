@@ -9,6 +9,7 @@ android {
         targetSdkVersion 32
         versionCode 128
         versionName "2.4.8"
+        resConfigs "hr", "sl", "bs", "b+sr+Latn"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
