@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity()  {
     override fun onBackPressed() {
         supportFragmentManager.findFragmentById(R.id.radar_img_fragment)
                 ?.let { it as RadarImageFragment? }
-                ?.takeIf { it.ds.isInFullScreen }
+                ?.takeIf { it.vmodel.isInFullScreen }
                 ?.apply {
                     exitFullScreen()
                     return

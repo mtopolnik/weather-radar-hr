@@ -36,15 +36,15 @@ private lateinit var dateFormat: DateFormat
 private lateinit var timeFormat: DateFormat
 
 class AnimationLooper(
-        private val ds: DisplayState
+        private val vmodel: RadarImageViewModel
 ) : SeekBar.OnSeekBarChangeListener {
 
-    private val animators = arrayOfNulls<FrameAnimator>(ds.imgBundles.size)
-    private val animatorJobs = arrayOfNulls<Job>(ds.imgBundles.size)
+    private val animators = arrayOfNulls<FrameAnimator>(vmodel.imgBundles.size)
+    private val animatorJobs = arrayOfNulls<Job>(vmodel.imgBundles.size)
     private var loopingJob: Job? = null
 
     fun receiveNewFrames(desc: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
-        animators[desc.positionInUI] = FrameAnimator(ds.imgBundles, desc, frameSequence, isOffline)
+        animators[desc.positionInUI] = FrameAnimator(vmodel.imgBundles, desc, frameSequence, isOffline)
     }
 
     fun resume(context: Context? = null, newCorrectFrameCount: Int? = null,
@@ -63,7 +63,7 @@ class AnimationLooper(
             newRateMinsPerSec?.also { animator.rateMinsPerSec = it }
             newFreezeTimeMillis?.also { animator.freezeTimeMillis = it }
         }
-        if (ds.isTrackingTouch) {
+        if (vmodel.isTrackingTouch) {
             return
         }
         stop()
@@ -74,7 +74,7 @@ class AnimationLooper(
             while (true) {
                 animatorJobs.forEach { it?.join() }
                 animators.withIndex()
-                        .filter { (i, _) -> ds.indexOfImgInFullScreen?.let { it == i } ?: true }
+                        .filter { (i, _) -> vmodel.indexOfImgInFullScreen?.let { it == i } ?: true }
                         .forEach { (i, it) -> animatorJobs[i] = it?.animate() }
             }
         }
@@ -88,13 +88,13 @@ class AnimationLooper(
 
     override fun onStartTrackingTouch(seekBar: SeekBar) {
         if (animators.any { it.hasSeekBar(seekBar) }) {
-            ds.isTrackingTouch = true
+            vmodel.isTrackingTouch = true
             stop()
         }
     }
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-        if (fromUser) ds.start {
+        if (fromUser) vmodel.start {
             animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress, seekBar.context)
         }
     }
@@ -107,7 +107,7 @@ class AnimationLooper(
             animators.filterNotNull().filter { it.hasSeekBar(null) }.forEach { plainAnimator ->
                 plainAnimator.imgBundle.animationProgress = fullScreenProgress
             }
-            ds.isTrackingTouch = false
+            vmodel.isTrackingTouch = false
             resume()
         }
     }
