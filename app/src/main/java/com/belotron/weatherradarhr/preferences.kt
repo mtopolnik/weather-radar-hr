@@ -24,16 +24,21 @@ private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 const val DEFAULT_ANIMATION_RATE = 85
 const val DEFAULT_ANIMATION_MINUTES = 90
 const val DEFAULT_FREEZE_TIME = 1500
+const val MIN_ANIMATION_RATE = 10
+const val MIN_ANIMATION_MINUTES = 5
+const val MIN_FREEZE_TIME = 100
 
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
 val Context.localPrefs: SharedPreferences get() = getSharedPreferences(NAME_LOCAL_PREFS, MODE_PRIVATE)
 
-val SharedPreferences.rateMinsPerSec: Int get() = max(1, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
+val SharedPreferences.rateMinsPerSec: Int get() =
+    max(MIN_ANIMATION_RATE, getInt(KEY_ANIMATION_RATE, DEFAULT_ANIMATION_RATE))
 
-val SharedPreferences.freezeTimeMillis: Int get() = getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME)
+val SharedPreferences.freezeTimeMillis: Int get() = max(MIN_FREEZE_TIME, getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME))
 
-val SharedPreferences.animationCoversMinutes: Int get() = getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES)
+val SharedPreferences.animationCoversMinutes: Int get() =
+    max(MIN_ANIMATION_MINUTES, getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =
