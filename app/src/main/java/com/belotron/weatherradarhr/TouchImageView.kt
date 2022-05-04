@@ -89,7 +89,7 @@ class TouchImageView
 
     // Initial coordinates and scale of the image inside the view,
     // when entering the full screen view
-    private var startImgX: Int = 0
+    private var startImgX: Int = -1
     private var startImgY: Int = 0
     private var startScale: Float = 0f
 
@@ -217,18 +217,29 @@ class TouchImageView
                 this.startImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale),
                 this.startImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale))
             .run()
-
     }
 
     suspend fun animateZoomExit() {
         loadMatrix()
         val initialScale = m[MSCALE_X]
-        val targetScale = startScale
+        val targetScale = if (startScale != 0f) startScale else estimateStartScale()
         val initialTransX = m[MTRANS_X]
         val initialTransY = m[MTRANS_Y]
-        val targetTransX = startImgX.toFloat()
+        val targetTransX = if (startImgX != -1) startImgX.toFloat() else estimateStartImgX(targetScale)
         val targetTransY = startImgY.toFloat()
         zoomAnimator(initialScale, targetScale, initialTransX, targetTransX, initialTransY, targetTransY).run()
+    }
+
+    private fun estimateStartScale(): Float {
+        val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return 1f
+        val fitWidthScale = viewWidth.toFloat() / bitmapW
+        val fitHeightScale = viewHeight.toFloat() / bitmapH
+        return min(fitWidthScale, fitHeightScale)
+    }
+
+    private fun estimateStartImgX(estimatedStartScale: Float): Float {
+        val (bitmapW, _) = bitmapSize(pointF) ?: return 0f
+        return (viewWidth.toFloat() - bitmapW * estimatedStartScale) / 2
     }
 
     suspend fun awaitBitmapMeasured() {
