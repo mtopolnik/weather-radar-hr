@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.PropertyValuesHolder
 import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -23,14 +24,12 @@ import android.view.ScaleGestureDetector
 import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View
 import android.view.View.MeasureSpec.*
-import android.widget.ImageView
 import android.widget.ImageView.ScaleType.*
 import android.widget.OverScroller
 import com.belotron.weatherradarhr.State.*
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.launch
@@ -60,6 +59,7 @@ private enum class State {
     NONE, DRAG, ZOOM, FLING, ANIMATE_ZOOM
 }
 
+@SuppressLint("ClickableViewAccessibility")
 class TouchImageView
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
     : ImageViewWithLocation(context, attrs, defStyle
@@ -85,7 +85,7 @@ class TouchImageView
     private var superMaxScale = 0f
     private var currentZoom: Float = 1f
 
-    private lateinit var scaleType: ImageView.ScaleType
+    private lateinit var scaleType: ScaleType
 
     // Initial coordinates and scale of the image inside the view,
     // when entering the full screen view
@@ -118,7 +118,7 @@ class TouchImageView
         super.setOnTouchListener(PrivateOnTouchListener())
     }
 
-    override fun setScaleType(type: ImageView.ScaleType) {
+    override fun setScaleType(type: ScaleType) {
         if (type == FIT_START || type == FIT_END) {
             throw UnsupportedOperationException("TouchImageView does not support FIT_START or FIT_END")
         }
@@ -129,17 +129,17 @@ class TouchImageView
         }
     }
 
-    override fun getScaleType(): ImageView.ScaleType = scaleType
+    override fun getScaleType(): ScaleType = scaleType
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val (bitmapW, bitmapH) = bitmapSize(point) ?: run {
             setMeasuredDimension(0, 0)
             return
         }
-        val widthSize = View.MeasureSpec.getSize(widthMeasureSpec)
-        val widthMode = View.MeasureSpec.getMode(widthMeasureSpec)
-        val heightSize = View.MeasureSpec.getSize(heightMeasureSpec)
-        val heightMode = View.MeasureSpec.getMode(heightMeasureSpec)
+        val widthSize = getSize(widthMeasureSpec)
+        val widthMode = getMode(widthMeasureSpec)
+        val heightSize = getSize(heightMeasureSpec)
+        val heightMode = getMode(heightMeasureSpec)
         viewWidth = computeViewSize(widthMode, widthSize, bitmapW)
         viewHeight = computeViewSize(heightMode, heightSize, bitmapH)
         setMeasuredDimension(viewWidth, viewHeight)
@@ -152,7 +152,7 @@ class TouchImageView
         if (bitmapMeasured) {
             bitmapMeasuredContinuation?.apply {
                 bitmapMeasuredContinuation = null
-                Dispatchers.Main.resumeUndispatched(Unit)
+                resume(Unit)
             }
         }
         super.onDraw(canvas)
@@ -209,7 +209,7 @@ class TouchImageView
         val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
         loadMatrix()
         val fitWidthScale = viewWidth.toFloat() / bitmapW
-        startScale = startImgWidth.toFloat()  / bitmapW
+        startScale = startImgWidth.toFloat() / bitmapW
         val toScale = max(fitWidthScale, viewHeight.toFloat() / bitmapH)
         this.startImgX = startImgX - screenX
         this.startImgY = startImgY - screenY
@@ -575,7 +575,7 @@ private fun coerceToRange(x: Float, range: PointF): Float = range.let {
 
 private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): Int {
     return when (mode) {
-        AT_MOST -> Math.min(drawableSize, requestedSize)
+        AT_MOST -> drawableSize.coerceAtMost(requestedSize)
         UNSPECIFIED -> drawableSize
         EXACTLY -> requestedSize
         else -> throw IllegalArgumentException("Undefined measure specification mode $mode")
