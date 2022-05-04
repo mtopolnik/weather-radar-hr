@@ -24,10 +24,8 @@ import androidx.core.content.ContextCompat.getColor
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart.UNDISPATCHED
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -44,15 +42,13 @@ private const val KEY_SAVED_AT = "instance-state-saved-at"
 lateinit var appContext: Context
 lateinit var appCoroScope: CoroutineScope
 
-fun CoroutineScope.start(block: suspend CoroutineScope.() -> Unit) = this.launch(start = UNDISPATCHED, block = block)
-
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         appContext = this
         val masterJob = Job()
         appCoroScope = object : CoroutineScope {
-            override val coroutineContext get() = Dispatchers.Main + masterJob
+            override val coroutineContext get() = Dispatchers.Main.immediate + masterJob
         }
         privateLogEnabled = mainPrefs.widgetLogEnabled
     }

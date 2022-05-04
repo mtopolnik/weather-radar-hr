@@ -9,12 +9,14 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
+import androidx.lifecycle.viewModelScope
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.concurrent.ArrayBlockingQueue
@@ -68,7 +70,7 @@ class AnimationLooper(
         }
         stop()
         var oldLoopingJob = loopingJob
-        loopingJob = appCoroScope.start {
+        loopingJob = appCoroScope.launch {
             oldLoopingJob?.join()
             oldLoopingJob = null
             while (true) {
@@ -94,7 +96,7 @@ class AnimationLooper(
     }
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-        if (fromUser) vmodel.start {
+        if (fromUser) vmodel.viewModelScope.launch {
             animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress, seekBar.context)
         }
     }
@@ -135,7 +137,7 @@ class FrameAnimator(
 
     fun animate(): Job {
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
-        return appCoroScope.start {
+        return appCoroScope.launch {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
             (currFrameIndex until correctFrameCount).forEach { i ->

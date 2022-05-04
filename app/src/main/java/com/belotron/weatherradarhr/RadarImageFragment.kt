@@ -35,26 +35,23 @@ import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewModelScope
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.*
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import java.util.*
-import kotlin.coroutines.CoroutineContext
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
-class RadarImageViewModel : ViewModel(), CoroutineScope {
+class RadarImageViewModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
         set(value) {
             field = value
@@ -75,8 +72,6 @@ class RadarImageViewModel : ViewModel(), CoroutineScope {
     // Serves to avoid IllegalStateException in DialogFragment.show()
     var possibleStateLoss = false
 
-    override val coroutineContext: CoroutineContext = Dispatchers.Main + SupervisorJob()
-
     fun destroyImgBundles() {
         imgBundles.forEach { it.destroyViews() }
         fullScreenBundle.destroyViews()
@@ -84,7 +79,7 @@ class RadarImageViewModel : ViewModel(), CoroutineScope {
     }
 }
 
-class RadarImageFragment : Fragment(), CoroutineScope {
+class RadarImageFragment : Fragment() {
 
     val permissionRequest = registerForActivityResult(RequestPermission()) {
         if (it) info { "User has granted us the location permission" }
@@ -104,14 +99,12 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
 
-    override val coroutineContext = Dispatchers.Main + SupervisorJob()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         vmodel = ViewModelProvider(this).get(RadarImageViewModel::class.java)
         setHasOptionsMenu(true)
-        launch { checkAndCorrectPermissionsAndSettings() }
+        lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -135,7 +128,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 viewGroup = rootView.findViewById(R.id.vg_zoomed),
                 textView = rootView.findViewById(R.id.text_zoomed),
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
-                    coroScope = vmodel
+                    coroScope = vmodel.viewModelScope
                     setOnDoubleTapListener(object : SimpleOnGestureListener() {
                         override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
@@ -267,7 +260,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
         } else {
             startReloadAnimations(PREFER_CACHED)
-            launch {
+            lifecycleScope.launch {
                 vmodel.reloadJob?.join()
                 (activity as AppCompatActivity).supportActionBar?.hide()
                 if (isTimeToReload) {
@@ -277,7 +270,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             }
             refreshWidgetsInForeground()
         }
-        launch { vmodel.locationState.trackLocationEnablement(activity) }
+        lifecycleScope.launch { vmodel.locationState.trackLocationEnablement(activity) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -312,7 +305,6 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     override fun onStop() {
         info { "RadarImageFragment.onStop" }
         super.onStop()
-        (this as CoroutineScope).cancel()
         vmodel.possibleStateLoss = true
     }
 
@@ -336,7 +328,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
                 startActivity(Intent(activity, SettingsActivity::class.java))
             }
             R.id.help -> startActivity(Intent(activity, HelpActivity::class.java))
-            R.id.about -> vmodel.start {
+            R.id.about -> vmodel.viewModelScope.launch {
                 showAboutDialogFragment(activity)
             }
             R.id.privacy_policy -> startActivity(Intent(Intent.ACTION_VIEW,
@@ -372,7 +364,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
             updateFullScreenVisibility()
             vmodel.animationLooper.resume(activity)
             seekBar?.visibility = INVISIBLE
-            start {
+            lifecycleScope.launch {
                 imgView?.let { it as TouchImageView }?.apply {
                     awaitBitmapMeasured()
                     animateZoomEnter(imgOnScreenX, imgOnScreenY, viewWidth, focusInBitmapX, focusInBitmapY)
@@ -385,7 +377,7 @@ class RadarImageFragment : Fragment(), CoroutineScope {
     fun exitFullScreen() {
         val index = vmodel.indexOfImgInFullScreen ?: return
         vmodel.indexOfImgInFullScreen = null
-        start {
+        lifecycleScope.launch {
             val bundleInTransition = vmodel.imgBundles[index]
             if (bundleInTransition.status in ImageBundle.loadingOrShowing) {
                 vmodel.fullScreenBundle.seekBar?.startAnimateExit()
@@ -430,18 +422,18 @@ class RadarImageFragment : Fragment(), CoroutineScope {
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         vmodel.reloadJob?.cancel()
-        vmodel.reloadJob = start {
+        vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
                 for (loader in frameSequenceLoaders) {
                     val bundle = vmodel.imgBundles[loader.positionInUI]
-                    launch {
+                    launch reloadOne@ {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
                             val (isOffline, frameSequence) = loader.fetchFrameSequence(
                                     context, animationCoversMinutes, fetchPolicy)
                             if (frameSequence == null) {
                                 bundle.status = BROKEN
-                                return@launch
+                                return@reloadOne
                             }
                             bundle.animationProgress = vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(vmodel.animationLooper) {

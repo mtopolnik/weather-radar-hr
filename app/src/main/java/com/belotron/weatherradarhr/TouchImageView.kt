@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.max
@@ -320,7 +321,7 @@ class TouchImageView
         val oldFling = flingJob
         val context = context
         oldFling?.cancel()
-        flingJob = coroScope.start {
+        flingJob = coroScope.launch {
             withState(FLING) {
                 loadMatrix()
                 val (minTransX, minTransY, maxTransX, maxTransY) = transBounds(currentZoom, false, rectF)
