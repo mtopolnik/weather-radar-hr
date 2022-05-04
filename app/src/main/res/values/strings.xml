@@ -15,6 +15,7 @@
     <string name="note_on_animation_length">* Slovenian agency publishes 90 minutes of animation</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
+    <string name="broken_image_description">Broken image</string>
     <string name="widget_log">Application Log</string>
     <string name="widget_log_enabled">Enabled</string>
     <string name="show_widget_log">Show</string>

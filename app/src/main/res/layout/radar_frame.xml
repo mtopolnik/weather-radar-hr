@@ -52,5 +52,5 @@
             android:layout_height="300dp"
             android:paddingTop="50dp"
             android:paddingBottom="50dp"
-    />
+            android:contentDescription="@string/broken_image_description" />
 </FrameLayout>
