@@ -45,11 +45,11 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(vmodel.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewFrames(desc: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
-        animators[desc.positionInUI] = FrameAnimator(vmodel.imgBundles, desc, frameSequence, isOffline)
+    fun receiveNewFrames(loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
+        animators[loader.positionInUI] = FrameAnimator(vmodel.imgBundles, loader, frameSequence, isOffline)
     }
 
-    fun resume(context: Context? = null, newCorrectFrameCount: Int? = null,
+    fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
                newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null
     ) {
         info { "AnimationLooper.resume" }
@@ -61,7 +61,7 @@ class AnimationLooper(
             return
         }
         animators.filterNotNull().forEach { animator ->
-            newCorrectFrameCount?.also { animator.correctFrameCount = it }
+            newAnimationCoversMinutes?.also { animator.animationCoversMinutes = it }
             newRateMinsPerSec?.also { animator.rateMinsPerSec = it }
             newFreezeTimeMillis?.also { animator.freezeTimeMillis = it }
         }
@@ -123,9 +123,9 @@ class FrameAnimator(
         frameSequence: FrameSequence<out Frame>,
         private val isOffline: Boolean
 ) {
-    var correctFrameCount: Int = 1
+    var animationCoversMinutes: Int = 1
     var rateMinsPerSec: Int = 20
-    var freezeTimeMillis: Int = 0
+    var freezeTimeMillis: Int = 500
     val imgBundle: ImageBundle get() = imgBundles[frameSeqLoader.positionInUI]
 
     private val frameDelayMillis get() =  1000 * frameSeqLoader.minutesPerFrame / rateMinsPerSec
@@ -135,11 +135,14 @@ class FrameAnimator(
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
 
+    private fun correctFrameCount() = frameSeqLoader.correctFrameCount(animationCoversMinutes)
+
     fun animate(): Job {
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
         return appCoroScope.launch {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
+            val correctFrameCount = correctFrameCount()
             (currFrameIndex until correctFrameCount).forEach { i ->
                 val animationProgress = toProgress(frameIndex = i)
                 if (i == currFrameIndex) {
@@ -181,7 +184,7 @@ class FrameAnimator(
         }
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
-        if (targetIndex == 0 || targetIndex == correctFrameCount - 1) {
+        if (targetIndex == 0 || targetIndex == correctFrameCount() - 1) {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
             } else {
@@ -224,7 +227,7 @@ class FrameAnimator(
         seekBar.also {
             val progressF = imgBundle.animationProgress / 100f
             seekBarAnimator = ObjectAnimator.ofInt(it, "progress", imgBundle.animationProgress, 100).apply {
-                duration = (correctFrameCount * frameDelayMillis * (1 - progressF)).roundToLong()
+                duration = (correctFrameCount() * frameDelayMillis * (1 - progressF)).roundToLong()
                 interpolator = linear
                 start()
             }
@@ -233,7 +236,7 @@ class FrameAnimator(
 
     private fun updateAgeText() {
         imgBundle.takeIf { it.status in ImageBundle.loadingOrShowing }?.textView?.setAgeText(
-                timestamp(correctFrameCount - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
+                timestamp(correctFrameCount() - 1), isOffline, dateFormat = dateFormat, timeFormat = timeFormat)
     }
 
     private fun timestamp(correctFrameIndex: Int) =
@@ -249,15 +252,15 @@ class FrameAnimator(
     private fun Bitmap.dispose() = allocator.release(this)
 
     private fun toFrameIndex(animationProgress: Int): Int {
-        return (animationProgress / 100f * (correctFrameCount - 1))
+        return (animationProgress / 100f * (correctFrameCount() - 1))
                 .roundToInt()
     }
 
     private fun adjustedFrameIndex(correctFrameIndex: Int): Int {
-        return max(0, correctFrameIndex - (correctFrameCount - frameDecoder.frameCount))
+        return max(0, correctFrameIndex - (correctFrameCount() - frameDecoder.frameCount))
     }
 
-    private fun toProgress(frameIndex: Int) = correctFrameCount.let { frameCount ->
+    private fun toProgress(frameIndex: Int) = correctFrameCount().let { frameCount ->
         if (frameCount == 1) 100
         else 100 * frameIndex / (frameCount - 1)
     }

@@ -254,7 +254,7 @@ class RadarImageFragment : Fragment() {
         if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
             with (activity.mainPrefs) {
                 vmodel.animationLooper.resume(activity,
-                        newCorrectFrameCount = null,
+                        newAnimationCoversMinutes = animationCoversMinutes,
                         newRateMinsPerSec = rateMinsPerSec,
                         newFreezeTimeMillis = freezeTimeMillis)
             }
@@ -438,8 +438,7 @@ class RadarImageFragment : Fragment() {
                             bundle.animationProgress = vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                             with(vmodel.animationLooper) {
                                 receiveNewFrames(loader, frameSequence, isOffline)
-                                val correctFrameCount = loader.correctFrameCount(animationCoversMinutes)
-                                resume(context, correctFrameCount, rateMinsPerSec, freezeTimeMillis)
+                                resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                             }
                             bundle.status = SHOWING
                         } catch (e: CancellationException) {
