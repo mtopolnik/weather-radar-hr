@@ -83,9 +83,9 @@ class AnimationLooper(
     }
 
     fun stop() {
+        loopingJob?.cancel()
         animatorJobs.forEach { it?.cancel() }
         animators.forEach { it?.stopSeekBarAnimation() }
-        loopingJob?.cancel()
     }
 
     override fun onStartTrackingTouch(seekBar: SeekBar) {
