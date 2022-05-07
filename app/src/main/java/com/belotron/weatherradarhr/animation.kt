@@ -46,7 +46,7 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewFrames(loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>, isOffline: Boolean) {
-        animators[loader.positionInUI] = FrameAnimator(vmodel.imgBundles, loader, frameSequence, isOffline)
+        animators[loader.positionInUI] = FrameAnimator(vmodel, loader, frameSequence, isOffline)
     }
 
     fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
@@ -70,7 +70,7 @@ class AnimationLooper(
         }
         stop()
         var oldLoopingJob = loopingJob
-        loopingJob = appCoroScope.launch {
+        loopingJob = vmodel.viewModelScope.launch {
             oldLoopingJob?.join()
             oldLoopingJob = null
             while (true) {
@@ -118,7 +118,7 @@ class AnimationLooper(
 }
 
 class FrameAnimator(
-        private val imgBundles: List<ImageBundle>,
+        vmodel: RadarImageViewModel,
         private val frameSeqLoader: FrameSequenceLoader,
         frameSequence: FrameSequence<out Frame>,
         private val isOffline: Boolean
@@ -128,6 +128,8 @@ class FrameAnimator(
     var freezeTimeMillis: Int = 500
     val imgBundle: ImageBundle get() = imgBundles[frameSeqLoader.positionInUI]
 
+    private val viewModelScope = vmodel.viewModelScope
+    private val imgBundles = vmodel.imgBundles
     private val frameDelayMillis get() =  1000 * frameSeqLoader.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
     private val frameDecoder = frameSequence.intoDecoder(allocator, frameSeqLoader.ocrTimestamp)
@@ -139,7 +141,7 @@ class FrameAnimator(
 
     fun animate(): Job {
         currFrameIndex = toFrameIndex(imgBundle.animationProgress)
-        return appCoroScope.launch {
+        return viewModelScope.launch {
             updateAgeText()
             var frame = suspendDecodeFrame(currFrameIndex)
             val correctFrameCount = correctFrameCount()
@@ -172,7 +174,7 @@ class FrameAnimator(
 
     fun stopSeekBarAnimation() {
         seekBarAnimator?.also {
-            it.pause()
+            it.cancel()
             seekBarAnimator = null
         }
     }
