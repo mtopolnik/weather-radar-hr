@@ -46,8 +46,16 @@ class PngDecoder(
     override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex])
 
     override fun assignTimestamp(frameIndex: Int) {
-        assignTimestamp(sequence.frames[frameIndex])
+        val frame = sequence.frames[frameIndex]
+        val bitmap = decodeFrame(frame)
+        try {
+            frame.timestamp = ocrTimestamp(bitmap)
+        } finally {
+            release(bitmap)
+        }
     }
+
+    fun ocrTimestamp(bitmap: Bitmap) = ocrTimestamp(bitmap.asPixels())
 
     fun decodeFrame(frame: PngFrame): Bitmap {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
@@ -56,15 +64,6 @@ class PngDecoder(
             inMutable = true
             inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
         })
-    }
-
-    fun assignTimestamp(frame: PngFrame) {
-        val bitmap = decodeFrame(frame)
-        try {
-            frame.timestamp = ocrTimestamp(bitmap.asPixels())
-        } finally {
-            release(bitmap)
-        }
     }
 
     override fun release(bitmap: Bitmap) {

@@ -76,6 +76,14 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         val isOffline = AtomicBoolean(false)
 
+        suspend fun invalidateInCache(url: String) {
+            withContext(IO) {
+                synchronized(CACHE_LOCK) {
+                    context.invalidateCache(url)
+                }
+            }
+        }
+
         suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame? {
             val url = urlTemplate.format(indexAtServer)
             var attempt = 0
@@ -84,24 +92,32 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 info { "Kradar fetch $url, attempt $attempt" }
                 try {
                     val (lastModified, frame) = try {
-                        fetchPngFrame(context, url, fetchPolicy)
+                        val (lastModified, nullableFrame) = fetchPngFrame(context, url, fetchPolicy)
+                        val frame = nullableFrame ?: throw NullFrameException()
+                        try {
+                            withContext(Default) {
+                                val bitmap = decoder.decodeFrame(frame)
+                                try {
+                                    if (bitmap.getPixel(360, 670) == 0) {
+                                        throw NullFrameException()
+                                    }
+                                    frame.timestamp = decoder.ocrTimestamp(bitmap)
+                                    if (bitmap.getPixel(360, 748) == 0) {
+                                        invalidateInCache(url)
+                                    }
+                                } finally {
+                                    decoder.release(bitmap)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            invalidateInCache(url)
+                        }
+                        Pair(lastModified, frame)
                     } catch (e: ImageFetchException) {
                         isOffline.set(true)
                         val cached = e.cached ?: throw NullFrameException()
                         val frame = cached as PngFrame
-                        try {
-                            decoder.assignTimestamp(frame)
-                        } catch (e: Exception) {
-                            withContext(IO) {
-                                synchronized(CACHE_LOCK) {
-                                    context.invalidateCache(url)
-                                }
-                            }
-                        }
                         Pair(0L, frame)
-                    }
-                    if (frame == null) {
-                        throw NullFrameException()
                     }
                     return frame
                 } catch (e: Exception) {
@@ -116,9 +132,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         fun timestampInCache(indexAtServer: Int): Long? {
             val url = urlTemplate.format(indexAtServer)
             val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
-            val frame = nullableFrame ?: return null
-            decoder.assignTimestamp(frame)
-            return frame.timestamp
+            return nullableFrame?.timestamp
         }
 
         var fetchPolicy = fetchPolicy
@@ -132,15 +146,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     urlTemplate.format(tempIndexOfMostRecentCached)
                 )
             }
-            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy).let { frame ->
-                if (frame == null) {
-                    throw NullFrameException()
-                }
-                withContext(Default) {
-                    decoder.assignTimestamp(frame)
-                }
-                frame
-            }
+            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy) ?: throw NullFrameException()
             val mostRecentTimestamp = mostRecentFrame.timestamp
 
             // Reuse cached images by renaming them to the expected new URLs
@@ -219,23 +225,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 }
             }
             withContext(Default) {
-                coroutineScope {
-                    rawFrames.forEachIndexed { i, frame ->
-                        if (frame == null) {
-                            return@forEachIndexed
-                        }
-                        launch {
-                            try {
-                                decoder.assignTimestamp(frame)
-                            } catch (e: Exception) {
-                                synchronized(CACHE_LOCK) {
-                                    context.invalidateCache(urlTemplate.format(i))
-                                }
-                                rawFrames[i] = null
-                            }
-                        }
-                    }
-                }
                 for (i in 0.until(rawFrames.size)) {
                     if (rawFrames[i] != null) {
                         continue
