@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -316,24 +315,6 @@ private enum class DstTransition {
     SUMMER_TO_WINTER,
 }
 
-fun main() {
-    val tz = TimeZone.getTimeZone("Europe/Zagreb")!!
-    val cal = Calendar.getInstance(tz)
-    cal.set(Calendar.YEAR, 2022)
-    cal.set(Calendar.MONTH, Calendar.MARCH)
-    cal.set(Calendar.DAY_OF_MONTH, 27)
-    cal.set(Calendar.HOUR_OF_DAY, 0)
-    cal.set(Calendar.MINUTE, 0)
-    cal.set(Calendar.SECOND, 1)
-    cal.set(Calendar.MILLISECOND, 0)
-
-    for (i in 1..24) {
-        val status = dstTransitionStatus(cal.timeInMillis)
-        println("${dateFormat.format(cal.time)} $status")
-        cal.add(Calendar.HOUR_OF_DAY, 1)
-    }
-}
-
 class LradarSequenceLoader : FrameSequenceLoader(
     positionInUI = 1,
     title = "SLO",
@@ -344,7 +325,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
     override suspend fun fetchFrameSequence(
-        context: Context, correctFrameCount: Int, fetchPolicy: FetchPolicy
+        context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Pair<Boolean, GifSequence?> {
         val (lastModified, sequence) = try {
             fetchGifSequence(context, url, fetchPolicy)
