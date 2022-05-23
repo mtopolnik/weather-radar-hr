@@ -134,16 +134,6 @@ fun RemoteViews.setWidgetText(text: CharSequence, visibleViewId: Int, invisibleV
 
 fun Context.fileInCache(name: String) = File(cacheDir, name)
 
-fun Activity.switchActionBarVisible() {
-    with((this as AppCompatActivity).supportActionBar!!) {
-        if (isShowing) {
-            hide()
-        } else {
-            show()
-        }
-    }
-}
-
 val Context.dateFormat get() = AndroidDateFormat.getDateFormat(this)!!
 val Context.timeFormat get() = AndroidDateFormat.getTimeFormat(this)!!
 

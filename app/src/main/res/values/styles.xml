@@ -1,14 +1,8 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <style name="AppTheme" parent="@style/Theme.AppCompat">
+    <style name="AppTheme" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary</item>
-        <item name="actionBarStyle">@style/MyActionBar</item>
-    </style>
-
-    <style name="MyActionBar" parent="@style/Widget.AppCompat.ActionBar">
-        <item name="background">@color/primary</item>
-        <item name="displayOptions">showTitle</item>
     </style>
     <style name="ProgressBar" parent="ThemeOverlay.AppCompat.Light">
         <item name="colorAccent">@color/secondary</item>

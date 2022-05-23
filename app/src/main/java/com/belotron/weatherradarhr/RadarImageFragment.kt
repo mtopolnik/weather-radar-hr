@@ -31,6 +31,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
@@ -95,6 +96,7 @@ class RadarImageFragment : Fragment() {
     }
 
     lateinit var vmodel: RadarImageViewModel
+    lateinit var rootView: View
     private var wasFastResume = false
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
@@ -113,7 +115,10 @@ class RadarImageFragment : Fragment() {
     ): View {
         info { "RadarImageFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
-        val rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        rootView = inflater.inflate(R.layout.fragment_radar, container, false)
+        rootView.findViewById<Toolbar>(R.id.toolbar).also {
+            (requireActivity() as AppCompatActivity).setSupportActionBar(it)
+        }
         vGroupOverview = rootView.findViewById<ViewGroup>(R.id.overview).also {
             it.doOnLayout { view ->
                 val w = view.measuredWidth
@@ -130,7 +135,6 @@ class RadarImageFragment : Fragment() {
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
                     coroScope = vmodel.viewModelScope
                     setOnDoubleTapListener(object : SimpleOnGestureListener() {
-                        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
                         override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
                     })
                 },
@@ -171,7 +175,6 @@ class RadarImageFragment : Fragment() {
                     mapShape = loader.mapShape,
                     seekBar = null,
                     brokenImgView = brokenImgView.apply {
-                        setOnClickListener { switchActionBarVisible() }
                         visibility = GONE
                     },
                     progressBar = progressBar
@@ -235,7 +238,6 @@ class RadarImageFragment : Fragment() {
             private val imgIndex: Int,
             private val imgView: ImageView
     ) : SimpleOnGestureListener() {
-        override fun onSingleTapConfirmed(e: MotionEvent) = switchActionBarVisible()
         override fun onDoubleTap(e: MotionEvent): Boolean {
             if (!vmodel.isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
             return true
@@ -262,7 +264,6 @@ class RadarImageFragment : Fragment() {
             startReloadAnimations(PREFER_CACHED)
             lifecycleScope.launch {
                 vmodel.reloadJob?.join()
-                (activity as AppCompatActivity).supportActionBar?.hide()
                 if (isTimeToReload) {
                     info { "Reloading animations" }
                     startReloadAnimations(UP_TO_DATE)
@@ -310,15 +311,15 @@ class RadarImageFragment : Fragment() {
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         info { "RadarImageFragment.onCreateOptionsMenu" }
-        inflater.inflate(R.menu.main_menu, menu)
-        menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
-        super.onCreateOptionsMenu(menu, inflater)
+        val tb = rootView.findViewById<Toolbar>(R.id.toolbar)
+        tb.inflateMenu(R.menu.main_menu)
+        tb.menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
+        tb.setOnMenuItemClickListener(this::onOptionsItemSelected)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         info { "RadarImageFragment.onOptionsItemSelected" }
         val activity = activity as AppCompatActivity
-        var shouldHideActionBar = true
         when (item.itemId) {
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
@@ -344,9 +345,7 @@ class RadarImageFragment : Fragment() {
             }
             R.id.show_widget_log -> startActivity(Intent(activity, ViewLogActivity::class.java))
             R.id.clear_widget_log -> clearPrivateLog()
-            else -> shouldHideActionBar = false
         }
-        if (shouldHideActionBar) activity.supportActionBar?.hide()
         return true
     }
 
@@ -452,6 +451,4 @@ class RadarImageFragment : Fragment() {
             }
         }
     }
-
-    private fun switchActionBarVisible() = run { activity?.switchActionBarVisible(); true }
 }
