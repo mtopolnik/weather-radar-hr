@@ -17,6 +17,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -31,7 +32,8 @@ import kotlin.text.Charsets.UTF_8
 private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
-private const val ESTIMATED_CONTENT_LENGTH = 1 shl 15
+private const val RESUME_DELAY_MILLIS = 1_000L
+private const val MAX_RESUMES = 5
 
 val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
@@ -159,29 +161,30 @@ class Exchange<out T>(
     }
 
     private fun HttpURLConnection.handleSuccessResponse(): Pair<Long, T> {
-        val contentLength = getHeaderFieldInt("Content-Length", ESTIMATED_CONTENT_LENGTH)
+        val acceptsByteRange = (getHeaderField("Accepts-Ranges") ?: "none") == "bytes"
+        val contentLength = getHeaderFieldInt("Content-Length", -1)
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR
         val fetchedLastModified = lastModifiedStr.parseLastModified()
         val responseBody = lazy {
             this@Exchange.inputStream = inputStream
-            inputStream.use { it.readBytes() }
-                .also {
-                    this@Exchange.inputStream = null
-                    if (!coroScope.isActive) throw CancellationException()
-                }
+            try {
+                inputStream.use { it.readBytes() }
+            } finally {
+                this@Exchange.inputStream = null
+            }
         }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         return try {
             val cachedIn = runOrNull { context.cachedDataIn(url.toExternalForm()) }
             val decodedImage = if (cachedIn == null) {
-                fetchContentAndUpdateCache(responseBody, lastModifiedStr)
+                ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
             } else {
                 // These checks are repeated in updateCache(). While the response body is being
                 // loaded, another thread could write a newer cached image.
                 val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
                 if (cachedLastModified == null || cachedLastModified < fetchedLastModified) {
                     cachedIn.close()
-                    fetchContentAndUpdateCache(responseBody, lastModifiedStr)
+                    ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
                 } else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
                     inputStream.close()
                     cachedIn.use { it.readBytes() }.parseOrInvalidateImage
@@ -194,12 +197,53 @@ class Exchange<out T>(
         }
     }
 
-    private fun fetchContentAndUpdateCache(
-            responseBody: Lazy<ByteArray>, lastModifiedStr: String
+    private fun ensureFullContentAndUpdateCache(
+        bytes: ByteArray, contentLength: Int, acceptsByteRange: Boolean, lastModifiedStr: String
     ): T {
-        val bytes = responseBody.value
-        return decode(bytes).also {
-            updateCache(context.cacheFile(url), lastModifiedStr, bytes)
+        if (!coroScope.isActive) throw CancellationException()
+        if (bytes.size >= contentLength) {
+            return decode(bytes).also {
+                updateCache(context.cacheFile(url), lastModifiedStr, bytes)
+            }
+        }
+        val bos = ByteArrayOutputStream()
+        bos.write(bytes)
+        var resumeCount = 1
+        while (resumeCount <= MAX_RESUMES && bos.size() < contentLength) {
+            resumeCount += 1
+            Thread.sleep(RESUME_DELAY_MILLIS)
+            warn { "Incomplete content (${bytes.size} of $contentLength), resuming download" }
+            if (!coroScope.isActive) throw CancellationException()
+            var conn: HttpURLConnection? = null
+            try {
+                conn = URL(url).openConnection() as HttpURLConnection
+                conn.addRequestProperty("Range", "bytes=${bos.size()}-${contentLength - 1}")
+                conn.connect()
+                if (!coroScope.isActive) throw CancellationException()
+                if (conn.responseCode >= 300) continue
+                val newLastModifiedStr = conn.getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR
+                if (newLastModifiedStr != lastModifiedStr) {
+                    throw IOException("Content changed while resuming download")
+                }
+                val inputStream = conn.inputStream
+                this@Exchange.inputStream = inputStream
+                try {
+                    inputStream.use { it.copyTo(bos) }
+                } finally {
+                    this@Exchange.inputStream = null
+                }
+                if (!coroScope.isActive) throw CancellationException()
+            } finally {
+                try {
+                    conn?.disconnect()
+                } catch (e: Exception) {
+                    severe(e) { "Error when closing connection" }
+                }
+            }
+        }
+        val completeBytes = bos.toByteArray()
+        return decode(completeBytes).also {
+            updateCache(context.cacheFile(url), lastModifiedStr, completeBytes)
         }
     }
 
