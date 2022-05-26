@@ -97,13 +97,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             withContext(Default) {
                                 val bitmap = decoder.decodeFrame(frame)
                                 try {
-                                    if (bitmap.getPixel(360, 670) == 0) {
-                                        throw NullFrameException()
-                                    }
                                     frame.timestamp = decoder.ocrTimestamp(bitmap)
-                                    if (bitmap.getPixel(360, 748) == 0) {
-                                        invalidateInCache(url)
-                                    }
                                 } finally {
                                     decoder.release(bitmap)
                                 }
