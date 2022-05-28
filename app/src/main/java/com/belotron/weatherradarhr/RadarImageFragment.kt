@@ -250,10 +250,15 @@ class RadarImageFragment : Fragment() {
         super.onResume()
         vmodel.possibleStateLoss = false
         val activity = requireActivity()
-        vmodel.lastReloadedTimestamp = activity.mainPrefs.lastReloadedTimestamp
-        val isTimeToReload = vmodel.lastReloadedTimestamp < aWhileAgo
-        val isAnimationShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
-        if (isAnimationShowing && (wasFastResume || !isTimeToReload)) {
+        val mainPrefs = activity.mainPrefs
+        vmodel.lastReloadedTimestamp = mainPrefs.lastReloadedTimestamp
+        val lastAnimationCoversMinutes = mainPrefs.lastAnimationCoversMinutes
+        val currAnimationCoversMinutes = mainPrefs.animationCoversMinutes
+        val animationLengthDidntChange = (currAnimationCoversMinutes == lastAnimationCoversMinutes)
+        val timeToReload = vmodel.lastReloadedTimestamp < aWhileAgo
+        info { "lastReloadedTimestamp ${vmodel.lastReloadedTimestamp} aWhileAgo $aWhileAgo timeToReload $timeToReload" }
+        val animationIsShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
+        if (animationIsShowing && animationLengthDidntChange && (wasFastResume || !timeToReload)) {
             with (activity.mainPrefs) {
                 vmodel.animationLooper.resume(activity,
                         newAnimationCoversMinutes = animationCoversMinutes,
@@ -264,8 +269,8 @@ class RadarImageFragment : Fragment() {
             startReloadAnimations(PREFER_CACHED)
             lifecycleScope.launch {
                 vmodel.reloadJob?.join()
-                if (isTimeToReload) {
-                    info { "Reloading animations" }
+                if (timeToReload) {
+                    info { "Time to reload animations" }
                     startReloadAnimations(UP_TO_DATE)
                 }
             }
@@ -297,8 +302,10 @@ class RadarImageFragment : Fragment() {
             if (!anyWidgetInUse()) {
                 stopReceivingLocationUpdatesBg()
             }
+            val lastAnimationCoversMinutes = mainPrefs.animationCoversMinutes
             mainPrefs.applyUpdate {
                 setLastReloadedTimestamp(vmodel.lastReloadedTimestamp)
+                setLastAnimationCoversMinutes(lastAnimationCoversMinutes)
             }
         }
     }
