@@ -205,6 +205,9 @@ class Exchange<out T>(
             return decode(bytes).also {
                 updateCache(context.cacheFile(url), lastModifiedStr, bytes)
             }
+        } else if (!acceptsByteRange) {
+            throw IOException("Incomplete content and the server doesn't support byte ranges." +
+                    " Expected $contentLength bytes, got ${bytes.size}.")
         }
         val bos = ByteArrayOutputStream()
         bos.write(bytes)
@@ -240,6 +243,10 @@ class Exchange<out T>(
                     severe(e) { "Error when closing connection" }
                 }
             }
+        }
+        if (bos.size() < contentLength) {
+            throw IOException("Couldn't get full content even after ${1 + MAX_RESUMES} attempts." +
+                    " Expected $contentLength bytes, got ${bytes.size}.")
         }
         val completeBytes = bos.toByteArray()
         return decode(completeBytes).also {
