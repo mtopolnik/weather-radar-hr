@@ -314,11 +314,11 @@ class TouchImageView
                 currentZoom = scale / unitScale
             }
             addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationStart(animation: Animator?) {
+                override fun onAnimationStart(animation: Animator) {
                     state = ANIMATE_ZOOM
                 }
-                override fun onAnimationEnd(a: Animator?) = resetState()
-                override fun onAnimationCancel(a: Animator?) = resetState()
+                override fun onAnimationEnd(a: Animator) = resetState()
+                override fun onAnimationCancel(a: Animator) = resetState()
                 private fun resetState() {
                     if (state == ANIMATE_ZOOM) {
                         state = NONE

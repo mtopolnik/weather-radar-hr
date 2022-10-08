@@ -3,7 +3,7 @@ apply plugin: 'kotlin-android'
 
 android {
     namespace 'com.belotron.weatherradarhr'
-    compileSdkVersion 32
+    compileSdkVersion 33
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21

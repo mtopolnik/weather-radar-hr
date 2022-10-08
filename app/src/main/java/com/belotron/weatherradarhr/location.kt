@@ -28,13 +28,12 @@ import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
-import com.google.android.gms.location.LocationRequest.PRIORITY_LOW_POWER
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationResult.extractResult
 import com.google.android.gms.location.LocationServices.getFusedLocationProviderClient
 import com.google.android.gms.location.LocationServices.getSettingsClient
 import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
@@ -77,13 +76,13 @@ val kradarShape = MapShape(
 val locationRequestFg: LocationRequest = LocationRequest.create().apply {
     interval = 1000
     fastestInterval = 10
-    priority = PRIORITY_BALANCED_POWER_ACCURACY
+    priority = Priority.PRIORITY_BALANCED_POWER_ACCURACY
 }
 
 val locationRequestBg: LocationRequest = LocationRequest.create().apply {
     interval = MINUTE_IN_MILLIS
     fastestInterval = MINUTE_IN_MILLIS
-    priority = PRIORITY_LOW_POWER
+    priority = Priority.PRIORITY_LOW_POWER
 }
 
 val Float.toDegrees get() = Math.toDegrees(this.toDouble()).toFloat()
@@ -220,7 +219,7 @@ object LocationCallbackFg : LocationCallback() {
     var locationState: LocationState? = null
 
     override fun onLocationResult(result: LocationResult) {
-        val lastLocation = result.lastLocation
+        val lastLocation = result.lastLocation ?: return
         info { "FG: received location ${lastLocation.description}" }
         locationState
             ?.apply { location = lastLocation }

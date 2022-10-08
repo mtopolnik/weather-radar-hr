@@ -216,7 +216,7 @@ class RadarImageFragment : Fragment() {
                 return true
             }
         }
-        ScaleGestureDetector(activity, sl).also {
+        ScaleGestureDetector(requireActivity(), sl).also {
             var secondPointerDown = false
             scrollView.setOnTouchListener { _, e ->
                 it.onTouchEvent(e)
