@@ -44,6 +44,7 @@ import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import java.util.*
@@ -435,18 +436,26 @@ class RadarImageFragment : Fragment() {
                     launch reloadOne@ {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
-                            val (isOffline, frameSequence) = loader.fetchFrameSequence(
-                                    context, animationCoversMinutes, fetchPolicy)
-                            if (frameSequence == null) {
-                                bundle.status = BROKEN
-                                return@reloadOne
+                            while (true) {
+                                val (hadCompleteSuccess, frameSequence) = loader.fetchFrameSequence(
+                                    context, animationCoversMinutes, fetchPolicy
+                                )
+                                if (frameSequence == null) {
+                                    bundle.status = BROKEN
+                                    return@reloadOne
+                                }
+                                bundle.animationProgress =
+                                    vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
+                                with(vmodel.animationLooper) {
+                                    receiveNewFrames(loader, frameSequence, !hadCompleteSuccess)
+                                    resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
+                                }
+                                bundle.status = SHOWING
+                                if (hadCompleteSuccess) {
+                                    break
+                                }
+                                delay(SLEEP_MILLIS_BEFORE_RETRYING)
                             }
-                            bundle.animationProgress = vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
-                            with(vmodel.animationLooper) {
-                                receiveNewFrames(loader, frameSequence, isOffline)
-                                resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
-                            }
-                            bundle.status = SHOWING
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {

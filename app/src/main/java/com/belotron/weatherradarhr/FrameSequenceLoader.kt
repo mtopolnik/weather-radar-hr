@@ -1,7 +1,9 @@
 package com.belotron.weatherradarhr
 
 import android.content.Context
+import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
+import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
@@ -16,14 +18,17 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.ceil
 
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 const val MILLIS_IN_MINUTE = 60_000
-const val SLEEP_MILLIS_BEFORE_RETRYING = 1_500L
-const val ATTEMPTS_BEFORE_GIVING_UP = 5
+const val SLEEP_MILLIS_BEFORE_RETRYING = 2_500L
+const val ATTEMPTS_BEFORE_GIVING_UP = 2
+
+enum class Outcome {
+    SUCCESS, PARTIAL_SUCCESS, FAILURE
+}
 
 sealed class FrameSequenceLoader(
     val positionInUI: Int,
@@ -73,8 +78,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
             throw RuntimeException("Asked for too many frames, max is 25")
         }
 
-        val isOffline = AtomicBoolean(false)
-
         suspend fun invalidateInCache(url: String) {
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
@@ -83,39 +86,48 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
         }
 
-        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): PngFrame? {
+        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): Pair<Outcome, PngFrame?> {
             val url = urlTemplate.format(indexAtServer)
             var attempt = 0
             while (true) {
-                attempt += 1
                 info { "Kradar fetch $url, attempt $attempt" }
+                attempt += 1
+                var outcome = SUCCESS
                 try {
-                    val (lastModified, frame) = try {
+                    val frame = try {
                         val (lastModified, nullableFrame) = fetchPngFrame(context, url, fetchPolicy)
                         val frame = nullableFrame ?: throw NullFrameException()
                         try {
                             withContext(Default) {
                                 val bitmap = decoder.decodeFrame(frame)
                                 try {
+                                    if (bitmap.getPixel(360, 670) == 0) {
+                                        throw NullFrameException()
+                                    }
                                     frame.timestamp = decoder.ocrTimestamp(bitmap)
+                                    if (bitmap.getPixel(360, 748) == 0) {
+                                        outcome = PARTIAL_SUCCESS
+                                        invalidateInCache(url)
+                                    }
                                 } finally {
                                     decoder.release(bitmap)
                                 }
                             }
                         } catch (e: Exception) {
                             invalidateInCache(url)
+                            throw e
                         }
-                        Pair(lastModified, frame)
+                        frame
                     } catch (e: ImageFetchException) {
-                        isOffline.set(true)
                         val cached = e.cached ?: throw NullFrameException()
                         val frame = cached as PngFrame
-                        Pair(0L, frame)
+                        outcome = PARTIAL_SUCCESS
+                        frame
                     }
-                    return frame
+                    return Pair(outcome, frame)
                 } catch (e: Exception) {
                     if (attempt == ATTEMPTS_BEFORE_GIVING_UP) {
-                        return null
+                        return Pair(FAILURE, null)
                     }
                     delay(SLEEP_MILLIS_BEFORE_RETRYING)
                 }
@@ -125,11 +137,19 @@ class KradarSequenceLoader : FrameSequenceLoader(
         fun timestampInCache(indexAtServer: Int): Long? {
             val url = urlTemplate.format(indexAtServer)
             val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
-            return nullableFrame?.timestamp
+            return nullableFrame?.let { frame ->
+                val bitmap = decoder.decodeFrame(frame)
+                try {
+                    decoder.ocrTimestamp(bitmap)
+                } finally {
+                    decoder.release(bitmap)
+                }
+            }
         }
 
         var fetchPolicy = fetchPolicy
         info { "Requested fetch policy $fetchPolicy" }
+        var hadCompleteSuccess = true
         try {
             val tempIndexOfMostRecentCached = -1
             val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
@@ -139,8 +159,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     urlTemplate.format(tempIndexOfMostRecentCached)
                 )
             }
-            val mostRecentFrame = fetchFrame(highestIndexAtServer, fetchPolicy) ?: throw NullFrameException()
-            val mostRecentTimestamp = mostRecentFrame.timestamp
+            val (outcomeOfMostRecent, mostRecentFrame) = fetchFrame(highestIndexAtServer, fetchPolicy)
+            val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException()).timestamp
+            hadCompleteSuccess = hadCompleteSuccess and (outcomeOfMostRecent == SUCCESS)
 
             // Reuse cached images by renaming them to the expected new URLs
             // after DHMZ posts a new image and renames the previous images
@@ -197,7 +218,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 info { "Deleting cached DHMZ image $indexAtServer" }
                                 context.deleteCached(urlNow)
                             } catch (e: IOException) {
-                                warn { "Failed to delete $urlNow in cache: " + e.message ?: "<reason missing>" }
+                                warn { "Failed to delete $urlNow in cache: " + (e.message ?: "<reason missing>") }
                             }
                         } else {
                             val urlToBe = urlTemplate.format(indexAtServerToBe)
@@ -214,7 +235,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         fetchFrame(i, fetchPolicy)
                     }
                 }.forEach {
-                    rawFrames.add(it.await())
+                    val (outcome, frame) = it.await()
+                    hadCompleteSuccess = hadCompleteSuccess and (outcome == SUCCESS)
+                    rawFrames.add(frame)
                 }
             }
             withContext(Default) {
@@ -259,12 +282,12 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 }
             }
         } catch (e: NullFrameException) {
-            return Pair(true, null)
+            return Pair(false, null)
         } finally {
             decoder.dispose()
         }
         info { "Kradar done fetchFrameSequence, frameCount = ${sequence.frames.size}" }
-        return Pair(isOffline.get(), sequence)
+        return Pair(hadCompleteSuccess, sequence)
     }
 }
 
@@ -339,7 +362,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
                 }
             }
         } catch (e: ImgDecodeException) {
-            severe(CcOption.CC_PRIVATE) { "Animated GIF decoding error" }
+            severe(CC_PRIVATE) { "Animated GIF decoding error" }
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
                     context.invalidateCache(url)
@@ -357,6 +380,6 @@ class LradarSequenceLoader : FrameSequenceLoader(
             clear()
             addAll(sortedFrames)
         }
-        return Pair(lastModified == 0L, sequence)
+        return Pair(lastModified != 0L, sequence)
     }
 }
