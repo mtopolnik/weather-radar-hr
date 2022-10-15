@@ -76,7 +76,7 @@ fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
     if (!shouldLogPrivate(ccOption)) return
     val now = System.currentTimeMillis()
     val exceptionMsg = exception?.let { e ->
-        ": $e.message"
+        ": $e"
 //        ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
     } ?: ""
     logFile.writer().use { w ->
