@@ -21,7 +21,6 @@ import android.view.Surface
 import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
-import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.UserReaction.PROCEED
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
@@ -209,7 +208,7 @@ class LocationState {
                 throw e
             }
             catch (e: Exception) {
-                severe(CC_PRIVATE, e) { "Exception in trackLocationEnablement" }
+                severe(e) { "Exception in trackLocationEnablement" }
             }
         }
     }
@@ -282,7 +281,7 @@ suspend fun RadarImageFragment.checkAndCorrectPermissionsAndSettings() {
         throw e
     }
     catch (e: Exception) {
-        severe(CC_PRIVATE, e) { "Failed to check and correct permission settings" }
+        severe(e) { "Failed to check and correct permission settings" }
     }
 }
 
@@ -295,7 +294,7 @@ suspend fun Context.receiveLocationUpdatesFg(locationState: LocationState) = ign
         }
         LocationCallbackFg.locationState = locationState
         requestLocationUpdates(locationRequestFg, LocationCallbackFg, Looper.getMainLooper()).await()
-        info(CC_PRIVATE) { "FG: started receiving location updates" }
+        info { "FG: started receiving location updates" }
     }
 }
 
@@ -303,7 +302,7 @@ fun Context.stopReceivingLocationUpdatesFg() = ignoringException {
     if (LocationCallbackFg.locationState == null) return
     fusedLocationProviderClient.removeLocationUpdates(LocationCallbackFg)
     LocationCallbackFg.locationState = null
-    info(CC_PRIVATE) { "FG: asked to stop receiving location updates" }
+    info { "FG: asked to stop receiving location updates" }
 }
 
 @SuppressLint("MissingPermission")
@@ -315,12 +314,12 @@ suspend fun Context.receiveLocationUpdatesBg() = ignoringException {
         }
         requestLocationUpdates(locationRequestBg, intentToReceiveLocation()).await()
     }
-    info(CC_PRIVATE) { "BG: started receiving location updates" }
+    info { "BG: started receiving location updates" }
 }
 
 fun Context.stopReceivingLocationUpdatesBg() = ignoringException {
     fusedLocationProviderClient.removeLocationUpdates(intentToReceiveLocation())
-    info(CC_PRIVATE) { "BG: asked to stop receiving location updates" }
+    info { "BG: asked to stop receiving location updates" }
 }
 
 private fun Context.intentToReceiveLocation() =
@@ -331,12 +330,12 @@ private fun Context.intentToReceiveLocation() =
 
 fun Activity.receiveAzimuthUpdates(locationState: LocationState) {
     val sensorManager = sensorManager ?: run {
-        warn(CC_PRIVATE) { "SensorManager not available" }
+        warn { "SensorManager not available" }
         return
     }
     locationState.clearAzimuthListener(sensorManager)
     val sensor = sensorManager.getDefaultSensor(TYPE_ROTATION_VECTOR) ?: run {
-        warn(CC_PRIVATE) { "Rotation vector sensor not available" }
+        warn { "Rotation vector sensor not available" }
         return
     }
     val newListener = OrientationListener(this, locationState)
@@ -356,12 +355,12 @@ suspend fun Context.refreshLocation(callingFromBg: Boolean) = ignoringException 
     val ageString = if (timestamp != 0L) "stale (${MILLISECONDS.toMinutes(age)} minutes old)" else "absent"
     val groundString = if (callingFromBg) "background" else "foreground"
     if (!canAccessLocation(callingFromBg)) {
-        info(CC_PRIVATE) { "Location is $ageString, can't refresh it from $groundString" +
+        info { "Location is $ageString, can't refresh it from $groundString" +
                 " due to lack of permissions/location settings" }
         deleteLocation()
         return
     }
-    info(CC_PRIVATE) { "Refreshing location because it's $ageString" }
+    info { "Refreshing location because it's $ageString" }
     fusedLocationProviderClient.tryFetchLastLocation()?.also { storeLocation(it) }
 }
 
@@ -371,14 +370,14 @@ val Context.locationIfFresh: Triple<Double, Double, Long>?
         val locTriple = storedLocation
         val timestamp = locTriple.third
         if (timestamp == 0L) {
-            warn(CC_PRIVATE) { "Stored location not present" }
+            warn { "Stored location not present" }
             return null
         }
         val age = now - timestamp
         return if (age < HOUR_IN_MILLIS)
             locTriple
         else run {
-            warn(CC_PRIVATE) { "Stored location is too old, age ${MILLISECONDS.toMinutes(age)} minutes" }
+            warn { "Stored location is too old, age ${MILLISECONDS.toMinutes(age)} minutes" }
             null
         }
     }
@@ -432,23 +431,23 @@ private inline fun ignoringException(block: () -> Unit) {
     try {
         block()
     } catch (e: ApiException) {
-        severe(CC_PRIVATE, e) { "Failed to complete a Location Service operation" }
+        severe(e) { "Failed to complete a Location Service operation" }
     } catch (e: SecurityException) {
-        severe(CC_PRIVATE, e) { "Failed to complete a Location Service operation" }
+        severe(e) { "Failed to complete a Location Service operation" }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        severe(CC_PRIVATE, e) { "Location Service operation failed with an unexpected exception!" }
+        severe(e) { "Location Service operation failed with an unexpected exception!" }
     }
 }
 
 class LocationBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
-        info(CC_PRIVATE) { "LocationBroadcastReceiver.onReceive" }
+        info { "LocationBroadcastReceiver.onReceive" }
         intent?.action?.takeIf { it == ACTION_RECEIVE_LOCATION } ?: return
         // implementation of extractResult explicitly returns null, contradicting the annotation:
         val location = extractResult(intent)?.lastLocation ?: return
-        info(CC_PRIVATE) { "Received location in the background: ${location.description}" }
+        info { "Received location in the background: ${location.description}" }
         context?.applicationContext?.storeLocation(location)
     }
 }

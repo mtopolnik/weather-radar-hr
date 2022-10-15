@@ -105,7 +105,7 @@ private class TimestampedBitmap(val timestamp: Long, val isOffline: Boolean, val
 fun refreshWidgetsInForeground() {
     onEachWidget {
         val logHead = "refreshWidgetsInForeground ${wDesc.name}"
-        info(CC_PRIVATE) { logHead }
+        info { logHead }
         appCoroScope.launch {
             fetchImageAndUpdateWidget(callingFromBg = false, onlyIfNew = false).also { lastModified_mmss ->
                 logFetchResult(logHead, lastModified_mmss)
@@ -152,7 +152,7 @@ class RefreshImageService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val widgetName = params.widgetName
         val logHead = "RefreshImage $widgetName"
-        info(CC_PRIVATE) { "$logHead: start job" }
+        info { "$logHead: start job" }
         try {
             val wDesc = params.widgetDescriptor!!.apply { refreshJobRunning = true }
             val wCtx = WidgetContext(applicationContext, wDesc)
@@ -187,7 +187,7 @@ class RefreshImageService : JobService() {
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        info(CC_PRIVATE) { "RefreshImage ${params.widgetName}: stop job" }
+        info { "RefreshImage ${params.widgetName}: stop job" }
         return true
     }
 }
@@ -227,7 +227,7 @@ private class WidgetContext (
 
     fun onUpdateWidget() {
         val logHead = "onUpdateWidget ${wDesc.name}"
-        info(CC_PRIVATE) { "$logHead: initial image fetch" }
+        info { "$logHead: initial image fetch" }
         try {
             updateRemoteViews(null)
             scheduleUpdateAge()
@@ -243,10 +243,10 @@ private class WidgetContext (
                 try {
                     val lastModified = fetchImageAndUpdateWidget(callingFromBg = true, onlyIfNew = false)
                     if (lastModified != null) {
-                        info(CC_PRIVATE) { "$logHead: success" }
+                        info { "$logHead: success" }
                         scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
                     } else {
-                        info(CC_PRIVATE) { "$logHead: failed, scheduling to retry" }
+                        info { "$logHead: failed, scheduling to retry" }
                         scheduleWidgetUpdate(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
                     }
                 } catch (e: CancellationException) {
@@ -271,7 +271,7 @@ private class WidgetContext (
                     return null
                 }
                 val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
-                info(CC_PRIVATE) { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
+                info { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
                 withContext(IO) {
                     writeImgAndTimestamp(tsBitmap)
                 }
@@ -282,10 +282,10 @@ private class WidgetContext (
                 if (e.cached != null) {
                     updateRemoteViews(wDesc.toTimestampedBitmap(e.cached as Bitmap, true))
                 } else if (!onlyIfNew) {
-                    warn(CC_PRIVATE) { "Failed to fetch ${wDesc.imgFilename}" }
+                    warn { "Failed to fetch ${wDesc.imgFilename}" }
                 }
             } catch (e: ImgDecodeException) {
-                severe(CC_PRIVATE) { "Image decoding error for ${wDesc.name}" }
+                severe { "Image decoding error for ${wDesc.name}" }
                 context.invalidateCache(wDesc.url)
                 throw e
             }
@@ -299,7 +299,7 @@ private class WidgetContext (
         if (!wDesc.refreshJobRunning
                 && appContext.jobScheduler.allPendingJobs.none { it.id == wDesc.refreshImageJobId }
         ) {
-            info(CC_PRIVATE) { "${wDesc.name}: refresh job neither scheduled nor running" }
+            info { "${wDesc.name}: refresh job neither scheduled nor running" }
             scheduleWidgetUpdate(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
         }
     }
@@ -334,7 +334,7 @@ private class WidgetContext (
     }
 
     fun cancelUpdateAge() {
-        info(CC_PRIVATE) { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
+        info { "No ${wDesc.name} widget in use, cancelling scheduled jobs" }
         with(context.jobScheduler) {
             cancel(wDesc.updateAgeJobId)
             cancel(wDesc.refreshImageJobId)
@@ -364,12 +364,12 @@ private class WidgetContext (
 
     private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>?) {
         if (location == null) {
-            warn(CC_PRIVATE) { "Location not present, not drawing on bitmap" }
+            warn { "Location not present, not drawing on bitmap" }
             return
         }
         val (lat, lon, timestamp) = location
         val age = System.currentTimeMillis() - timestamp
-        info(CC_PRIVATE) { "Draw location (%.3f, %.3f) aged %d minutes on bitmap".format(
+        info { "Draw location (%.3f, %.3f) aged %d minutes on bitmap".format(
                 lat, lon, MILLISECONDS.toMinutes(age)) }
         val point = FloatArray(2)
         wDesc.mapShape.locationToPixel(lat, lon, point)
@@ -396,7 +396,7 @@ private class WidgetContext (
             tsBitmap.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         if (!growingFile.renameTo(context.fileInCache(fname))) {
-            throw IOException("Couldn't rename $growingFile")
+            throw IOException("Couldn't rename $growingFile to $fname")
         }
     }
 }
@@ -421,7 +421,7 @@ private fun Context.intentLaunchMainActivity(): PendingIntent {
 }
 
 private fun logFetchResult(logHead: String, lastModified_mmss: Long?) {
-    info(CC_PRIVATE) { "$logHead: " +
+    info { "$logHead: " +
             if (lastModified_mmss != null) "success, last modified ${formatElapsedTime(lastModified_mmss)}"
             else "no new image"
     }
@@ -430,13 +430,13 @@ private fun logFetchResult(logHead: String, lastModified_mmss: Long?) {
 private fun reportScheduleResult(task: String, resultCode: Int) {
     when (resultCode) {
         JobScheduler.RESULT_SUCCESS -> {
-            info(CC_PRIVATE) { "Scheduled to $task" }
+            info { "Scheduled to $task" }
         }
         JobScheduler.RESULT_FAILURE -> {
-            severe(CC_PRIVATE) { "Failed to schedule to $task" }
+            severe { "Failed to schedule to $task" }
         }
         else -> {
-            severe(CC_PRIVATE) { "Unknown scheduler result code $resultCode" }
+            severe { "Unknown scheduler result code $resultCode" }
         }
     }
 }
