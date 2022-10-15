@@ -52,6 +52,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
+private const val SLEEP_MILLIS_BEFORE_RETRYING = 2_500L
 
 class RadarImageViewModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
@@ -450,8 +451,8 @@ class RadarImageFragment : Fragment() {
                                     receiveNewFrames(loader, frameSequence, !hadCompleteSuccess)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }
-                                bundle.status = SHOWING
                                 if (hadCompleteSuccess) {
+                                    bundle.status = SHOWING
                                     break
                                 }
                                 delay(SLEEP_MILLIS_BEFORE_RETRYING)
