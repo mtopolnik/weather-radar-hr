@@ -23,8 +23,8 @@ import kotlin.math.ceil
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 const val MILLIS_IN_MINUTE = 60_000
-const val SLEEP_MILLIS_BEFORE_RETRYING = 2_500L
-const val ATTEMPTS_BEFORE_GIVING_UP = 2
+private const val RETRY_TIME_BUDGET_MILLIS = 3_000L
+private const val RETRY_DELAY_MILLIS = 500L
 
 enum class Outcome {
     SUCCESS, PARTIAL_SUCCESS, FAILURE
@@ -88,10 +88,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): Pair<Outcome, PngFrame?> {
             val url = urlTemplate.format(indexAtServer)
-            var attempt = 0
+            val startTime = System.currentTimeMillis()
             while (true) {
-                info { "Kradar fetch $url, attempt $attempt" }
-                attempt += 1
+                info { "Kradar fetch $url with $fetchPolicy" }
                 var outcome = SUCCESS
                 try {
                     val frame = try {
@@ -114,6 +113,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 }
                             }
                         } catch (e: Exception) {
+                            severe(CC_PRIVATE) { "Error decoding/OCRing PNG: ${e.message}" }
                             invalidateInCache(url)
                             throw e
                         }
@@ -126,10 +126,13 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     }
                     return Pair(outcome, frame)
                 } catch (e: Exception) {
-                    if (attempt == ATTEMPTS_BEFORE_GIVING_UP) {
+                    val timeSpent = System.currentTimeMillis() - startTime
+                    if (timeSpent > RETRY_TIME_BUDGET_MILLIS) {
+                        info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, give up" }
                         return Pair(FAILURE, null)
                     }
-                    delay(SLEEP_MILLIS_BEFORE_RETRYING)
+                    info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, retry" }
+                    delay(RETRY_DELAY_MILLIS)
                 }
             }
         }
@@ -148,7 +151,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         var fetchPolicy = fetchPolicy
-        info { "Requested fetch policy $fetchPolicy" }
         var hadCompleteSuccess = true
         try {
             val tempIndexOfMostRecentCached = -1
@@ -362,7 +364,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
                 }
             }
         } catch (e: ImgDecodeException) {
-            severe(CC_PRIVATE) { "Animated GIF decoding error" }
+            severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
                     context.invalidateCache(url)
