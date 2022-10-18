@@ -7,9 +7,9 @@ android {
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
-        versionCode 135
-        versionName "2.4.15"
         targetSdkVersion 33
+        versionCode 136
+        versionName "2.5"
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
