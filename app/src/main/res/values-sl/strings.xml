@@ -14,13 +14,14 @@
     <string name="animation_covers_minutes">Obdobje, ki ga zajema animacija*</string>
     <string name="note_on_animation_length">* ARSO izdaja 90 minut animacije</string>
     <string name="animation_rate">Hitrost animacije</string>
+    <string name="freeze_time">Premor med ponovitvijo</string>
+    <string name="broken_image_description">Ni slike</string>
     <string name="widget_log">Diagnostični dnevnik aplikacije</string>
     <string name="widget_log_enabled">Vklopljeno</string>
     <string name="show_widget_log">Prikaži</string>
     <string name="clear_widget_log">Izbriši</string>
     <string name="oops_dont_clear_widget_log">Ups</string>
     <string name="yes_clear_widget_log">Da, briši!</string>
-    <string name="freeze_time">Premor med ponovitvijo</string>
     <string name="rateme_title">Ocenite aplikacijo</string>
     <string name="rateme_question">
         V kolikor se vam naša aplikacija zdi uporabna, bi bili veseli,

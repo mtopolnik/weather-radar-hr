@@ -193,7 +193,7 @@ class Exchange<out T>(
                     ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
                 } else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
                     inputStream.close()
-                    cachedIn.use { it.readBytes() }.parseOrInvalidateImage
+                    cachedIn.use { it.readBytes() }.parseOrInvalidateImage()
                 }
             }
             Pair(parseLastModified_mmss(lastModifiedStr), decodedImage)
@@ -262,23 +262,22 @@ class Exchange<out T>(
 
     private fun loadCachedResult(): Pair<Long, T>? = runOrNull {
         val (lastModifiedStr, imgBytes) = context.cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
-        Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage)
+        Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage())
     }
 
     private fun loadCachedImage(): T? = runOrNull {
         context.cachedDataIn(url).use { it.readUTF(); it.readBytes() }
-    }?.parseOrInvalidateImage
+    }?.parseOrInvalidateImage()
 
-    private val ByteArray.parseOrInvalidateImage: T
-        get() {
-            try {
-                return decode(this)
-            } catch (e: ImgDecodeException) {
-                severe(CC_PRIVATE) { "Image parsing error" }
-                context.invalidateCache(url)
-                throw e
-            }
+    private fun ByteArray.parseOrInvalidateImage(): T {
+        try {
+            return decode(this)
+        } catch (e: ImgDecodeException) {
+            severe(CC_PRIVATE) { "Image parsing error" }
+            context.invalidateCache(url)
+            throw e
         }
+    }
 
     private fun loadCachedLastModified(url: String) = runOrNull { context.cachedDataIn(url).use { it.readUTF() } }
 

@@ -70,7 +70,7 @@ public class GifFrame implements Frame {
     /**
      * The index of the frame in the animated GIF.
      */
-    int index;
+    final int index;
 
     /** WeatherRadar-specific: OCR-ed timestamp of the image. */
     private long timestamp;

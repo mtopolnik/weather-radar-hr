@@ -102,7 +102,7 @@ class RateMeDialogFragment : DialogFragment() {
     @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val activity = requireActivity()
-        val rootView = LayoutInflater.from(activity).inflate(R.layout.rate_me, null).apply {
+        val rootView = layoutInflater.inflate(R.layout.rate_me, null).apply {
             findViewById<Button>(R.id.rateme_yes).setOnClickListener {
                 activity.openAppRating()
                 dismissAllowingStateLoss()

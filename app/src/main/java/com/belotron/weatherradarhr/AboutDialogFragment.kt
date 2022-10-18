@@ -30,7 +30,7 @@ class AboutDialogFragment : DialogFragment() {
     @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val activity = requireActivity()
-        val rootView = LayoutInflater.from(activity).inflate(R.layout.about, null)
+        val rootView = layoutInflater.inflate(R.layout.about, null)
         val version =
                 try { activity.packageManager?.getPackageInfo(activity.packageName, 0)?.versionName }
                 catch (e: Exception) { null } ?: "??"
