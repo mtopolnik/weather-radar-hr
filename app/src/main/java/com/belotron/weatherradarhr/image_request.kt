@@ -22,10 +22,12 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.lang.Integer.parseInt
+import java.lang.Thread.sleep
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.ThreadLocalRandom
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.text.Charsets.UTF_8
 
@@ -161,6 +163,10 @@ class Exchange<out T>(
     }
 
     private fun HttpURLConnection.handleSuccessResponse(): Pair<Long, T> {
+//        if (ThreadLocalRandom.current().nextInt(100) < 10) {
+//            sleep(5_000)
+//            throw IOException("Fake exception")
+//        }
         val acceptsByteRange = (getHeaderField("Accepts-Ranges") ?: "none") == "bytes"
         val contentLength = getHeaderFieldInt("Content-Length", -1)
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR

@@ -40,35 +40,37 @@ class PngSequence(
 class PngDecoder(
     private val allocator: Allocator,
     override val sequence: PngSequence,
-    private val ocrTimestamp: (Pixels) -> Long
+    private val ocrFun: (Pixels) -> Long
 ) : FrameDecoder<PngFrame> {
 
-    override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex])
+    override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex], allocator)
 
     override fun assignTimestamp(frameIndex: Int) {
         val frame = sequence.frames[frameIndex]
-        val bitmap = decodeFrame(frame)
+        val bitmap = decodeFrame(frame, allocator)
         try {
-            frame.timestamp = ocrTimestamp(bitmap)
+            frame.timestamp = ocrTimestamp(bitmap, ocrFun)
         } finally {
             release(bitmap)
         }
-    }
-
-    fun ocrTimestamp(bitmap: Bitmap) = ocrTimestamp(bitmap.asPixels())
-
-    fun decodeFrame(frame: PngFrame): Bitmap {
-        val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
-        BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, opts)
-        return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
-            inMutable = true
-            inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
-        })
     }
 
     override fun release(bitmap: Bitmap) {
         allocator.release(bitmap)
     }
 
-    override fun dispose() {}
+    override fun dispose() {
+        allocator.dispose()
+    }
+}
+
+fun ocrTimestamp(bitmap: Bitmap, ocrFun: (Pixels) -> Long) = ocrFun(bitmap.asPixels())
+
+fun decodeFrame(frame: PngFrame, allocator: Allocator): Bitmap {
+    val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
+    BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, opts)
+    return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
+        inMutable = true
+        inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
+    })
 }

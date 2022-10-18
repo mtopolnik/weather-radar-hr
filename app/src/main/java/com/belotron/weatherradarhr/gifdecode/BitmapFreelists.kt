@@ -60,4 +60,15 @@ class BitmapFreelists : Allocator {
         }
         freelist.add(array)
     }
+
+    override fun dispose() {
+        bitmapQueues.values.forEach { freelist ->
+            freelist.forEach { bitmap ->
+                bitmap.recycle()
+            }
+        }
+        bitmapQueues.clear()
+        byteArrayQueues.clear()
+        intArrayQueues.clear()
+    }
 }

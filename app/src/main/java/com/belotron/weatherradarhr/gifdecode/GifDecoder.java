@@ -110,8 +110,7 @@ public class GifDecoder implements FrameDecoder<GifFrame>
 
     @Override public void dispose() {
         gifSequence = null;
-        allocator.release(pixelCodes);
-        allocator.release(outPixels);
+        allocator.dispose();
         isFirstFrameTransparent = null;
     }
 

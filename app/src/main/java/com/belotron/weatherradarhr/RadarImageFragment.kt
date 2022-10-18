@@ -44,7 +44,6 @@ import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import java.util.*
@@ -52,7 +51,6 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
-private const val SLEEP_MILLIS_BEFORE_RETRYING = 2_500L
 
 class RadarImageViewModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
@@ -434,28 +432,23 @@ class RadarImageFragment : Fragment() {
             supervisorScope {
                 for (loader in frameSequenceLoaders) {
                     val bundle = vmodel.imgBundles[loader.positionInUI]
-                    launch reloadOne@ {
+                    launch {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
-                            while (true) {
-                                val (hadCompleteSuccess, frameSequence) = loader.fetchFrameSequence(
-                                    context, animationCoversMinutes, fetchPolicy
-                                )
+                            loader.incrementallyFetchFrameSequence(
+                                context, animationCoversMinutes, fetchPolicy
+                            ).collect {
+                                val (havingCompleteSuccess, frameSequence) = it
                                 if (frameSequence == null) {
                                     bundle.status = BROKEN
-                                    return@reloadOne
+                                    return@collect
                                 }
                                 bundle.animationProgress =
                                     vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                                 with(vmodel.animationLooper) {
-                                    receiveNewFrames(loader, frameSequence, !hadCompleteSuccess)
+                                    receiveNewFrames(loader, frameSequence, !havingCompleteSuccess)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }
-                                if (hadCompleteSuccess) {
-                                    bundle.status = SHOWING
-                                    break
-                                }
-                                delay(SLEEP_MILLIS_BEFORE_RETRYING)
                             }
                         } catch (e: CancellationException) {
                             throw e
@@ -463,6 +456,7 @@ class RadarImageFragment : Fragment() {
                             severe(CC_PRIVATE, e) { "Failed to load animation for ${loader.title}" }
                             bundle.status = BROKEN
                         }
+                        bundle.status = SHOWING
                     }
                 }
             }

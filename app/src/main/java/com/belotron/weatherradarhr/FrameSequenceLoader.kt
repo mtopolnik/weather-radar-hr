@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -24,7 +26,8 @@ val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader(
 
 const val MILLIS_IN_MINUTE = 60_000
 private const val RETRY_TIME_BUDGET_MILLIS = 3_000L
-private const val RETRY_DELAY_MILLIS = 500L
+private const val FRAME_RETRY_DELAY_MILLIS = 500L
+private const val SEQUENCE_RETRY_DELAY_MILLIS = 2_000L
 
 enum class Outcome {
     SUCCESS, PARTIAL_SUCCESS, FAILURE
@@ -41,14 +44,40 @@ sealed class FrameSequenceLoader(
         ceil(animationCoversMinutes.toDouble() / minutesPerFrame).toInt() + 1
 
     // Returns Pair(isOffline, sequence)
-    abstract suspend fun fetchFrameSequence(
+    abstract fun incrementallyFetchFrameSequence(
         context: Context,
         animationCoversMinutes: Int,
         fetchPolicy: FetchPolicy
-    ): Pair<Boolean, FrameSequence<out Frame>?>
+    ): Flow<Pair<Boolean, FrameSequence<out Frame>?>>
 }
 
 class NullFrameException : Exception("Failed to fetch, missing from cache")
+
+private fun withGapsFilledIn(nullableFrames: List<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> {
+    val frames = nullableFrames.toMutableList()
+    for (i in frames.indices) {
+        if (frames[i] != null) {
+            continue
+        }
+        val prevFrame = (i - 1).downTo(0).map { frames[it] }.find { it != null }
+        if (prevFrame != null) {
+            frames[i] = prevFrame
+        } else {
+            val nextFrame = (i + 1).until(frames.size).map { frames[it] }.find { it != null }
+            if (nextFrame != null) {
+                frames[i] = nextFrame
+            } else {
+                frames[i] = mostRecentFrame
+            }
+        }
+    }
+    return frames.map { frame ->
+        if (frame == null) {
+            throw NullFrameException() // the logic above should ensure this can't happen
+        }
+        frame
+    }
+}
 
 class KradarSequenceLoader : FrameSequenceLoader(
     positionInUI = 0,
@@ -61,17 +90,12 @@ class KradarSequenceLoader : FrameSequenceLoader(
     private val lowestIndexAtServer = 1
     private val highestIndexAtServer = 25
 
-    override suspend fun fetchFrameSequence(
+    override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Pair<Boolean, PngSequence?> {
+    ): Flow<Pair<Boolean, PngSequence?>> {
         // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
         assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_IF_NEW" }
-        val rawFrames = mutableListOf<PngFrame?>()
-        val frames = mutableListOf<PngFrame>()
-        val sequence = PngSequence(frames)
-        val allocator = BitmapFreelists()
-        val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
         val correctFrameCount = correctFrameCount(animationCoversMinutes)
         val indexOfFrameZeroAtServer = highestIndexAtServer - (correctFrameCount - 1)
         if (indexOfFrameZeroAtServer < 1) {
@@ -86,210 +110,210 @@ class KradarSequenceLoader : FrameSequenceLoader(
             }
         }
 
-        suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): Pair<Outcome, PngFrame?> {
-            val url = urlTemplate.format(indexAtServer)
-            val startTime = System.currentTimeMillis()
+        return flow {
             while (true) {
-                info { "Kradar fetch $url with $fetchPolicy" }
-                var outcome = SUCCESS
-                try {
-                    val frame = try {
-                        val (lastModified, nullableFrame) = fetchPngFrame(context, url, fetchPolicy)
-                        val frame = nullableFrame ?: throw NullFrameException()
+                val allocator = BitmapFreelists()
+
+                suspend fun fetchFrame(indexAtServer: Int, fetchPolicy: FetchPolicy): Pair<Outcome, PngFrame?> {
+                    val url = urlTemplate.format(indexAtServer)
+                    val startTime = System.currentTimeMillis()
+                    while (true) {
+                        info { "Kradar fetch $url with $fetchPolicy" }
+                        var outcome = SUCCESS
                         try {
-                            withContext(Default) {
-                                val bitmap = decoder.decodeFrame(frame)
+                            val frame = try {
+                                val (lastModified, nullableFrame) = fetchPngFrame(context, url, fetchPolicy)
+                                val frame = nullableFrame ?: throw NullFrameException()
                                 try {
-                                    if (bitmap.getPixel(360, 670) == 0) {
-                                        throw NullFrameException()
+                                    withContext(Default) {
+                                        val bitmap = decodeFrame(frame, allocator)
+                                        try {
+                                            if (bitmap.getPixel(360, 670) == 0) {
+                                                throw NullFrameException()
+                                            }
+                                            frame.timestamp = ocrTimestamp(bitmap, ocrTimestamp)
+                                            if (bitmap.getPixel(360, 748) == 0) {
+                                                outcome = PARTIAL_SUCCESS
+                                                invalidateInCache(url)
+                                            }
+                                        } finally {
+                                            allocator.release(bitmap)
+                                        }
                                     }
-                                    frame.timestamp = decoder.ocrTimestamp(bitmap)
-                                    if (bitmap.getPixel(360, 748) == 0) {
-                                        outcome = PARTIAL_SUCCESS
-                                        invalidateInCache(url)
-                                    }
-                                } finally {
-                                    decoder.release(bitmap)
+                                } catch (e: Exception) {
+                                    severe(CC_PRIVATE) { "Error decoding/OCRing PNG: ${e.message}" }
+                                    invalidateInCache(url)
+                                    throw e
                                 }
+                                frame
+                            } catch (e: ImageFetchException) {
+                                val cached = e.cached ?: throw NullFrameException()
+                                val frame = cached as PngFrame
+                                outcome = PARTIAL_SUCCESS
+                                frame
                             }
+                            return Pair(outcome, frame)
                         } catch (e: Exception) {
-                            severe(CC_PRIVATE) { "Error decoding/OCRing PNG: ${e.message}" }
-                            invalidateInCache(url)
-                            throw e
+                            val timeSpent = System.currentTimeMillis() - startTime
+                            if (timeSpent > RETRY_TIME_BUDGET_MILLIS) {
+                                info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, give up" }
+                                return Pair(FAILURE, null)
+                            }
+                            info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, retry" }
+                            delay(FRAME_RETRY_DELAY_MILLIS)
                         }
-                        frame
-                    } catch (e: ImageFetchException) {
-                        val cached = e.cached ?: throw NullFrameException()
-                        val frame = cached as PngFrame
-                        outcome = PARTIAL_SUCCESS
-                        frame
                     }
-                    return Pair(outcome, frame)
-                } catch (e: Exception) {
-                    val timeSpent = System.currentTimeMillis() - startTime
-                    if (timeSpent > RETRY_TIME_BUDGET_MILLIS) {
-                        info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, give up" }
-                        return Pair(FAILURE, null)
-                    }
-                    info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, retry" }
-                    delay(RETRY_DELAY_MILLIS)
                 }
-            }
-        }
 
-        fun timestampInCache(indexAtServer: Int): Long? {
-            val url = urlTemplate.format(indexAtServer)
-            val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
-            return nullableFrame?.let { frame ->
-                val bitmap = decoder.decodeFrame(frame)
+                fun timestampInCache(indexAtServer: Int): Long? {
+                    val url = urlTemplate.format(indexAtServer)
+                    val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
+                    return nullableFrame?.let { frame ->
+                        val bitmap = decodeFrame(frame, allocator)
+                        try {
+                            ocrTimestamp(bitmap, ocrTimestamp)
+                        } finally {
+                            allocator.release(bitmap)
+                        }
+                    }
+                }
+
+                var havingCompleteSuccess = true
                 try {
-                    decoder.ocrTimestamp(bitmap)
-                } finally {
-                    decoder.release(bitmap)
-                }
-            }
-        }
+                    val tempIndexOfMostRecentCached = -1
+                    val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
+                    if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
+                        context.copyCached(
+                            urlTemplate.format(highestIndexAtServer),
+                            urlTemplate.format(tempIndexOfMostRecentCached)
+                        )
+                    }
+                    val (outcomeOfMostRecent, mostRecentFrame) = fetchFrame(highestIndexAtServer, fetchPolicy)
+                    val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException()).timestamp
+                    havingCompleteSuccess = havingCompleteSuccess && outcomeOfMostRecent == SUCCESS
 
-        var fetchPolicy = fetchPolicy
-        var hadCompleteSuccess = true
-        try {
-            val tempIndexOfMostRecentCached = -1
-            val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
-            if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
-                context.copyCached(
-                    urlTemplate.format(highestIndexAtServer),
-                    urlTemplate.format(tempIndexOfMostRecentCached)
-                )
-            }
-            val (outcomeOfMostRecent, mostRecentFrame) = fetchFrame(highestIndexAtServer, fetchPolicy)
-            val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException()).timestamp
-            hadCompleteSuccess = hadCompleteSuccess and (outcomeOfMostRecent == SUCCESS)
-
-            // Reuse cached images by renaming them to the expected new URLs
-            // after DHMZ posts a new image and renames the previous images
-            withContext(IO) {
-                if (mostRecentTimestampInCache == null) {
-                    info { "mostRecentTimestampInCache == null" }
-                    return@withContext
-                }
-                val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
-                if (diffBetweenMostRecentAtServerAndInCache <= 0) {
-                    info { "mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
-                    return@withContext
-                }
-                val millisInMinute = 60_000
-                val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
-                        (minutesPerFrame * millisInMinute)
-                if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
-                    info { "There are no cached frames to rename" }
-                    return@withContext
-                }
-                synchronized(CACHE_LOCK) {
-                    val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second))
-                    info { "Collecting cached DHMZ timestamps" }
-                    run {
-                        var addedCount = 0
-                        for (i in (highestIndexAtServer - 1).downTo(lowestIndexAtServer)) {
-                            val timestamp = timestampInCache(i) ?: continue
-                            addedCount += 1
-                            sortedByTimestamp.add(Pair(i, timestamp))
-                        }
-                        if (sortedByTimestamp.size < addedCount) {
-                            info { "Cached DHMZ timestamps have duplicates" }
+                    // Reuse cached images by renaming them to the expected new URLs
+                    // after DHMZ posts a new image and renames the previous images
+                    var fetchPolicy = fetchPolicy
+                    withContext(IO) {
+                        if (mostRecentTimestampInCache == null) {
+                            info { "mostRecentTimestampInCache == null" }
                             return@withContext
                         }
-                    }
-                    run {
-                        var previousIndex = -1
-                        for ((indexAtServer, _) in sortedByTimestamp) {
-                            if (indexAtServer < previousIndex) {
-                                info { "DHMZ frames aren't ordered by timestamp" }
-                                return@withContext
+                        val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
+                        if (diffBetweenMostRecentAtServerAndInCache <= 0) {
+                            info { "mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
+                            return@withContext
+                        }
+                        val millisInMinute = 60_000
+                        val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
+                                (minutesPerFrame * millisInMinute)
+                        if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
+                            info { "There are no cached frames to rename" }
+                            return@withContext
+                        }
+                        synchronized(CACHE_LOCK) {
+                            val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second))
+                            info { "Collecting cached DHMZ timestamps" }
+                            run {
+                                var addedCount = 0
+                                for (i in (highestIndexAtServer - 1).downTo(lowestIndexAtServer)) {
+                                    val timestamp = timestampInCache(i) ?: continue
+                                    addedCount += 1
+                                    sortedByTimestamp.add(Pair(i, timestamp))
+                                }
+                                if (sortedByTimestamp.size < addedCount) {
+                                    info { "Cached DHMZ timestamps have duplicates" }
+                                    return@withContext
+                                }
                             }
-                            previousIndex = indexAtServer
-                        }
-                    }
-                    sortedByTimestamp.add(Pair(tempIndexOfMostRecentCached, mostRecentTimestampInCache))
-                    for ((indexAtServer, _) in sortedByTimestamp) {
-                        val indexAtServerSoFar = if (indexAtServer == tempIndexOfMostRecentCached)
-                            highestIndexAtServer else indexAtServer
-                        val indexAtServerToBe = indexAtServerSoFar - indexShift
-                        val urlNow = urlTemplate.format(indexAtServer)
-                        if (indexAtServerToBe < 1) {
-                            try {
-                                info { "Deleting cached DHMZ image $indexAtServer" }
-                                context.deleteCached(urlNow)
-                            } catch (e: IOException) {
-                                warn { "Failed to delete $urlNow in cache: " + (e.message ?: "<reason missing>") }
+                            run {
+                                var previousIndex = -1
+                                for ((indexAtServer, _) in sortedByTimestamp) {
+                                    if (indexAtServer < previousIndex) {
+                                        info { "DHMZ frames aren't ordered by timestamp" }
+                                        return@withContext
+                                    }
+                                    previousIndex = indexAtServer
+                                }
                             }
-                        } else {
-                            val urlToBe = urlTemplate.format(indexAtServerToBe)
-                            info { "Reusing DHMZ image $indexAtServer as $indexAtServerToBe" }
-                            context.renameCached(urlNow, urlToBe)
+                            sortedByTimestamp.add(Pair(tempIndexOfMostRecentCached, mostRecentTimestampInCache))
+                            for ((indexAtServer, _) in sortedByTimestamp) {
+                                val indexAtServerSoFar = if (indexAtServer == tempIndexOfMostRecentCached)
+                                    highestIndexAtServer else indexAtServer
+                                val indexAtServerToBe = indexAtServerSoFar - indexShift
+                                val urlNow = urlTemplate.format(indexAtServer)
+                                if (indexAtServerToBe < 1) {
+                                    try {
+                                        info { "Deleting cached DHMZ image $indexAtServer" }
+                                        context.deleteCached(urlNow)
+                                    } catch (e: IOException) {
+                                        warn { "Failed to delete $urlNow in cache: " + (e.message ?: "<reason missing>") }
+                                    }
+                                } else {
+                                    val urlToBe = urlTemplate.format(indexAtServerToBe)
+                                    info { "Reusing DHMZ image $indexAtServer as $indexAtServerToBe" }
+                                    context.renameCached(urlNow, urlToBe)
+                                }
+                            }
+                        }
+                        fetchPolicy = PREFER_CACHED
+                    }
+                    var lastEmittedTime = System.currentTimeMillis()
+                    var lastEmittedFrameCount = 0
+                    coroutineScope {
+                        val rawFrames = mutableListOf<PngFrame?>()
+                        val fetchFrameCount = highestIndexAtServer - indexOfFrameZeroAtServer
+                        (highestIndexAtServer - 1).downTo(indexOfFrameZeroAtServer).map { i ->
+                            async {
+                                fetchFrame(i, fetchPolicy)
+                            }
+                        }.forEach {
+                            val (outcome, frame) = it.await()
+                            havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
+                            rawFrames.add(0, frame)
+                            val frames = mutableListOf<PngFrame>()
+                            withContext(Default) {
+                                frames.clear()
+                                withGapsFilledIn(rawFrames, mostRecentFrame).forEach(frames::add)
+                                frames.add(mostRecentFrame)
+                                val dstTransition = dstTransitionStatus(mostRecentTimestamp)
+                                if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
+                                    return@withContext
+                                }
+                                frames.sortWith(compareBy(PngFrame::timestamp))
+                                val oldestAcceptableTimestamp =
+                                    mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
+                                            if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
+                                val iter = frames.iterator()
+                                while (iter.hasNext()) {
+                                    if (iter.next().timestamp < oldestAcceptableTimestamp) {
+                                        iter.remove()
+                                    }
+                                }
+                            }
+                            val now = System.currentTimeMillis()
+                            if (rawFrames.size == fetchFrameCount ||
+                                (now - lastEmittedTime > 5_000 && frames.size > lastEmittedFrameCount)
+                            ) {
+                                info { "Emit sequence with ${frames.size} frames" }
+                                emit(Pair(havingCompleteSuccess, PngSequence(frames)))
+                                lastEmittedTime = now
+                                lastEmittedFrameCount = frames.size
+                            }
                         }
                     }
+                } catch (e: NullFrameException) {
+                    havingCompleteSuccess = false
+                } finally {
+                    allocator.dispose()
                 }
-                fetchPolicy = PREFER_CACHED
+                if (havingCompleteSuccess) {
+                    break
+                }
+                delay(SEQUENCE_RETRY_DELAY_MILLIS)
             }
-            coroutineScope {
-                indexOfFrameZeroAtServer.until(highestIndexAtServer).map { i ->
-                    async {
-                        fetchFrame(i, fetchPolicy)
-                    }
-                }.forEach {
-                    val (outcome, frame) = it.await()
-                    hadCompleteSuccess = hadCompleteSuccess and (outcome == SUCCESS)
-                    rawFrames.add(frame)
-                }
-            }
-            withContext(Default) {
-                for (i in 0.until(rawFrames.size)) {
-                    if (rawFrames[i] != null) {
-                        continue
-                    }
-                    val prevFrame = (i - 1).downTo(0).map { rawFrames[it] }.find { it != null }
-                    if (prevFrame != null) {
-                        rawFrames[i] = prevFrame
-                    } else {
-                        val nextFrame = (i + 1).until(rawFrames.size).map { rawFrames[it] }.find { it != null }
-                        if (nextFrame != null) {
-                            rawFrames[i] = nextFrame
-                        } else {
-                            rawFrames[i] = mostRecentFrame
-                        }
-                    }
-                }
-                rawFrames.map { frame ->
-                    if (frame == null) {
-                        throw NullFrameException() // the logic above should prevent this from being possible
-                    }
-                    frame
-                }.forEach {
-                    frames.add(it)
-                }
-                frames.add(mostRecentFrame)
-                val dstTransition = dstTransitionStatus(mostRecentTimestamp)
-                if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
-                    return@withContext
-                }
-                frames.sortWith(compareBy(PngFrame::timestamp))
-                val oldestAcceptableTimestamp =
-                    mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
-                            if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
-                val iter = frames.iterator()
-                while (iter.hasNext()) {
-                    if (iter.next().timestamp < oldestAcceptableTimestamp) {
-                        iter.remove()
-                    }
-                }
-            }
-        } catch (e: NullFrameException) {
-            return Pair(false, null)
-        } finally {
-            decoder.dispose()
         }
-        info { "Kradar done fetchFrameSequence, frameCount = ${sequence.frames.size}" }
-        return Pair(hadCompleteSuccess, sequence)
     }
 }
 
@@ -343,45 +367,48 @@ class LradarSequenceLoader : FrameSequenceLoader(
 ) {
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
-    override suspend fun fetchFrameSequence(
+    override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Pair<Boolean, GifSequence?> {
-        val (lastModified, sequence) = try {
-            fetchGifSequence(context, url, fetchPolicy)
-        } catch (e: ImageFetchException) {
-            Pair(0L, e.cached as GifSequence?)
-        }
-        if (sequence == null) {
-            return Pair(true, null)
-        }
-        val allocator = BitmapFreelists()
-        val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
-        try {
-            val frames = sequence.frames
-            withContext(Default) {
-                (0 until frames.size).forEach { frameIndex ->
-                    decoder.assignTimestamp(frameIndex)
-                }
+    ): Flow<Pair<Boolean, GifSequence?>> {
+        return flow {
+            val (lastModified, sequence) = try {
+                fetchGifSequence(context, url, fetchPolicy)
+            } catch (e: ImageFetchException) {
+                Pair(0L, e.cached as GifSequence?)
             }
-        } catch (e: ImgDecodeException) {
-            severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
-            withContext(IO) {
-                synchronized(CACHE_LOCK) {
-                    context.invalidateCache(url)
-                }
+            if (sequence == null) {
+                emit(Pair(true, null))
+                return@flow
             }
-            throw e
-        } finally {
-            decoder.dispose()
+            val allocator = BitmapFreelists()
+            val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
+            try {
+                val frames = sequence.frames
+                withContext(Default) {
+                    (0 until frames.size).forEach { frameIndex ->
+                        decoder.assignTimestamp(frameIndex)
+                    }
+                }
+            } catch (e: ImgDecodeException) {
+                severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
+                withContext(IO) {
+                    synchronized(CACHE_LOCK) {
+                        context.invalidateCache(url)
+                    }
+                }
+                throw e
+            } finally {
+                decoder.dispose()
+            }
+            // SLO animated gif has repeated frames at the end, remove the duplicates
+            val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
+                addAll(sequence.frames)
+            }
+            sequence.frames.apply {
+                clear()
+                addAll(sortedFrames)
+            }
+            emit(Pair(lastModified != 0L, sequence))
         }
-        // SLO animated gif has repeated frames at the end, remove the duplicates
-        val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
-            addAll(sequence.frames)
-        }
-        sequence.frames.apply {
-            clear()
-            addAll(sortedFrames)
-        }
-        return Pair(lastModified != 0L, sequence)
     }
 }

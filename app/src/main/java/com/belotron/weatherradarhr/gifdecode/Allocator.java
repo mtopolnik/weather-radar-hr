@@ -47,4 +47,6 @@ public interface Allocator {
      * Release the given array back to the pool.
      */
     void release(@NonNull int[] array);
+
+    void dispose();
 }
