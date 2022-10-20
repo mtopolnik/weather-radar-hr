@@ -272,14 +272,16 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             val (outcome, frame) = it.await()
                             havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
                             rawFrames.add(0, frame)
-                            val frames = mutableListOf<PngFrame>()
-                            withContext(Default) {
-                                frames.clear()
-                                withGapsFilledIn(rawFrames, mostRecentFrame).forEach(frames::add)
+                            val now = System.currentTimeMillis()
+                            if (rawFrames.size < fetchFrameCount && now - lastEmittedTime < 5_000) {
+                                return@forEach
+                            }
+                            val frames = withContext(Default) {
+                                val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
                                 frames.add(mostRecentFrame)
                                 val dstTransition = dstTransitionStatus(mostRecentTimestamp)
                                 if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
-                                    return@withContext
+                                    return@withContext frames
                                 }
                                 frames.sortWith(compareBy(PngFrame::timestamp))
                                 val oldestAcceptableTimestamp =
@@ -291,11 +293,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                         iter.remove()
                                     }
                                 }
+                                frames
                             }
-                            val now = System.currentTimeMillis()
-                            if (rawFrames.size == fetchFrameCount ||
-                                (now - lastEmittedTime > 5_000 && frames.size > lastEmittedFrameCount)
-                            ) {
+                            if (rawFrames.size == fetchFrameCount || frames.size > lastEmittedFrameCount) {
                                 info { "Emit sequence with ${frames.size} frames" }
                                 emit(Pair(havingCompleteSuccess, PngSequence(frames)))
                                 lastEmittedTime = now
