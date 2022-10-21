@@ -28,6 +28,7 @@ const val MILLIS_IN_MINUTE = 60_000
 private const val RETRY_TIME_BUDGET_MILLIS = 3_000L
 private const val FRAME_RETRY_DELAY_MILLIS = 500L
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 2_000L
+private const val EMIT_INTERVAL_MILLIS = 2_000L
 
 enum class Outcome {
     SUCCESS, PARTIAL_SUCCESS, FAILURE
@@ -274,7 +275,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         fetchedCount++
                         rawFrames[i] = frame
                         val now = System.currentTimeMillis()
-                        if (fetchedCount < correctFrameCount && now - lastEmittedTime < 5_000) {
+                        if (fetchedCount < correctFrameCount && now - lastEmittedTime < EMIT_INTERVAL_MILLIS) {
                             return@collect
                         }
                         val frames = withContext(Default) {

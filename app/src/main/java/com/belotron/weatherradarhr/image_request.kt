@@ -34,8 +34,8 @@ import kotlin.text.Charsets.UTF_8
 private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
-private const val RESUME_DELAY_MILLIS = 1_000L
-private const val MAX_RESUMES = 5
+private const val RESUME_DELAY_MILLIS = 500L
+private const val MAX_RESUMES = 2
 
 val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
