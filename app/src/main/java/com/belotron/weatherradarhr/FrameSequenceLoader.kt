@@ -11,11 +11,11 @@ import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -53,8 +53,7 @@ sealed class FrameSequenceLoader(
 
 class NullFrameException : Exception("Failed to fetch, missing from cache")
 
-private fun withGapsFilledIn(nullableFrames: List<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> {
-    val frames = nullableFrames.toMutableList()
+private fun withGapsFilledIn(frames: Array<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> {
     for (i in frames.indices) {
         if (frames[i] != null) {
             continue
@@ -190,7 +189,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     }
                     val (outcomeOfMostRecent, mostRecentFrame) = fetchFrame(highestIndexAtServer, fetchPolicy)
                     val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException()).timestamp
-                    havingCompleteSuccess = havingCompleteSuccess && outcomeOfMostRecent == SUCCESS
 
                     // Reuse cached images by renaming them to the expected new URLs
                     // after DHMZ posts a new image and renames the previous images
@@ -259,49 +257,49 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         }
                         fetchPolicy = PREFER_CACHED
                     }
-                    var lastEmittedTime = System.currentTimeMillis()
+                    var lastEmittedTime = 0L
                     var lastEmittedFrameCount = 0
-                    coroutineScope {
-                        val rawFrames = mutableListOf<PngFrame?>()
-                        val fetchFrameCount = highestIndexAtServer - indexOfFrameZeroAtServer
-                        (highestIndexAtServer - 1).downTo(indexOfFrameZeroAtServer).map { i ->
-                            async {
-                                fetchFrame(i, fetchPolicy)
-                            }
-                        }.forEach {
-                            val (outcome, frame) = it.await()
-                            havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
-                            rawFrames.add(0, frame)
-                            val now = System.currentTimeMillis()
-                            if (rawFrames.size < fetchFrameCount && now - lastEmittedTime < 5_000) {
-                                return@forEach
-                            }
-                            val frames = withContext(Default) {
-                                val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
-                                frames.add(mostRecentFrame)
-                                val dstTransition = dstTransitionStatus(mostRecentTimestamp)
-                                if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
-                                    return@withContext frames
-                                }
-                                frames.sortWith(compareBy(PngFrame::timestamp))
-                                val oldestAcceptableTimestamp =
-                                    mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
-                                            if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
-                                val iter = frames.iterator()
-                                while (iter.hasNext()) {
-                                    if (iter.next().timestamp < oldestAcceptableTimestamp) {
-                                        iter.remove()
-                                    }
-                                }
-                                frames
-                            }
-                            if (rawFrames.size == fetchFrameCount || frames.size > lastEmittedFrameCount) {
-                                info { "Emit sequence with ${frames.size} frames" }
-                                emit(Pair(havingCompleteSuccess, PngSequence(frames)))
-                                lastEmittedTime = now
-                                lastEmittedFrameCount = frames.size
+                    var fetchedCount = 0
+                    val rawFrames = Array<PngFrame?>(correctFrameCount) { null }
+                    channelFlow {
+                        send(Triple(correctFrameCount - 1, outcomeOfMostRecent, mostRecentFrame))
+                        for (i in (highestIndexAtServer - 1).downTo(indexOfFrameZeroAtServer)) {
+                            launch {
+                                val (outcome, frame) = fetchFrame(i, fetchPolicy)
+                                send(Triple(i - indexOfFrameZeroAtServer, outcome, frame))
                             }
                         }
+                    }.collect {
+                        val (i, outcome, frame) = it
+                        havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
+                        fetchedCount++
+                        rawFrames[i] = frame
+                        val now = System.currentTimeMillis()
+                        if (fetchedCount < correctFrameCount && now - lastEmittedTime < 5_000) {
+                            return@collect
+                        }
+                        val frames = withContext(Default) {
+                            val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
+                            val dstTransition = dstTransitionStatus(mostRecentTimestamp)
+                            if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
+                                return@withContext frames
+                            }
+                            frames.sortWith(compareBy(PngFrame::timestamp))
+                            val oldestAcceptableTimestamp =
+                                mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
+                                        if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
+                            val iter = frames.iterator()
+                            while (iter.hasNext()) {
+                                if (iter.next().timestamp < oldestAcceptableTimestamp) {
+                                    iter.remove()
+                                }
+                            }
+                            frames
+                        }
+                        info { "Emit frame sequence after fetching $fetchedCount frames" }
+                        emit(Pair(havingCompleteSuccess, PngSequence(frames)))
+                        lastEmittedTime = now
+                        lastEmittedFrameCount = frames.size
                     }
                 } catch (e: NullFrameException) {
                     havingCompleteSuccess = false
