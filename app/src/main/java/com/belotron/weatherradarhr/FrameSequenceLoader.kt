@@ -258,7 +258,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         fetchPolicy = PREFER_CACHED
                     }
                     var lastEmittedTime = 0L
-                    var lastEmittedFrameCount = 0
                     var fetchedCount = 0
                     val rawFrames = Array<PngFrame?>(correctFrameCount) { null }
                     channelFlow {
@@ -299,7 +298,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         info { "Emit frame sequence after fetching $fetchedCount frames" }
                         emit(Pair(havingCompleteSuccess, PngSequence(frames)))
                         lastEmittedTime = now
-                        lastEmittedFrameCount = frames.size
                     }
                 } catch (e: NullFrameException) {
                     havingCompleteSuccess = false
