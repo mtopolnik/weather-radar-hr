@@ -48,17 +48,17 @@ enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
 class ImageFetchException(val cached : Any?) : Exception()
 
-suspend fun fetchPngFrame(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, PngFrame?> =
-    context.fetchImg(url, fetchPolicy, ::PngFrame)
+suspend fun fetchPngFrame(context: Context, url: String, fetchPolicy: FetchPolicy): PngFrame? =
+    context.fetchImg(url, fetchPolicy, ::PngFrame).second
 
-suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, GifSequence?> =
-    context.fetchImg(url, fetchPolicy, GifParser::parse)
+suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): GifSequence? =
+    context.fetchImg(url, fetchPolicy, GifParser::parse).second
 
 suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         context.fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
 
-suspend fun fetchPngFromCache(context: Context, url: String): Pair<Long, PngFrame?> =
-    Exchange(context, GlobalScope, url, ONLY_CACHED, ::PngFrame).proceed()
+suspend fun fetchPngFromCache(context: Context, url: String): PngFrame? =
+    Exchange(context, GlobalScope, url, ONLY_CACHED, ::PngFrame).proceed().second
 
 
 /**

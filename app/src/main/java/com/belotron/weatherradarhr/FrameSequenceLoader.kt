@@ -125,7 +125,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         var outcome = SUCCESS
                         try {
                             val frame = try {
-                                val (lastModified, nullableFrame) = fetchPngFrame(context, url, fetchPolicy)
+                                val nullableFrame = fetchPngFrame(context, url, fetchPolicy)
                                 val frame = nullableFrame ?: throw NullFrameException()
                                 try {
                                     withContext(Default) {
@@ -170,7 +170,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
                 suspend fun timestampInCache(indexAtServer: Int): Long? {
                     val url = urlTemplate.format(indexAtServer)
-                    val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
+                    val nullableFrame = fetchPngFromCache(context, url)
                     return nullableFrame?.let { frame ->
                         val bitmap = decodeFrame(frame, allocator)
                         try {
