@@ -52,7 +52,7 @@ sealed class FrameSequenceLoader(
         context: Context,
         animationCoversMinutes: Int,
         fetchPolicy: FetchPolicy
-    ): Flow<Pair<Boolean, FrameSequence<out Frame>?>>
+    ): Flow<FrameSequence<out Frame>?>
 }
 
 class NullFrameException : Exception("Failed to fetch, missing from cache")
@@ -95,7 +95,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Flow<Pair<Boolean, PngSequence?>> {
+    ): Flow<PngSequence?> {
         // This function is not designed to work correctly for these two fetch policies:
         assert(fetchPolicy != ONLY_CACHED) { "fetchPolicy == ONLY_CACHED" }
         assert(fetchPolicy != ONLY_IF_NEW) { "fetchPolicy == ONLY_IF_NEW" }
@@ -387,7 +387,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Flow<Pair<Boolean, GifSequence?>> {
+    ): Flow<GifSequence?> {
         return flow {
             do {
                 val (outcome, sequence) = try {

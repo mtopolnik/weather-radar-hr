@@ -438,7 +438,7 @@ class RadarImageFragment : Fragment() {
                             loader.incrementallyFetchFrameSequence(
                                 context, animationCoversMinutes, fetchPolicy
                             ).collect {
-                                val (havingCompleteSuccess, frameSequence) = it
+                                val frameSequence = it
                                 if (frameSequence == null) {
                                     bundle.status = BROKEN
                                     return@collect
