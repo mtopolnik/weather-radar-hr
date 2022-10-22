@@ -57,7 +57,7 @@ suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPo
 suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         context.fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
 
-fun fetchPngFromCache(context: Context, url: String): Pair<Long, PngFrame?> =
+suspend fun fetchPngFromCache(context: Context, url: String): Pair<Long, PngFrame?> =
     Exchange(context, GlobalScope, url, ONLY_CACHED, ::PngFrame).proceed()
 
 
@@ -90,9 +90,7 @@ private suspend fun <T> Context.fetchImg(
                 }
             }
         }
-        withContext(LimitedIO) {
-            exchange.proceed()
-        }.also {
+        exchange.proceed().also {
             doneSignal.complete(Unit)
         }
     }
@@ -108,56 +106,58 @@ class Exchange<out T>(
     @Volatile
     var inputStream: InputStream? = null
 
-    fun proceed(): Pair<Long, T?> {
+    suspend fun proceed(): Pair<Long, T?> {
+        if (fetchPolicy == ONLY_CACHED) {
+            withContext(IO) { loadCachedResult() }?.also { return it }
+            return Pair(0L, null)
+        }
         if (fetchPolicy == PREFER_CACHED) {
             try {
-                loadCachedResult()?.also { return it }
+                withContext(IO) { loadCachedResult() } ?.also { return it }
             } catch (e: Exception) {
                 severe(CC_PRIVATE, e) { "Error loading cached image for $url" }
             }
         }
-        if (fetchPolicy == ONLY_CACHED) {
-            loadCachedResult()?.also { return it }
-            return Pair(0L, null)
-        }
-        var conn: HttpURLConnection? = null
-        try {
-            conn = URL(url).openConnection() as HttpURLConnection
-            val ifModifiedSince = loadCachedLastModified(url)
-            ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
-            conn.connect()
-            if (!coroScope.isActive) {
-                throw CancellationException()
-            }
-            return when {
-                conn.responseCode == 200 -> {
-                    conn.handleSuccessResponse()
+        return withContext(LimitedIO) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = URL(url).openConnection() as HttpURLConnection
+                val ifModifiedSince = loadCachedLastModified(url)
+                ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
+                conn.connect()
+                if (!coroScope.isActive) {
+                    throw CancellationException()
                 }
-                conn.responseCode != 304 ->
-                    throw HttpErrorResponse()
-                fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
-                    Pair(0L, null)
-                else -> { // responseCode == 304, fetch from cache
-                    info { "Not Modified since $ifModifiedSince: $url" }
-                    loadCachedResult() ?: Exchange(context, coroScope, url, UP_TO_DATE, decode).proceed()
+                when {
+                    conn.responseCode == 200 -> {
+                        conn.handleSuccessResponse()
+                    }
+                    conn.responseCode != 304 ->
+                        throw HttpErrorResponse()
+                    fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
+                        Pair(0L, null)
+                    else -> { // responseCode == 304, fetch from cache
+                        info { "Not Modified since $ifModifiedSince: $url" }
+                        loadCachedResult() ?: Exchange(context, coroScope, url, UP_TO_DATE, decode).proceed()
+                    }
                 }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (e is HttpErrorResponse) {
-                conn!!.logErrorResponse()
-            } else {
-                severe(CC_PRIVATE, e) { "Error fetching $url" }
-            }
-            throw ImageFetchException(
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is HttpErrorResponse) {
+                    conn!!.logErrorResponse()
+                } else {
+                    severe(CC_PRIVATE, e) { "Error fetching $url" }
+                }
+                throw ImageFetchException(
                     if (fetchPolicy == ONLY_IF_NEW) null
                     else runOrNull { loadCachedImage() })
-        } finally {
-            try {
-                conn?.disconnect()
-            } catch (e: Exception) {
-                severe(e) { "Error when closing connection" }
+            } finally {
+                try {
+                    conn?.disconnect()
+                } catch (e: Exception) {
+                    severe(e) { "Error when closing connection" }
+                }
             }
         }
     }

@@ -16,10 +16,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
@@ -28,6 +30,7 @@ const val MILLIS_IN_MINUTE = 60_000
 private const val RETRY_TIME_BUDGET_MILLIS = 3_000L
 private const val FRAME_RETRY_DELAY_MILLIS = 500L
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 2_000L
+private const val INITIAL_EMIT_DELAY_MILLIS = 500L
 private const val EMIT_INTERVAL_MILLIS = 2_000L
 
 enum class Outcome {
@@ -165,7 +168,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     }
                 }
 
-                fun timestampInCache(indexAtServer: Int): Long? {
+                suspend fun timestampInCache(indexAtServer: Int): Long? {
                     val url = urlTemplate.format(indexAtServer)
                     val (lastModified, nullableFrame) = fetchPngFromCache(context, url)
                     return nullableFrame?.let { frame ->
@@ -181,7 +184,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 var havingCompleteSuccess = true
                 try {
                     val tempIndexOfMostRecentCached = -1
-                    val mostRecentTimestampInCache = withContext(IO) { timestampInCache(highestIndexAtServer) }
+                    val mostRecentTimestampInCache = timestampInCache(highestIndexAtServer)
                     if (mostRecentTimestampInCache != null && fetchPolicy != PREFER_CACHED) {
                         context.copyCached(
                             urlTemplate.format(highestIndexAtServer),
@@ -193,23 +196,22 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
                     // Reuse cached images by renaming them to the expected new URLs
                     // after DHMZ posts a new image and renames the previous images
-                    var fetchPolicy = fetchPolicy
-                    withContext(IO) {
+                    val canReuse = withContext(IO) {
                         if (mostRecentTimestampInCache == null) {
                             info { "mostRecentTimestampInCache == null" }
-                            return@withContext
+                            return@withContext false
                         }
                         val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
                         if (diffBetweenMostRecentAtServerAndInCache <= 0) {
                             info { "mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
-                            return@withContext
+                            return@withContext false
                         }
                         val millisInMinute = 60_000
                         val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
                                 (minutesPerFrame * millisInMinute)
                         if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
                             info { "There are no cached frames to rename" }
-                            return@withContext
+                            return@withContext false
                         }
                         synchronized(CACHE_LOCK) {
                             val sortedByTimestamp = TreeSet(compareBy(Pair<Int, Long>::second))
@@ -217,13 +219,13 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             run {
                                 var addedCount = 0
                                 for (i in (highestIndexAtServer - 1).downTo(lowestIndexAtServer)) {
-                                    val timestamp = timestampInCache(i) ?: continue
+                                    val timestamp = runBlocking { timestampInCache(i) } ?: continue
                                     addedCount += 1
                                     sortedByTimestamp.add(Pair(i, timestamp))
                                 }
                                 if (sortedByTimestamp.size < addedCount) {
                                     info { "Cached DHMZ timestamps have duplicates" }
-                                    return@withContext
+                                    return@withContext false
                                 }
                             }
                             run {
@@ -231,7 +233,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 for ((indexAtServer, _) in sortedByTimestamp) {
                                     if (indexAtServer < previousIndex) {
                                         info { "DHMZ frames aren't ordered by timestamp" }
-                                        return@withContext
+                                        return@withContext false
                                     }
                                     previousIndex = indexAtServer
                                 }
@@ -256,27 +258,47 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 }
                             }
                         }
-                        fetchPolicy = PREFER_CACHED
+                        true
                     }
-                    var lastEmittedTime = 0L
                     var fetchedCount = 0
                     val rawFrames = Array<PngFrame?>(correctFrameCount) { null }
                     channelFlow {
+                        val countDown = AtomicInteger(correctFrameCount - 1)
+                        val heartbeatJob = launch {
+                            if (countDown.get() <= 0) {
+                                return@launch
+                            }
+                            delay(INITIAL_EMIT_DELAY_MILLIS)
+                            while (true) {
+                                send(Triple(-1, SUCCESS, null))
+                                delay(EMIT_INTERVAL_MILLIS)
+                            }
+                        }
                         send(Triple(correctFrameCount - 1, outcomeOfMostRecent, mostRecentFrame))
-                        for (i in (highestIndexAtServer - 1).downTo(indexOfFrameZeroAtServer)) {
+                        for (i in (correctFrameCount - 2).downTo(0)) {
                             launch {
-                                val (outcome, frame) = fetchFrame(i, fetchPolicy)
-                                send(Triple(i - indexOfFrameZeroAtServer, outcome, frame))
+                                try {
+                                    val (outcome, frame) = fetchFrame(
+                                        i + indexOfFrameZeroAtServer,
+                                        if (canReuse) PREFER_CACHED else fetchPolicy
+                                    )
+                                    send(Triple(i, outcome, frame))
+                                } finally {
+                                    if (countDown.addAndGet(-1) == 0) {
+                                        heartbeatJob.cancel()
+                                    }
+                                }
                             }
                         }
                     }.collect {
                         val (i, outcome, frame) = it
-                        havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
-                        fetchedCount++
-                        rawFrames[i] = frame
-                        val now = System.currentTimeMillis()
-                        if (fetchedCount < correctFrameCount && now - lastEmittedTime < EMIT_INTERVAL_MILLIS) {
-                            return@collect
+                        if (i != -1) {
+                            havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
+                            fetchedCount++
+                            rawFrames[i] = frame
+                            if (fetchedCount < correctFrameCount) {
+                                return@collect
+                            }
                         }
                         val frames = withContext(Default) {
                             val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
@@ -296,9 +318,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             }
                             frames
                         }
-                        info { "Emit frame sequence after fetching $fetchedCount frames" }
+                        info(CC_PRIVATE) { "Emit frame sequence after fetching $fetchedCount frames" }
                         emit(Pair(havingCompleteSuccess, PngSequence(frames)))
-                        lastEmittedTime = now
                     }
                 } catch (e: NullFrameException) {
                     havingCompleteSuccess = false
