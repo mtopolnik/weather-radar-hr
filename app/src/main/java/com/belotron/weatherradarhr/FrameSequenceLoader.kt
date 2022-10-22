@@ -319,7 +319,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             frames
                         }
                         info(CC_PRIVATE) { "Emit frame sequence after fetching $fetchedCount frames" }
-                        emit(Pair(havingCompleteSuccess, PngSequence(frames)))
+                        emit(PngSequence(frames))
                     }
                 } catch (e: NullFrameException) {
                     havingCompleteSuccess = false
@@ -389,44 +389,47 @@ class LradarSequenceLoader : FrameSequenceLoader(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Flow<Pair<Boolean, GifSequence?>> {
         return flow {
-            val (lastModified, sequence) = try {
-                fetchGifSequence(context, url, fetchPolicy)
-            } catch (e: ImageFetchException) {
-                Pair(0L, e.cached as GifSequence?)
-            }
-            if (sequence == null) {
-                emit(Pair(true, null))
-                return@flow
-            }
-            val allocator = BitmapFreelists()
-            val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
-            try {
-                val frames = sequence.frames
-                withContext(Default) {
-                    (0 until frames.size).forEach { frameIndex ->
-                        decoder.assignTimestamp(frameIndex)
-                    }
+            do {
+                val (outcome, sequence) = try {
+                    Pair(SUCCESS, fetchGifSequence(context, url, fetchPolicy))
+                } catch (e: ImageFetchException) {
+                    val cached = e.cached as GifSequence?
+                    Pair(if (cached != null) PARTIAL_SUCCESS else FAILURE, cached)
                 }
-            } catch (e: ImgDecodeException) {
-                severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
-                withContext(IO) {
-                    synchronized(CACHE_LOCK) {
-                        context.invalidateCache(url)
-                    }
+                if (sequence == null) {
+                    delay(SEQUENCE_RETRY_DELAY_MILLIS)
+                    continue
                 }
-                throw e
-            } finally {
-                decoder.dispose()
-            }
-            // SLO animated gif has repeated frames at the end, remove the duplicates
-            val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
-                addAll(sequence.frames)
-            }
-            sequence.frames.apply {
-                clear()
-                addAll(sortedFrames)
-            }
-            emit(Pair(lastModified != 0L, sequence))
+                val allocator = BitmapFreelists()
+                val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
+                try {
+                    val frames = sequence.frames
+                    withContext(Default) {
+                        (0 until frames.size).forEach { frameIndex ->
+                            decoder.assignTimestamp(frameIndex)
+                        }
+                    }
+                } catch (e: ImgDecodeException) {
+                    severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
+                    withContext(IO) {
+                        synchronized(CACHE_LOCK) {
+                            context.invalidateCache(url)
+                        }
+                    }
+                    throw e
+                } finally {
+                    decoder.dispose()
+                }
+                // SLO animated gif has repeated frames at the end, remove the duplicates
+                val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
+                    addAll(sequence.frames)
+                }
+                sequence.frames.apply {
+                    clear()
+                    addAll(sortedFrames)
+                }
+                emit(sequence)
+            } while (outcome != SUCCESS)
         }
     }
 }

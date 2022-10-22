@@ -1,6 +1,5 @@
 package com.belotron.weatherradarhr
 
-import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.res.Resources
@@ -19,7 +18,6 @@ import android.view.View.VISIBLE
 import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.getColor
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import kotlinx.coroutines.CancellationException
@@ -80,13 +78,10 @@ fun ImageView?.bitmapSize(p: PointF) =
                 ?: it.set(0f, 0f)
         }.takeIf { it.x > 0 && it.y > 0 }
 
-fun TextView.setAgeText(
-        timestamp: Long, isOffline: Boolean,
-        dateFormat: DateFormat, timeFormat: DateFormat
-) {
+fun TextView.setAgeText(timestamp: Long, dateFormat: DateFormat, timeFormat: DateFormat) {
     val now = System.currentTimeMillis()
     text = ageText(
-            timestamp = timestamp, now = now, isOffline = isOffline,
+            timestamp = timestamp, now = now, isOffline = false,
             dateFormat = dateFormat, timeFormat = timeFormat)
     val isFresh = isFreshTimestamp(timestamp = timestamp, now = now)
     setTextColor(getColor(context,

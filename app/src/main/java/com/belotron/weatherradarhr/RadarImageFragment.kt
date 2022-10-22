@@ -446,7 +446,7 @@ class RadarImageFragment : Fragment() {
                                 bundle.animationProgress =
                                     vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
                                 with(vmodel.animationLooper) {
-                                    receiveNewFrames(loader, frameSequence, !havingCompleteSuccess)
+                                    receiveNewFrames(loader, frameSequence)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }
                             }
