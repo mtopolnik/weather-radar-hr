@@ -57,29 +57,31 @@ sealed class FrameSequenceLoader(
 
 class NullFrameException : Exception("Failed to fetch, missing from cache")
 
-private fun withGapsFilledIn(frames: Array<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> {
-    for (i in frames.indices) {
-        if (frames[i] != null) {
-            continue
-        }
-        val prevFrame = (i - 1).downTo(0).map { frames[it] }.find { it != null }
-        if (prevFrame != null) {
-            frames[i] = prevFrame
-        } else {
-            val nextFrame = (i + 1).until(frames.size).map { frames[it] }.find { it != null }
-            if (nextFrame != null) {
-                frames[i] = nextFrame
-            } else {
-                frames[i] = mostRecentFrame
-            }
-        }
-    }
-    return frames.map { frame ->
-        if (frame == null) {
-            throw NullFrameException() // the logic above should ensure this can't happen
-        }
+private fun withGapsFilledIn(frames: Array<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> =
+    frames.mapIndexed { i, frame ->
         frame
+        ?: (i - 1).downTo(0).map { frames[it] }.find { it != null }
+        ?: (i + 1).until(frames.size).map { frames[it] }.find { it != null }
+        ?: mostRecentFrame
     }
+
+private fun frameTimestampsString(frames: List<Frame?>): String {
+    val mostRecentTimestamp = (frames.last() ?: return "xxx").timestamp
+    val b = StringBuilder()
+    var afterFirst = false
+    for (frame in frames) {
+        if (afterFirst) {
+            b.append(", ")
+        }
+        if (frame == null) {
+            b.append("x")
+        } else {
+            val lagMillis = mostRecentTimestamp - frame.timestamp
+            b.append(lagMillis / (5 * MILLIS_IN_MINUTE))
+        }
+        afterFirst = true
+    }
+    return b.toString()
 }
 
 class KradarSequenceLoader : FrameSequenceLoader(
@@ -318,7 +320,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             }
                             frames
                         }
-                        info(CC_PRIVATE) { "Emit frame sequence after fetching $fetchedCount frames" }
+                        info(CC_PRIVATE) {
+                            "Raw frames ${frameTimestampsString(rawFrames.toList())}\n" +
+                            "Emit frames ${frameTimestampsString(frames)}"
+                        }
                         emit(PngSequence(frames))
                     }
                 } catch (e: NullFrameException) {
