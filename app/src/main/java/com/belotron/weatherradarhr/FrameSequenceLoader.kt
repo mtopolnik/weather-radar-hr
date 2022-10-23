@@ -263,6 +263,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         true
                     }
                     var fetchedCount = 0
+                    var nonFailureCount = 0
+                    var nonFailureCountAtLastEmit = 0
                     val rawFrames = Array<PngFrame?>(correctFrameCount) { null }
                     channelFlow {
                         val countDown = AtomicInteger(correctFrameCount - 1)
@@ -300,10 +302,15 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         if (i != -1) {
                             havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
                             fetchedCount++
+                            if (outcome != FAILURE) {
+                                nonFailureCount++
+                            }
                             rawFrames[i] = frame
                             if (fetchedCount < correctFrameCount) {
                                 return@collect
                             }
+                        } else if (nonFailureCount <= nonFailureCountAtLastEmit) {
+                            return@collect
                         }
                         val frames = withContext(Default) {
                             val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
@@ -327,6 +334,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             "Raw frames ${frameTimestampsString(rawFrames.toList())}\n" +
                             "Emit frames ${frameTimestampsString(frames)}"
                         }
+                        nonFailureCountAtLastEmit = nonFailureCount
                         emit(PngSequence(frames))
                     }
                 } catch (e: NullFrameException) {
