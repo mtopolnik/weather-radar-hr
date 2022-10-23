@@ -17,6 +17,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -27,15 +28,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.ThreadLocalRandom
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.text.Charsets.UTF_8
 
 private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
-private const val RESUME_DELAY_MILLIS = 500L
-private const val MAX_RESUMES = 2
+private const val CONNECT_TIMEOUT_MILLIS = 30_000
+private const val RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS = 15_000
+private const val FETCH_TIMOEUT_MILLIS = 90_000L
+private const val RESUME_DELAY_MILLIS = 1_000L
 
 val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
@@ -77,7 +79,9 @@ private suspend fun <T> Context.fetchImg(
         val doneSignal = CompletableDeferred<Unit>()
         launch {
             try {
-                doneSignal.await()
+                withTimeout(FETCH_TIMOEUT_MILLIS) {
+                    doneSignal.await()
+                }
             } catch (e: CancellationException) {
                 val inputStream = exchange.inputStream ?: return@launch
                 info { "Request cancelled, closing connection to $url" }
@@ -122,6 +126,8 @@ class Exchange<out T>(
             var conn: HttpURLConnection? = null
             try {
                 conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = CONNECT_TIMEOUT_MILLIS
+                conn.readTimeout = RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS
                 val ifModifiedSince = loadCachedLastModified(url)
                 ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
                 conn.connect()
@@ -163,8 +169,8 @@ class Exchange<out T>(
     }
 
     private fun HttpURLConnection.handleSuccessResponse(): Pair<Long, T> {
-//        if (ThreadLocalRandom.current().nextInt(100) < 10) {
-//            sleep(5_000)
+//        if (java.util.concurrent.ThreadLocalRandom.current().nextInt(100) < 10) {
+//            sleep(3_000)
 //            throw IOException("Fake exception")
 //        }
         val acceptsByteRange = (getHeaderField("Accepts-Ranges") ?: "none") == "bytes"
@@ -217,9 +223,10 @@ class Exchange<out T>(
         }
         val bos = ByteArrayOutputStream()
         bos.write(bytes)
-        var resumeCount = 1
-        while (resumeCount <= MAX_RESUMES && bos.size() < contentLength) {
-            resumeCount += 1
+        var attemptCount = 1
+        while (bos.size() < contentLength) {
+            attemptCount += 1
+            if (!coroScope.isActive) throw CancellationException()
             sleep(RESUME_DELAY_MILLIS)
             warn { "Incomplete content (${bytes.size} of $contentLength), resuming download" }
             if (!coroScope.isActive) throw CancellationException()
@@ -241,7 +248,6 @@ class Exchange<out T>(
                 } finally {
                     this@Exchange.inputStream = null
                 }
-                if (!coroScope.isActive) throw CancellationException()
             } finally {
                 try {
                     conn?.disconnect()
@@ -251,8 +257,9 @@ class Exchange<out T>(
             }
         }
         if (bos.size() < contentLength) {
-            throw IOException("Couldn't get full content even after ${1 + MAX_RESUMES} attempts." +
-                    " Expected $contentLength bytes, got ${bytes.size}.")
+            throw IOException("Couldn't get full content even after ${attemptCount} attempts." +
+                    " Expected $contentLength bytes, got ${bytes.size}."
+            )
         }
         val completeBytes = bos.toByteArray()
         return decode(completeBytes).also {
