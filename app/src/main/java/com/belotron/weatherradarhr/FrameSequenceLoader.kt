@@ -71,13 +71,13 @@ private fun frameTimestampsString(frames: List<Frame?>): String {
     var afterFirst = false
     for (frame in frames) {
         if (afterFirst) {
-            b.append(", ")
+            b.append(" ")
         }
         if (frame == null) {
-            b.append("x")
+            b.append("..")
         } else {
             val lagMillis = mostRecentTimestamp - frame.timestamp
-            b.append(lagMillis / (5 * MILLIS_IN_MINUTE))
+            b.append("%2d".format(lagMillis / (5 * MILLIS_IN_MINUTE)))
         }
         afterFirst = true
     }
@@ -331,7 +331,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             frames
                         }
                         info(CC_PRIVATE) {
-                            "Raw frames ${frameTimestampsString(rawFrames.toList())}\n" +
+                            "Raw frames  ${frameTimestampsString(rawFrames.toList())}\n" +
                             "Emit frames ${frameTimestampsString(frames)}"
                         }
                         nonFailureCountAtLastEmit = nonFailureCount
