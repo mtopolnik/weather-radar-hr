@@ -291,6 +291,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                     }
                                 }
                             }
+                            // Brief pause to improve the chance of network fetches
+                            // keeping the order of launching the jobs
+                            delay(10)
                         }
                     }.collect {
                         val (i, outcome, frame) = it
