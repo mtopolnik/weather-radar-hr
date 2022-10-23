@@ -392,19 +392,23 @@ class LradarSequenceLoader : FrameSequenceLoader(
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Flow<GifSequence?> {
-        return flow {
-            do {
+    ): Flow<GifSequence?> = flow {
+
+        suspend fun fetchSequence(): GifSequence? {
+            while (true) {
                 val (outcome, sequence) = try {
                     Pair(SUCCESS, fetchGifSequence(context, url, fetchPolicy))
                 } catch (e: ImageFetchException) {
                     val cached = e.cached as GifSequence?
                     Pair(if (cached != null) PARTIAL_SUCCESS else FAILURE, cached)
                 }
-                if (sequence == null) {
+                if (outcome != SUCCESS) {
                     delay(SEQUENCE_RETRY_DELAY_MILLIS)
                     continue
                 }
+                if (sequence == null)
+                    return null
+
                 val allocator = BitmapFreelists()
                 val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
                 try {
@@ -433,8 +437,10 @@ class LradarSequenceLoader : FrameSequenceLoader(
                     clear()
                     addAll(sortedFrames)
                 }
-                emit(sequence)
-            } while (outcome != SUCCESS)
+                return sequence
+            }
         }
+
+        emit(fetchSequence())
     }
 }
