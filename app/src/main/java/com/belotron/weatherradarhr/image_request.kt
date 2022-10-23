@@ -220,7 +220,7 @@ class Exchange<out T>(
         var resumeCount = 1
         while (resumeCount <= MAX_RESUMES && bos.size() < contentLength) {
             resumeCount += 1
-            Thread.sleep(RESUME_DELAY_MILLIS)
+            sleep(RESUME_DELAY_MILLIS)
             warn { "Incomplete content (${bytes.size} of $contentLength), resuming download" }
             if (!coroScope.isActive) throw CancellationException()
             var conn: HttpURLConnection? = null
