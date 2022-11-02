@@ -2,6 +2,8 @@ package com.belotron.weatherradarhr
 
 import android.content.Context
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
+import com.belotron.weatherradarhr.DstTransition.SUMMER_TO_WINTER
+import com.belotron.weatherradarhr.DstTransition.WINTER_TO_SUMMER
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
@@ -123,6 +125,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         return flow {
+            invalidateAllInCache()
             while (true) {
                 val allocator = BitmapFreelists()
 
@@ -188,6 +191,13 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             allocator.release(bitmap)
                         }
                     }
+                }
+
+                fun renameInCache(indexNow: Int, indexToBe: Int) {
+                    context.renameCached(
+                        urlTemplate.format(indexOfFrameZeroAtServer + indexNow),
+                        urlTemplate.format(indexOfFrameZeroAtServer + indexToBe)
+                    )
                 }
 
                 var havingCompleteSuccess = true
@@ -324,19 +334,67 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         }
                         val frames = withContext(Default) {
                             val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
-                            val dstTransition = dstTransitionStatus(mostRecentTimestamp)
-                            if (dstTransition == SUMMER_TO_WINTER) {
+                            if (frames.size <= 1) {
                                 return@withContext frames
                             }
-                            frames.sortWith(compareBy(PngFrame::timestamp))
-                            val oldestAcceptableTimestamp =
-                                mostRecentTimestamp - (correctFrameCount - 1) * minutesPerFrame * MILLIS_IN_MINUTE -
-                                        if (dstTransition == DstTransition.WINTER_TO_SUMMER) 60 * MILLIS_IN_MINUTE else 0
-                            val iter = frames.iterator()
-                            while (iter.hasNext()) {
-                                if (iter.next().timestamp < oldestAcceptableTimestamp) {
-                                    iter.remove()
+                            if (fetchedCount != correctFrameCount || !havingCompleteSuccess) {
+                                return@withContext frames
+                            }
+                            val dstTransition = dstTransitionStatus(mostRecentTimestamp)
+                            if (dstTransition == SUMMER_TO_WINTER) {
+                                info(CC_PRIVATE) { "Summer-to-winter DST transition, won't try to fix mixed timestamps" }
+                                return@withContext frames
+                            }
+                            val millisPerFrame = minutesPerFrame * MILLIS_IN_MINUTE
+                            var expectedTimestamp = frames[0].timestamp
+                            var dstCrossed = false
+                            var mixedTimestampsDetected = false
+                            for (j in 1 until frames.size) {
+                                expectedTimestamp += millisPerFrame
+                                val actualTimestamp = frames[j].timestamp
+                                if (actualTimestamp >= expectedTimestamp + 60 * MILLIS_IN_MINUTE) {
+                                    if (dstCrossed || dstTransition != WINTER_TO_SUMMER) {
+                                        info(CC_PRIVATE) {
+                                            "frames[$j].timestamp >= expectedTimestamp + 1 hour, but " +
+                                            "dstTransition is $dstTransition and dstAlreadyCrossed is $dstCrossed"
+                                        }
+                                        invalidateAllInCache()
+                                        return@withContext frames
+                                    }
+                                    expectedTimestamp += 60 * MILLIS_IN_MINUTE
+                                    dstCrossed = true
                                 }
+                                if (actualTimestamp == expectedTimestamp) {
+                                    continue
+                                }
+                                if (actualTimestamp == expectedTimestamp + millisPerFrame) {
+                                    if (mixedTimestampsDetected) {
+                                        info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp + 5 minutes, " +
+                                                "observed for the 2nd time" }
+                                        invalidateAllInCache()
+                                        return@withContext frames
+                                    }
+                                    info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp + 5 minutes" }
+                                    mixedTimestampsDetected = true
+                                    expectedTimestamp = actualTimestamp
+                                    for (k in 1 until j) {
+                                        havingCompleteSuccess = false
+                                        info { "renameInCache($k, ${k - 1})" }
+                                        frames[k - 1] = frames[k]
+                                        renameInCache(k, k - 1)
+                                    }
+                                    continue
+                                }
+                                if (actualTimestamp == expectedTimestamp - millisPerFrame) {
+                                    info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp - 5 minutes" }
+                                    mixedTimestampsDetected = true
+                                    havingCompleteSuccess = false
+                                    info { "renameInCache($j, ${j - 1})" }
+                                    frames[j - 1] = frames[j]
+                                    renameInCache(j, j - 1)
+                                    continue
+                                }
+                                return@withContext frames
                             }
                             frames
                         }
