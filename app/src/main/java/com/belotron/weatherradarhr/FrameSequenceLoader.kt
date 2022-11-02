@@ -325,7 +325,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         val frames = withContext(Default) {
                             val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
                             val dstTransition = dstTransitionStatus(mostRecentTimestamp)
-                            if (dstTransition == DstTransition.SUMMER_TO_WINTER) {
+                            if (dstTransition == SUMMER_TO_WINTER) {
                                 return@withContext frames
                             }
                             frames.sortWith(compareBy(PngFrame::timestamp))
@@ -389,9 +389,9 @@ private fun dstTransitionStatus(timestamp: Long): DstTransition {
     val noonIsSummerTime = cal.get(Calendar.DST_OFFSET) != 0
     return when (Pair(midnightIsSummerTime, noonIsSummerTime)) {
         Pair(false, false) -> DstTransition.NONE
-        Pair(false, true) -> DstTransition.WINTER_TO_SUMMER
+        Pair(false, true) -> WINTER_TO_SUMMER
         Pair(true, true) -> DstTransition.NONE
-        Pair(true, false) -> DstTransition.SUMMER_TO_WINTER
+        Pair(true, false) -> SUMMER_TO_WINTER
         else -> throw RuntimeException("unreachable")
     }
 }
