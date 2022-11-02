@@ -325,7 +325,7 @@ private fun Context.cachedDataIn(url: String) = cacheFile(url).dataIn()
 
 fun Context.invalidateCache(url: String) {
     synchronized(CACHE_LOCK) {
-        severe(CC_PRIVATE) { "Invalidating cache for $url" }
+        warn(CC_PRIVATE) { "Invalidating cache for $url" }
         val cacheFile = cacheFile(url)
         if (!cacheFile.delete()) {
             severe(CC_PRIVATE) { "Failed to delete a broken cached image for $url" }
