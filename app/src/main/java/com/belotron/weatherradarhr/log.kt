@@ -4,14 +4,18 @@ import android.annotation.SuppressLint
 import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.CcOption.NO_CC
+import java.io.BufferedReader
 import java.io.File
 import java.text.SimpleDateFormat
 
 var privateLogEnabled = false
 
 const val LOGTAG = "WeatherRadar"
+const val MAX_PRIVATE_LOG_SIZE = 65_536
+const val SHORTEN_PRIVATE_LOG_TO = 49_152
 
 private val logFile get() = File(appContext.noBackupFilesDir, "app-widget-log.txt")
+private val logFileTmp get() = File(appContext.noBackupFilesDir, "app-widget-log.txt.growing")
 
 @SuppressLint("SimpleDateFormat")
 private val timeFormat = SimpleDateFormat("MM-dd HH:mm:ss")
@@ -82,6 +86,19 @@ fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
     logFile.writer().use { w ->
         w.println("${timeFormat.format(now)} $msg$exceptionMsg")
     }
+    val logSize = logFile.length().toInt()
+    if (logSize <= MAX_PRIVATE_LOG_SIZE) return
+
+    logFileTmp.writer().use { output ->
+        BufferedReader(logFile.reader()).use { input ->
+            repeat(logSize - SHORTEN_PRIVATE_LOG_TO) {
+                input.read()
+            }
+            output.write("...")
+            input.copyTo(output)
+        }
+    }
+    logFileTmp.renameTo(logFile)
 }
 
 fun appLogString() = logFile.takeIf { it.exists() }?.readText() ?: "The log is empty."
