@@ -109,8 +109,16 @@ class KradarSequenceLoader : FrameSequenceLoader(
 
         suspend fun invalidateInCache(url: String) {
             withContext(IO) {
+                context.invalidateCache(url)
+            }
+        }
+
+        suspend fun invalidateAllInCache() {
+            withContext(IO) {
                 synchronized(CACHE_LOCK) {
-                    context.invalidateCache(url)
+                    for (index in indexOfFrameZeroAtServer until highestIndexAtServer) {
+                        context.invalidateCache(urlTemplate.format(index))
+                    }
                 }
             }
         }
