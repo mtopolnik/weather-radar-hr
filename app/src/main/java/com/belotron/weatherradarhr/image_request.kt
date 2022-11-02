@@ -328,7 +328,7 @@ fun Context.invalidateCache(url: String) {
         warn(CC_PRIVATE) { "Invalidating cache for $url" }
         val cacheFile = cacheFile(url)
         if (!cacheFile.delete()) {
-            severe(CC_PRIVATE) { "Failed to delete a broken cached image for $url" }
+            severe(CC_PRIVATE) { "Failed to delete the cached file for $url" }
             // At least write a stale last-modified date to prevent retry loops
             cacheFile.dataOut().use { cachedOut ->
                 cachedOut.writeUTF(DEFAULT_LAST_MODIFIED_STR)

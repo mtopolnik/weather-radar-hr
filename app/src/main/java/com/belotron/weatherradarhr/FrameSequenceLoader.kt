@@ -56,7 +56,7 @@ sealed class FrameSequenceLoader(
     ): Flow<FrameSequence<out Frame>?>
 }
 
-class NullFrameException : Exception("Failed to fetch, missing from cache")
+class NullFrameException(msg: String) : Exception(msg)
 
 private fun withGapsFilledIn(frames: Array<PngFrame?>, mostRecentFrame: PngFrame): List<PngFrame> =
     frames.mapIndexed { i, frame ->
@@ -117,7 +117,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         suspend fun invalidateAllInCache() {
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
-                    for (index in indexOfFrameZeroAtServer until highestIndexAtServer) {
+                    for (index in indexOfFrameZeroAtServer..highestIndexAtServer) {
                         context.invalidateCache(urlTemplate.format(index))
                     }
                 }
@@ -138,16 +138,17 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         try {
                             val frame = try {
                                 val nullableFrame = fetchPngFrame(context, url, fetchPolicy)
-                                val frame = nullableFrame ?: throw NullFrameException()
+                                val frame = nullableFrame ?: throw NullFrameException("Not available with $fetchPolicy")
                                 try {
                                     withContext(Default) {
                                         val bitmap = decodeFrame(frame, allocator)
                                         try {
                                             if (bitmap.getPixel(360, 670) == 0) {
-                                                throw NullFrameException()
+                                                throw NullFrameException("Incomplete image")
                                             }
                                             frame.timestamp = ocrTimestamp(bitmap, ocrTimestamp)
                                             if (bitmap.getPixel(360, 748) == 0) {
+                                                info(CC_PRIVATE) { "Frame with indexAtServer == $indexAtServer is incomplete" }
                                                 outcome = PARTIAL_SUCCESS
                                                 invalidateInCache(url)
                                             }
@@ -162,7 +163,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 }
                                 frame
                             } catch (e: ImageFetchException) {
-                                val cached = e.cached ?: throw NullFrameException()
+                                val cached = e.cached ?: throw NullFrameException("Failed to fetch, missing from cache")
                                 val frame = cached as PngFrame
                                 outcome = PARTIAL_SUCCESS
                                 frame
@@ -211,7 +212,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         )
                     }
                     val (outcomeOfMostRecent, mostRecentFrame) = fetchFrame(highestIndexAtServer, fetchPolicy)
-                    val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException()).timestamp
+                    val mostRecentTimestamp = (mostRecentFrame ?: throw NullFrameException("Gave up retrying")).timestamp
 
                     // Reuse cached images by renaming them to the expected new URLs
                     // after DHMZ posts a new image and renames the previous images
