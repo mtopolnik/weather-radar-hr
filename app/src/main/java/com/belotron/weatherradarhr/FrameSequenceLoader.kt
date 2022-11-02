@@ -30,7 +30,6 @@ const val MILLIS_IN_MINUTE = 60_000
 private const val RETRY_TIME_BUDGET_MILLIS = 90_000L
 private const val FRAME_RETRY_DELAY_MILLIS = 1_000L
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 2_000L
-private const val INITIAL_EMIT_DELAY_MILLIS = 500L
 private const val EMIT_INTERVAL_MILLIS = 2_000L
 
 enum class Outcome {
@@ -284,10 +283,9 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             if (countDown.get() <= 0) {
                                 return@launch
                             }
-                            delay(INITIAL_EMIT_DELAY_MILLIS)
                             while (true) {
-                                send(Triple(-1, SUCCESS, null))
                                 delay(EMIT_INTERVAL_MILLIS)
+                                send(Triple(-1, SUCCESS, null))
                             }
                         }
                         send(Triple(correctFrameCount - 1, outcomeOfMostRecent, mostRecentFrame))
