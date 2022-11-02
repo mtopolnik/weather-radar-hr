@@ -125,7 +125,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         return flow {
-            invalidateAllInCache()
             while (true) {
                 val allocator = BitmapFreelists()
 
