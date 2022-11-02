@@ -442,9 +442,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
                 } catch (e: ImgDecodeException) {
                     severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
                     withContext(IO) {
-                        synchronized(CACHE_LOCK) {
-                            context.invalidateCache(url)
-                        }
+                        context.invalidateCache(url)
                     }
                     throw e
                 } finally {
