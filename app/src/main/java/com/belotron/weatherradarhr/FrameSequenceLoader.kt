@@ -212,9 +212,13 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             return@withContext false
                         }
                         val diffBetweenMostRecentAtServerAndInCache = mostRecentTimestamp - mostRecentTimestampInCache
-                        if (diffBetweenMostRecentAtServerAndInCache <= 0) {
-                            info { "mostRecentTimestampInCache >= mostRecentTimestampAtServer" }
+                        if (diffBetweenMostRecentAtServerAndInCache == 0L) {
+                            info { "mostRecentTimestampInCache == mostRecentTimestampAtServer" }
                             return@withContext true
+                        }
+                        if (diffBetweenMostRecentAtServerAndInCache < 0L) {
+                            info { "mostRecentTimestampInCache > mostRecentTimestampAtServer" }
+                            return@withContext false
                         }
                         val millisInMinute = 60_000
                         val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
