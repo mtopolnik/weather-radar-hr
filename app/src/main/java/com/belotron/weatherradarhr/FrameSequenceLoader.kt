@@ -377,7 +377,7 @@ private fun dstTransitionStatus(timestamp: Long): DstTransition {
         val isAfter2am = cal > compareCal
         compareCal.set(Calendar.HOUR_OF_DAY, 5)
         val isBefore5am = cal < compareCal
-        println("${dateFormat.format(cal.time)} $isAfter2am $isBefore5am")
+        debug { "${dateFormat.format(cal.time)} $isAfter2am $isBefore5am" }
         isAfter2am && isBefore5am
     }
     if (!isInDangerZone) {
