@@ -194,6 +194,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                 }
 
                 fun renameInCache(indexNow: Int, indexToBe: Int) {
+                    info { "renameInCache(${indexOfFrameZeroAtServer + indexNow}, ${indexOfFrameZeroAtServer + indexToBe})" }
                     context.renameCached(
                         urlTemplate.format(indexOfFrameZeroAtServer + indexNow),
                         urlTemplate.format(indexOfFrameZeroAtServer + indexToBe)
@@ -303,7 +304,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             launch {
                                 try {
                                     val (outcome, frame) = fetchFrame(
-                                        i + indexOfFrameZeroAtServer,
+                                        indexOfFrameZeroAtServer + i,
                                         if (canReuse) PREFER_CACHED else fetchPolicy
                                     )
                                     send(Triple(i, outcome, frame))
@@ -379,7 +380,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                     expectedTimestamp = actualTimestamp
                                     for (k in 1 until j) {
                                         havingCompleteSuccess = false
-                                        info { "renameInCache($k, ${k - 1})" }
                                         frames[k - 1] = frames[k]
                                         renameInCache(k, k - 1)
                                     }
@@ -389,7 +389,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                     info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp - 5 minutes" }
                                     mixedTimestampsDetected = true
                                     havingCompleteSuccess = false
-                                    info { "renameInCache($j, ${j - 1})" }
                                     frames[j - 1] = frames[j]
                                     renameInCache(j, j - 1)
                                     continue
