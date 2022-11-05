@@ -186,27 +186,22 @@ class Exchange<out T>(
             }
         }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
-        return try {
-            val cachedIn = runOrNull { context.cachedDataIn(url.toExternalForm()) }
-            val decodedImage = if (cachedIn == null) {
+        val cachedIn = runOrNull { context.cachedDataIn(url.toExternalForm()) }
+        val decodedImage = if (cachedIn == null) {
+            ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
+        } else {
+            // These checks are repeated in updateCache(). While the response body is being
+            // loaded, another thread could write a newer cached image.
+            val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
+            if (cachedLastModified == null || cachedLastModified < fetchedLastModified) {
+                cachedIn.close()
                 ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
-            } else {
-                // These checks are repeated in updateCache(). While the response body is being
-                // loaded, another thread could write a newer cached image.
-                val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
-                if (cachedLastModified == null || cachedLastModified < fetchedLastModified) {
-                    cachedIn.close()
-                    ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
-                } else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
-                    inputStream.close()
-                    cachedIn.use { it.readBytes() }.parseOrInvalidateImage()
-                }
+            } else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
+                inputStream.close()
+                cachedIn.use { it.readBytes() }.parseOrInvalidateImage()
             }
-            Pair(parseLastModified_mmss(lastModifiedStr), decodedImage)
-        } catch (e: Exception) {
-            severe(CC_PRIVATE) { "Failed to handle a successful image response for $url" }
-            throw e
         }
+        return Pair(parseLastModified_mmss(lastModifiedStr), decodedImage)
     }
 
     private fun ensureFullContentAndUpdateCache(
