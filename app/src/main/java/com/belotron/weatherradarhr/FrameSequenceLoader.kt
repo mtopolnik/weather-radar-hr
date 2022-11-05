@@ -319,14 +319,14 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             delay(10)
                         }
                     }.collect {
-                        val (i, outcome, frame) = it
-                        if (i != -1) {
+                        val (frameIndex, outcome, frame) = it
+                        if (frameIndex != -1) {
                             havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
                             fetchedCount++
                             if (outcome != FAILURE) {
                                 nonFailureCount++
                             }
-                            rawFrames[i] = frame
+                            rawFrames[frameIndex] = frame
                             if (fetchedCount < correctFrameCount) {
                                 return@collect
                             }
@@ -350,13 +350,13 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             var expectedTimestamp = frames[0].timestamp
                             var dstCrossed = false
                             var mixedTimestampsDetected = false
-                            for (j in 1 until frames.size) {
+                            for (i in 1 until frames.size) {
                                 expectedTimestamp += millisPerFrame
-                                val actualTimestamp = frames[j].timestamp
+                                val actualTimestamp = frames[i].timestamp
                                 if (actualTimestamp >= expectedTimestamp + 60 * MILLIS_IN_MINUTE) {
                                     if (dstCrossed || dstTransition != WINTER_TO_SUMMER) {
                                         info(CC_PRIVATE) {
-                                            "frames[$j].timestamp >= expectedTimestamp + 1 hour, but " +
+                                            "frames[$i].timestamp >= expectedTimestamp + 1 hour, but " +
                                             "dstTransition is $dstTransition and dstAlreadyCrossed is $dstCrossed"
                                         }
                                         invalidateAllInCache()
@@ -370,27 +370,27 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 }
                                 if (actualTimestamp == expectedTimestamp + millisPerFrame) {
                                     if (mixedTimestampsDetected) {
-                                        info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp + 5 minutes, " +
+                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes, " +
                                                 "observed for the 2nd time" }
                                         invalidateAllInCache()
                                         return@withContext frames
                                     }
-                                    info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp + 5 minutes" }
+                                    info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes" }
                                     mixedTimestampsDetected = true
                                     expectedTimestamp = actualTimestamp
-                                    for (k in 1 until j) {
+                                    for (j in 1 until i) {
                                         havingCompleteSuccess = false
-                                        frames[k - 1] = frames[k]
-                                        renameInCache(k, k - 1)
+                                        frames[j - 1] = frames[j]
+                                        renameInCache(j, j - 1)
                                     }
                                     continue
                                 }
                                 if (actualTimestamp == expectedTimestamp - millisPerFrame) {
-                                    info(CC_PRIVATE) { "frames[$j].timestamp == expectedTimestamp - 5 minutes" }
+                                    info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp - 5 minutes" }
                                     mixedTimestampsDetected = true
                                     havingCompleteSuccess = false
-                                    frames[j - 1] = frames[j]
-                                    renameInCache(j, j - 1)
+                                    frames[i - 1] = frames[i]
+                                    renameInCache(i, i - 1)
                                     continue
                                 }
                                 return@withContext frames
