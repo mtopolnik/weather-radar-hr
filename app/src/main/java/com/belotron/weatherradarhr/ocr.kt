@@ -49,10 +49,9 @@ object KradarOcr {
 
     fun ocrKradarTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
-        ocrDateTime(pixels).also {
-            debug { "DHMZ OCRed date/time: $it" }
-            return it.toTimestamp
-        }
+        val dateTime = ocrDateTime(pixels)
+        debug { "DHMZ OCRed date/time: $dateTime" }
+        return dateTime.toTimestamp
     }
 
     private fun initDigitPixelses() = synchronized(this) {
