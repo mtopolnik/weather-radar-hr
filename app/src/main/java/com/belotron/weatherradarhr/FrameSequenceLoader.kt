@@ -125,6 +125,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         return flow {
+            var nonFailureCountAtLastEmit = 0
             while (true) {
                 val allocator = BitmapFreelists()
 
@@ -286,7 +287,6 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     }
                     var fetchedCount = 0
                     var nonFailureCount = 0
-                    var nonFailureCountAtLastEmit = 0
                     val rawFrames = Array<PngFrame?>(correctFrameCount) { null }
                     channelFlow {
                         val countDown = AtomicInteger(correctFrameCount - 1)
