@@ -136,37 +136,36 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         info { "Kradar fetch $url with $fetchPolicy" }
                         var outcome = SUCCESS
                         try {
-                            val frame = try {
-                                val nullableFrame = fetchPngFrame(context, url, fetchPolicy)
-                                val frame = nullableFrame ?: throw NullFrameException("Not available with $fetchPolicy")
-                                try {
-                                    withContext(Default) {
-                                        val bitmap = decodeFrame(frame, allocator)
-                                        try {
-                                            if (bitmap.getPixel(360, 670) == 0) {
-                                                throw NullFrameException("Incomplete image")
-                                            }
-                                            frame.timestamp = ocrTimestamp(bitmap, ocrTimestamp)
-                                            if (bitmap.getPixel(360, 748) == 0) {
-                                                info(CC_PRIVATE) { "Frame with indexAtServer == $indexAtServer is incomplete" }
-                                                outcome = PARTIAL_SUCCESS
-                                                invalidateInCache(url)
-                                            }
-                                        } finally {
-                                            allocator.release(bitmap)
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    severe(CC_PRIVATE) { "Error decoding/OCRing PNG: ${e.message}" }
-                                    invalidateInCache(url)
-                                    throw e
-                                }
-                                frame
+                            val frame: PngFrame = try {
+                                fetchPngFrame(context, url, fetchPolicy)
+                                    ?: throw NullFrameException("Not available with $fetchPolicy")
                             } catch (e: ImageFetchException) {
                                 val cached = e.cached ?: throw NullFrameException("Failed to fetch, missing from cache")
                                 val frame = cached as PngFrame
                                 outcome = PARTIAL_SUCCESS
                                 frame
+                            }
+                            try {
+                                withContext(Default) {
+                                    val bitmap = decodeFrame(frame, allocator)
+                                    try {
+                                        if (bitmap.getPixel(360, 670) == 0) {
+                                            throw NullFrameException("Incomplete image")
+                                        }
+                                        frame.timestamp = ocrTimestamp(bitmap, ocrTimestamp)
+                                        if (bitmap.getPixel(360, 748) == 0) {
+                                            info(CC_PRIVATE) { "Frame with indexAtServer == $indexAtServer is incomplete" }
+                                            outcome = PARTIAL_SUCCESS
+                                            invalidateInCache(url)
+                                        }
+                                    } finally {
+                                        allocator.release(bitmap)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                severe(CC_PRIVATE) { "Error decoding/OCRing PNG: ${e.message}" }
+                                invalidateInCache(url)
+                                throw e
                             }
                             return Pair(outcome, frame)
                         } catch (e: Exception) {
