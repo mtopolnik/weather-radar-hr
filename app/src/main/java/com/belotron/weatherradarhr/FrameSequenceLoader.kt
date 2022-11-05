@@ -30,9 +30,9 @@ val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader(
 
 const val MILLIS_IN_MINUTE = 60_000
 private const val RETRY_TIME_BUDGET_MILLIS = 90_000L
-private const val FRAME_RETRY_DELAY_MILLIS = 1_000L
-private const val SEQUENCE_RETRY_DELAY_MILLIS = 2_000L
-private const val EMIT_INTERVAL_MILLIS = 2_000L
+private const val FRAME_RETRY_DELAY_MILLIS = 3_000L
+private const val SEQUENCE_RETRY_DELAY_MILLIS = 7_000L
+private const val EMIT_INTERVAL_MILLIS = 4_000L
 
 enum class Outcome {
     SUCCESS, PARTIAL_SUCCESS, FAILURE
