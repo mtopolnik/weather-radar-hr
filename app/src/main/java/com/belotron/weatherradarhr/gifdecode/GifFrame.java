@@ -2,6 +2,8 @@ package com.belotron.weatherradarhr.gifdecode;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.belotron.weatherradarhr.Frame;
 
 import java.lang.annotation.Retention;
@@ -44,11 +46,12 @@ public class GifFrame implements Frame {
         this.index = index;
     }
 
-    @Override public long getTimestamp() {
+    @Override
+    public long getTimestamp() {
         return timestamp;
     }
 
-    @Override public void setTimestamp(long timestamp) {
+    public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
 
@@ -73,7 +76,7 @@ public class GifFrame implements Frame {
     final int index;
 
     /** WeatherRadar-specific: OCR-ed timestamp of the image. */
-    private long timestamp;
+    private Long timestamp;
 
     int ix, iy, iw, ih;
 

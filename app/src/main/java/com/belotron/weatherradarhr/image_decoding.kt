@@ -4,9 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.belotron.weatherradarhr.gifdecode.Allocator
 import com.belotron.weatherradarhr.gifdecode.Pixels
+import kotlin.properties.Delegates
 
 interface Frame {
-    var timestamp: Long
+    val timestamp: Long
 }
 
 interface FrameSequence<T : Frame> {
@@ -27,7 +28,7 @@ val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
 class PngFrame(
     val pngBytes: ByteArray,
 ) : Frame {
-    override var timestamp = 0L
+    override var timestamp by Delegates.notNull<Long>()
 }
 
 class PngSequence(
