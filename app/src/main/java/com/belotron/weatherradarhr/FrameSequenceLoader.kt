@@ -29,8 +29,10 @@ import kotlin.math.ceil
 val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
 
 const val MILLIS_IN_MINUTE = 60_000
-private const val RETRY_TIME_BUDGET_MILLIS = 90_000L
+private const val INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS = 900_000L
+private const val FRAME_RETRY_TIME_BUDGET_MILLIS = 90_000L
 private const val FRAME_RETRY_DELAY_MILLIS = 3_000L
+private const val SEQUENCE_RETRY_TIME_BUDGET_MILLIS = 180_000L
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 7_000L
 private const val EMIT_INTERVAL_MILLIS = 4_000L
 
@@ -115,8 +117,16 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         suspend fun invalidateAllInCache() {
+            val now = System.currentTimeMillis()
+            if (now < context.localPrefs.lastInvalidatedCacheTimestamp + INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS) {
+                info(CC_PRIVATE) { "Asked to invalidate cache, but cooldown period is still on" }
+                return
+            }
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
+                    context.localPrefs.applyUpdate {
+                        setLastInvalidatedCacheTimestamp(now)
+                    }
                     for (index in indexOfFrameZeroAtServer..highestIndexAtServer) {
                         context.invalidateCache(urlTemplate.format(index))
                     }
@@ -125,6 +135,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
         }
 
         return flow {
+            val start = System.currentTimeMillis()
             var nonFailureCountAtLastEmit = 0
             while (true) {
                 val allocator = BitmapFreelists()
@@ -141,9 +152,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                     ?: throw NullFrameException("Not available with $fetchPolicy")
                             } catch (e: ImageFetchException) {
                                 val cached = e.cached ?: throw NullFrameException("Failed to fetch, missing from cache")
-                                val frame = cached as PngFrame
                                 outcome = PARTIAL_SUCCESS
-                                frame
+                                cached as PngFrame
                             }
                             try {
                                 withContext(Default) {
@@ -170,7 +180,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             return Pair(outcome, frame)
                         } catch (e: Exception) {
                             val timeSpent = System.currentTimeMillis() - startTime
-                            if (timeSpent > RETRY_TIME_BUDGET_MILLIS) {
+                            if (timeSpent > FRAME_RETRY_TIME_BUDGET_MILLIS) {
                                 info(CC_PRIVATE) { "Spent ${timeSpent / 1000} seconds on $url without success, give up" }
                                 return Pair(FAILURE, null)
                             }
@@ -329,8 +339,11 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             if (fetchedCount < correctFrameCount) {
                                 return@collect
                             }
+                            info(CC_PRIVATE) { "fetchedCount $fetchedCount >= correctFrameCount $correctFrameCount" }
                         } else if (nonFailureCount <= nonFailureCountAtLastEmit) {
                             return@collect
+                        } else {
+                            info(CC_PRIVATE) { "nonFailureCount $nonFailureCount > nonFailureCountAtLastEmit $nonFailureCountAtLastEmit" }
                         }
                         val frames = withContext(Default) {
                             val frames = withGapsFilledIn(rawFrames, mostRecentFrame).toMutableList()
@@ -409,6 +422,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     allocator.dispose()
                 }
                 if (havingCompleteSuccess) {
+                    break
+                }
+                if (System.currentTimeMillis() > start + SEQUENCE_RETRY_TIME_BUDGET_MILLIS) {
+                    info(CC_PRIVATE) { "Time budget to fetch DHMZ animation exhausted, giving up" }
                     break
                 }
                 delay(SEQUENCE_RETRY_DELAY_MILLIS)

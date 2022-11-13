@@ -7,6 +7,7 @@ import android.location.Location
 import androidx.preference.PreferenceManager
 
 private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
+private const val KEY_LAST_INVALIDATED_CACHE_TIMESTAMP = "last_invalidated_cache_timestamp"
 private const val KEY_LAST_ANIMATION_MINUTES = "last_animation_covers_minutes"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
@@ -49,6 +50,10 @@ fun SharedPreferences.Editor.setLastAnimationCoversMinutes(value: Int): SharedPr
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =
         putLong(KEY_LAST_RELOADED_TIMESTAMP, value)
+
+val SharedPreferences.lastInvalidatedCacheTimestamp: Long get() = getLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, 0L)
+fun SharedPreferences.Editor.setLastInvalidatedCacheTimestamp(value: Long): SharedPreferences.Editor =
+        putLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, value)
 
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
