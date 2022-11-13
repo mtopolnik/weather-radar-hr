@@ -377,35 +377,39 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                     expectedTimestamp += 60 * MILLIS_IN_MINUTE
                                     dstCrossed = true
                                 }
-                                if (actualTimestamp == expectedTimestamp) {
-                                    continue
-                                }
-                                if (actualTimestamp == expectedTimestamp + millisPerFrame) {
-                                    if (mixedTimestampsDetected) {
-                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes, " +
-                                                "observed for the 2nd time" }
-                                        invalidateAllInCache()
+                                when (actualTimestamp) {
+                                    expectedTimestamp -> {
+                                    }
+                                    expectedTimestamp + millisPerFrame -> {
+                                        if (mixedTimestampsDetected) {
+                                            info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes, " +
+                                                    "observed for the 2nd time" }
+                                            invalidateAllInCache()
+                                            return@withContext frames
+                                        }
+                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes" }
+                                        mixedTimestampsDetected = true
+                                        expectedTimestamp = actualTimestamp
+                                        for (j in 1 until i) {
+                                            havingCompleteSuccess = false
+                                            frames[j - 1] = frames[j]
+                                            renameInCache(j, j - 1)
+                                        }
+                                    }
+                                    expectedTimestamp - millisPerFrame -> {
+                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp - 5 minutes" }
+                                        mixedTimestampsDetected = true
+                                        havingCompleteSuccess = false
+                                        frames[i - 1] = frames[i]
+                                        renameInCache(i, i - 1)
+                                    }
+                                    else -> {
+                                        info(CC_PRIVATE) {
+                                            "frames[$i].timestamp != expectedTimestamp, and the diff isn't +/- 5 minutes"
+                                        }
                                         return@withContext frames
                                     }
-                                    info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes" }
-                                    mixedTimestampsDetected = true
-                                    expectedTimestamp = actualTimestamp
-                                    for (j in 1 until i) {
-                                        havingCompleteSuccess = false
-                                        frames[j - 1] = frames[j]
-                                        renameInCache(j, j - 1)
-                                    }
-                                    continue
                                 }
-                                if (actualTimestamp == expectedTimestamp - millisPerFrame) {
-                                    info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp - 5 minutes" }
-                                    mixedTimestampsDetected = true
-                                    havingCompleteSuccess = false
-                                    frames[i - 1] = frames[i]
-                                    renameInCache(i, i - 1)
-                                    continue
-                                }
-                                return@withContext frames
                             }
                             frames
                         }
