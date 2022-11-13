@@ -36,7 +36,7 @@ private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private const val CONNECT_TIMEOUT_MILLIS = 30_000
 private const val RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS = 15_000
-private const val FETCH_TIMOEUT_MILLIS = 90_000L
+private const val FETCH_TIMEOUT_MILLIS = 90_000L
 private const val RESUME_DELAY_MILLIS = 1_000L
 
 val CACHE_LOCK = Object()
@@ -79,7 +79,7 @@ private suspend fun <T> Context.fetchImg(
         val doneSignal = CompletableDeferred<Unit>()
         launch {
             try {
-                withTimeout(FETCH_TIMOEUT_MILLIS) {
+                withTimeout(FETCH_TIMEOUT_MILLIS) {
                     doneSignal.await()
                 }
             } catch (e: CancellationException) {
