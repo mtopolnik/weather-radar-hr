@@ -248,8 +248,10 @@ class KradarSequenceLoader : FrameSequenceLoader(
                         }
                         if (indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
                             info { "All cached frames are stale, deleting all except most recent" }
-                            for (indexAtServer in lowestIndexAtServer until highestIndexAtServer) {
-                                context.deleteCached(urlTemplate.format(indexAtServer))
+                            synchronized(CACHE_LOCK) {
+                                for (indexAtServer in lowestIndexAtServer until highestIndexAtServer) {
+                                    context.deleteCached(urlTemplate.format(indexAtServer))
+                                }
                             }
                             return@withContext false
                         }
