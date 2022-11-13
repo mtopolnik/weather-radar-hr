@@ -240,11 +240,17 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             info { "mostRecentTimestampInCache > mostRecentTimestampAtServer" }
                             return@withContext false
                         }
-                        val millisInMinute = 60_000
-                        val indexShift = (diffBetweenMostRecentAtServerAndInCache + millisInMinute) /
-                                (minutesPerFrame * millisInMinute)
-                        if (indexShift < 1 || indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
-                            info { "There are no cached frames to rename" }
+                        val indexShift = (diffBetweenMostRecentAtServerAndInCache + MILLIS_IN_MINUTE) /
+                                (minutesPerFrame * MILLIS_IN_MINUTE)
+                        if (indexShift < 1) {
+                            info { "indexShift < 1, not renaming any cached frames" }
+                            return@withContext false
+                        }
+                        if (indexShift > highestIndexAtServer + 1 - lowestIndexAtServer) {
+                            info { "All cached frames are stale, deleting all except most recent" }
+                            for (indexAtServer in lowestIndexAtServer until highestIndexAtServer) {
+                                context.deleteCached(urlTemplate.format(indexAtServer))
+                            }
                             return@withContext false
                         }
                         synchronized(CACHE_LOCK) {
