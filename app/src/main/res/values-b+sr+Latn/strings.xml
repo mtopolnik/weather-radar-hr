@@ -78,10 +78,5 @@
         veb-sedišta ne ažuriraju slike, tada ćeš videti da starost slike raste.
         Ako je starija od 1h, tekst će pocrvenjeti da te upozori da slika nije
         više aktualna.
-        \n
-        \nAplikacija maksimalno štedi mrežni promet, ali uvijek daje najsvežije
-        slike zahvaljujući If-Modified-Since HTTP headeru. Neka te ne iznenadi
-        trenutni odziv nakon osvežavanja, server je javio da nema noviju sliku.
-        Ako je server nedostupan, u naslovu iznad slike pisaće “Offline”.
     </string>
 </resources>

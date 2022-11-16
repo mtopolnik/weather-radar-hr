@@ -79,11 +79,5 @@
         Kadar spletni servisi radarskih slik ne osvežujejo, boste opazili, da
         starost animacije narašča. Če bi starost slike presegla 1 uro, se starost
         izpiše v rdeči barvi.
-        \n
-        \nAplikacija je zelo varčna s podatkovnim prometom, a zahvaljujoč
-        If-Modified-Since HTTP glavi vedno postreže z najnovejšimi slikami. Ne
-        bodite presenečeni, če se osveževanje prikaza izvede v trenutku. To se
-        zgodi, kadar servis ne ponuja novejše slike in zato prenos podatkov ni
-        potreben. Kadar je servis nedostopen, se nad animacijo izpiše “Offline”.
     </string>
 </resources>
