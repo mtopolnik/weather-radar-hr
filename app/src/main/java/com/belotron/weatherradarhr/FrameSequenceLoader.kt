@@ -287,12 +287,8 @@ class KradarSequenceLoader : FrameSequenceLoader(
                                 val indexAtServerToBe = indexAtServerSoFar - indexShift
                                 val urlNow = urlTemplate.format(indexAtServer)
                                 if (indexAtServerToBe < 1) {
-                                    try {
-                                        info { "Deleting cached DHMZ image $indexAtServer" }
-                                        context.deleteCached(urlNow)
-                                    } catch (e: IOException) {
-                                        warn { "Failed to delete $urlNow in cache: " + (e.message ?: "<reason missing>") }
-                                    }
+                                    info { "Deleting cached DHMZ image $indexAtServer" }
+                                    context.deleteCached(urlNow)
                                 } else {
                                     val urlToBe = urlTemplate.format(indexAtServerToBe)
                                     info { "Reusing DHMZ image $indexAtServer as $indexAtServerToBe" }

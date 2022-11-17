@@ -322,7 +322,7 @@ fun Context.invalidateCache(url: String) {
     synchronized(CACHE_LOCK) {
         warn(CC_PRIVATE) { "Invalidating cache for $url" }
         val cacheFile = cacheFile(url)
-        if (!cacheFile.delete()) {
+        if (!cacheFile.delete() && cacheFile.exists()) {
             severe(CC_PRIVATE) { "Failed to delete the cached file for $url" }
             // At least write a stale last-modified date to prevent retry loops
             cacheFile.dataOut().use { cachedOut ->
@@ -335,8 +335,8 @@ fun Context.invalidateCache(url: String) {
 fun Context.deleteCached(url: String) {
     synchronized(CACHE_LOCK) {
         val cacheFile = cacheFile(url)
-        if (!cacheFile.delete()) {
-            throw IOException("Failed to delete $cacheFile")
+        if (!cacheFile.delete() && cacheFile.exists()) {
+            severe(CC_PRIVATE) { "Failed to delete $cacheFile" }
         }
     }
 }
@@ -346,7 +346,7 @@ fun Context.renameCached(urlNow: String, urlToBe: String) {
         warn(CC_PRIVATE) { "Renaming cached $urlNow to $urlToBe" }
         val cacheFileNow = cacheFile(urlNow)
         val cacheFileToBe = cacheFile(urlToBe)
-        if (!cacheFileNow.renameTo(cacheFileToBe)) {
+        if (!cacheFileNow.renameTo(cacheFileToBe) && cacheFileNow.exists()) {
             severe(CC_PRIVATE) { "Failed to rename $cacheFileNow to $cacheFileToBe" }
         }
     }
