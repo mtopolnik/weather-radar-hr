@@ -343,7 +343,7 @@ fun Context.deleteCached(url: String) {
 
 fun Context.renameCached(urlNow: String, urlToBe: String) {
     synchronized(CACHE_LOCK) {
-        warn(CC_PRIVATE) { "Renaming cached $urlNow to $urlToBe" }
+        warn(CC_PRIVATE) { "Rename cached ...${urlNow.takeLast(8)} to ...${urlToBe.takeLast(8)}" }
         val cacheFileNow = cacheFile(urlNow)
         val cacheFileToBe = cacheFile(urlToBe)
         if (!cacheFileNow.renameTo(cacheFileToBe) && cacheFileNow.exists()) {

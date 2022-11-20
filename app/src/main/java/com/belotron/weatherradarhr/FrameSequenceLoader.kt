@@ -430,6 +430,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     allocator.dispose()
                 }
                 if (havingCompleteSuccess) {
+                    info(CC_PRIVATE) { "Fetched DHMZ animation" }
                     break
                 }
                 if (System.currentTimeMillis() > start + SEQUENCE_RETRY_TIME_BUDGET_MILLIS) {
@@ -437,6 +438,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     break
                 }
                 delay(SEQUENCE_RETRY_DELAY_MILLIS)
+                info(CC_PRIVATE) { "Retry fetching DHMZ animation" }
             }
         }
     }
