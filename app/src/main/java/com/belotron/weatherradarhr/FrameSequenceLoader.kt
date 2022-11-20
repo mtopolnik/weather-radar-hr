@@ -30,7 +30,7 @@ val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader(
 
 const val MILLIS_IN_MINUTE = 60_000
 private const val INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS = 900_000L
-private const val FRAME_RETRY_TIME_BUDGET_MILLIS = 90_000L
+private const val FRAME_RETRY_TIME_BUDGET_MILLIS = 5_000L
 private const val FRAME_RETRY_DELAY_MILLIS = 3_000L
 private const val SEQUENCE_RETRY_TIME_BUDGET_MILLIS = 180_000L
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 7_000L
