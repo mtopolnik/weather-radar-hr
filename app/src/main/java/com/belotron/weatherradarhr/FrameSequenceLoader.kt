@@ -9,7 +9,7 @@ import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
-import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import com.belotron.weatherradarhr.ImageDecodeException
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
@@ -522,7 +521,7 @@ class LradarSequenceLoader : FrameSequenceLoader(
                             decoder.assignTimestamp(frameIndex)
                         }
                     }
-                } catch (e: ImgDecodeException) {
+                } catch (e: ImageDecodeException) {
                     severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
                     withContext(IO) {
                         context.invalidateCache(url)

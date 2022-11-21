@@ -7,7 +7,7 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.GifSequence
-import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import com.belotron.weatherradarhr.ImageDecodeException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
@@ -274,7 +274,7 @@ class Exchange<out T>(
     private fun ByteArray.parseOrInvalidateImage(): T {
         try {
             return decode(this)
-        } catch (e: ImgDecodeException) {
+        } catch (e: ImageDecodeException) {
             severe(CC_PRIVATE) { "Image parsing error" }
             context.invalidateCache(url)
             throw e

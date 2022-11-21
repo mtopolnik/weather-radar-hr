@@ -25,7 +25,7 @@ import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
-import com.belotron.weatherradarhr.gifdecode.ImgDecodeException
+import com.belotron.weatherradarhr.ImageDecodeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
@@ -284,7 +284,7 @@ private class WidgetContext (
                 } else if (!onlyIfNew) {
                     warn { "Failed to fetch ${wDesc.imgFilename}" }
                 }
-            } catch (e: ImgDecodeException) {
+            } catch (e: ImageDecodeException) {
                 severe { "Image decoding error for ${wDesc.name}" }
                 context.invalidateCache(wDesc.url)
                 throw e

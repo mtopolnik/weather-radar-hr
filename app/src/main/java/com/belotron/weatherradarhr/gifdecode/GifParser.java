@@ -4,6 +4,7 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_NONE;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 import androidx.annotation.NonNull;
+import com.belotron.weatherradarhr.ImageDecodeException;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -146,7 +147,7 @@ public class GifParser {
         parser.readContents();
         GifSequence gifSequence = parser.gifSequence;
         if (gifSequence.getFrames().size() == 0) {
-            throw new ImgDecodeException("The GIF contains zero images");
+            throw new ImageDecodeException("The GIF contains zero images");
         }
         return gifSequence;
     }
@@ -160,7 +161,7 @@ public class GifParser {
             id.append((char) read());
         }
         if (!id.toString().startsWith("GIF")) {
-            throw new ImgDecodeException("Image data doesn't start with 'GIF'");
+            throw new ImageDecodeException("Image data doesn't start with 'GIF'");
         }
         readLSD();
         if (gifSequence.gctFlag) {
@@ -219,7 +220,7 @@ public class GifParser {
             }
             return tab;
         } catch (BufferUnderflowException e) {
-            throw new ImgDecodeException("Format error while redaing color table", e);
+            throw new ImageDecodeException("Format error while redaing color table", e);
         }
     }
 
@@ -275,7 +276,7 @@ public class GifParser {
                     // This block is a single-field block indicating the end of the GIF Data Stream.
                     break readLoop;
                 default:
-                    throw new ImgDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
+                    throw new ImageDecodeException("Bad byte at " + (rawData.position() - 1) + ": " + code);
             }
         }
     }
@@ -436,7 +437,7 @@ public class GifParser {
                     n += count;
                 }
             } catch (Exception e) {
-                throw new ImgDecodeException(
+                throw new ImageDecodeException(
                         "Error reading block, n = " + n + " count = " + count + " blockSize = " + blockSize, e);
             }
         }
@@ -449,7 +450,7 @@ public class GifParser {
         try {
             return rawData.get() & MASK_INT_LOWEST_BYTE;
         } catch (BufferUnderflowException e) {
-            throw new ImgDecodeException("GIF parse error", e);
+            throw new ImageDecodeException("GIF parse error", e);
         }
     }
 
