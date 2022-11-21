@@ -3,6 +3,7 @@ package com.belotron.weatherradarhr
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.belotron.weatherradarhr.gifdecode.Allocator
+import com.belotron.weatherradarhr.ImageDecodeException
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlin.properties.Delegates
 
@@ -26,9 +27,31 @@ interface FrameDecoder<T : Frame> {
 val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
 
 class PngFrame(
-    val pngBytes: ByteArray,
+    private val pngBytes: ByteArray,
 ) : Frame {
+    private val width: Int
+    private val height: Int
+
     override var timestamp by Delegates.notNull<Long>()
+
+    init {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
+        BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size, opts)
+        opts.apply {
+            if (outWidth <= 0 || outHeight <= 0) {
+                throw ImageDecodeException("Image has no pixels. width: $outWidth height: $outHeight")
+            }
+            width = outWidth
+            height = outHeight
+        }
+    }
+
+    fun decode(allocator: Allocator): Bitmap {
+        return BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size, BitmapFactory.Options().apply {
+            inMutable = true
+            inBitmap = allocator.obtain(width, height, Bitmap.Config.ARGB_8888)
+        })
+    }
 }
 
 class PngSequence(
@@ -44,11 +67,11 @@ class PngDecoder(
     private val ocrFun: (Pixels) -> Long
 ) : FrameDecoder<PngFrame> {
 
-    override fun decodeFrame(frameIndex: Int): Bitmap = decodeFrame(sequence.frames[frameIndex], allocator)
+    override fun decodeFrame(frameIndex: Int): Bitmap = sequence.frames[frameIndex].decode(allocator)
 
     override fun assignTimestamp(frameIndex: Int) {
         val frame = sequence.frames[frameIndex]
-        val bitmap = decodeFrame(frame, allocator)
+        val bitmap = frame.decode(allocator)
         try {
             frame.timestamp = ocrTimestamp(bitmap, ocrFun)
         } finally {
@@ -66,12 +89,3 @@ class PngDecoder(
 }
 
 fun ocrTimestamp(bitmap: Bitmap, ocrFun: (Pixels) -> Long) = ocrFun(bitmap.asPixels())
-
-fun decodeFrame(frame: PngFrame, allocator: Allocator): Bitmap {
-    val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
-    BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, opts)
-    return BitmapFactory.decodeByteArray(frame.pngBytes, 0, frame.pngBytes.size, BitmapFactory.Options().apply {
-        inMutable = true
-        inBitmap = allocator.obtain(opts.outWidth, opts.outHeight, Bitmap.Config.ARGB_8888)
-    })
-}

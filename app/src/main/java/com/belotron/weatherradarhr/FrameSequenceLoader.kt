@@ -156,7 +156,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                             }
                             try {
                                 withContext(Default) {
-                                    val bitmap = decodeFrame(frame, allocator)
+                                    val bitmap = frame.decode(allocator)
                                     try {
                                         if (bitmap.getPixel(360, 670) == 0) {
                                             throw NullFrameException("Incomplete image")
@@ -193,7 +193,7 @@ class KradarSequenceLoader : FrameSequenceLoader(
                     val url = urlTemplate.format(indexAtServer)
                     val nullableFrame = fetchPngFromCache(context, url)
                     return nullableFrame?.let { frame ->
-                        val bitmap = decodeFrame(frame, allocator)
+                        val bitmap = frame.decode(allocator)
                         try {
                             ocrTimestamp(bitmap, ocrTimestamp)
                         } finally {
