@@ -3,7 +3,6 @@ package com.belotron.weatherradarhr
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.belotron.weatherradarhr.gifdecode.Allocator
-import com.belotron.weatherradarhr.ImageDecodeException
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlin.properties.Delegates
 

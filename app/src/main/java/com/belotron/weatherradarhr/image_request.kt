@@ -7,7 +7,6 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.gifdecode.GifParser
 import com.belotron.weatherradarhr.gifdecode.GifSequence
-import com.belotron.weatherradarhr.ImageDecodeException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO

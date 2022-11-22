@@ -25,7 +25,6 @@ import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
 import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
-import com.belotron.weatherradarhr.ImageDecodeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch

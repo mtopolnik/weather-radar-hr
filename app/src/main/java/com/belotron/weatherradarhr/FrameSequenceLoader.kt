@@ -9,7 +9,6 @@ import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
-import com.belotron.weatherradarhr.ImageDecodeException
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
