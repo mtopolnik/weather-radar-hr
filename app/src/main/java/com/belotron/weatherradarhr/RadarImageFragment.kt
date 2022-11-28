@@ -424,29 +424,28 @@ class RadarImageFragment : Fragment() {
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
-        frameSequenceLoaders.map { vmodel.imgBundles[it.positionInUI] }.forEach { it.status = LOADING }
+        frameSequenceLoaders.indices.map { vmodel.imgBundles[it] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         vmodel.reloadJob?.cancel()
         vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
-                for (loader in frameSequenceLoaders) {
-                    val bundle = vmodel.imgBundles[loader.positionInUI]
+                frameSequenceLoaders.forEachIndexed { positionInUI, loader ->
+                    val bundle = vmodel.imgBundles[positionInUI]
                     launch {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
                             loader.incrementallyFetchFrameSequence(
                                 context, animationCoversMinutes, fetchPolicy
-                            ).collect {
-                                val frameSequence = it
+                            ).collect { frameSequence ->
                                 if (frameSequence == null) {
                                     bundle.status = BROKEN
                                     return@collect
                                 }
                                 bundle.animationProgress =
-                                    vmodel.imgBundles.map { it.animationProgress }.maxOrNull() ?: 0
+                                    vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
                                 with(vmodel.animationLooper) {
-                                    receiveNewFrames(loader, frameSequence)
+                                    receiveNewFrames(positionInUI, loader, frameSequence)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }
                             }

@@ -45,8 +45,8 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(vmodel.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewFrames(loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>) {
-        animators[loader.positionInUI] = FrameAnimator(vmodel, loader, frameSequence)
+    fun receiveNewFrames(positionInUI: Int, loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>) {
+        animators[positionInUI] = FrameAnimator(positionInUI, loader, vmodel, frameSequence)
     }
 
     fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
@@ -118,14 +118,15 @@ class AnimationLooper(
 }
 
 class FrameAnimator(
-        vmodel: RadarImageViewModel,
-        private val frameSeqLoader: FrameSequenceLoader,
-        frameSequence: FrameSequence<out Frame>,
+    private val positionInUI: Int,
+    private val frameSeqLoader: FrameSequenceLoader,
+    vmodel: RadarImageViewModel,
+    frameSequence: FrameSequence<out Frame>,
 ) {
     var animationCoversMinutes: Int = 1
     var rateMinsPerSec: Int = 20
     var freezeTimeMillis: Int = 500
-    val imgBundle: ImageBundle get() = imgBundles[frameSeqLoader.positionInUI]
+    val imgBundle: ImageBundle get() = imgBundles[positionInUI]
 
     private val viewModelScope = vmodel.viewModelScope
     private val imgBundles = vmodel.imgBundles

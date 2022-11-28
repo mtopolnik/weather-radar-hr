@@ -39,7 +39,6 @@ enum class Outcome {
 }
 
 sealed class FrameSequenceLoader(
-    val positionInUI: Int,
     val title: String,
     val minutesPerFrame: Int,
     val mapShape: MapShape,
@@ -86,7 +85,6 @@ private fun frameTimestampsString(frames: List<Frame?>): String {
 }
 
 class KradarSequenceLoader : FrameSequenceLoader(
-    positionInUI = 0,
     title = "HR",
     minutesPerFrame = 5,
     mapShape = kradarShape,
@@ -484,7 +482,6 @@ private enum class DstTransition {
 }
 
 class LradarSequenceLoader : FrameSequenceLoader(
-    positionInUI = 1,
     title = "SLO",
     minutesPerFrame = 5,
     mapShape = lradarShape,
