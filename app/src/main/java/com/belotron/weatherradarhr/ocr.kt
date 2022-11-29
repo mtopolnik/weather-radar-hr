@@ -9,12 +9,12 @@ import java.util.Calendar.*
 import java.util.TimeZone.getTimeZone
 import kotlin.math.abs
 
-object LradarOcr {
+object SloOcr {
 
     @Volatile
     private var digitTemplates: List<Pixels> = emptyList()
 
-    fun ocrLradarTimestamp(pixels: Pixels): Long {
+    fun ocrSloTimestamp(pixels: Pixels): Long {
         initDigitPixelses()
         ocrDateTime(pixels).also {
             debug { "ARSO OCRed date/time: $it" }
@@ -43,13 +43,17 @@ object LradarOcr {
             (0..9).find { stripeEqual(pixels, 7 * pos + 9, 28, digitTemplates[it], 0) } ?: ocrFailed()
 }
 
-object KradarOcr {
+object HrOcr {
     @Volatile
     private var digitTemplates: List<Pixels> = emptyList()
 
-    fun ocrKradarTimestamp(pixels: Pixels): Long {
+    fun ocrTimestampKompozit(pixels: Pixels) = ocrHrTimestamp(pixels, 6)
+
+    fun ocrTimestampSingle(pixels: Pixels) = ocrHrTimestamp(pixels, 66)
+
+    private fun ocrHrTimestamp(pixels: Pixels, imgY: Int): Long {
         initDigitPixelses()
-        val dateTime = ocrDateTime(pixels)
+        val dateTime = ocrDateTime(pixels, imgY)
         debug { "DHMZ OCRed date/time: $dateTime" }
         return dateTime.toTimestamp
     }
@@ -60,12 +64,12 @@ object KradarOcr {
         }
     }
 
-    private fun ocrDateTime(img: Pixels): DateTime {
-        var x = 110
+    private fun ocrDateTime(img: Pixels, y: Int): DateTime {
+        var x = 80
         val digits = IntArray(12) { 0 }
         var digitIndex = 0
         while (x < 260 && digitIndex < 12) {
-            val digit = (0..9).find { isMatch(img, x, digitTemplates[it]) }
+            val digit = (0..9).find { isMatch(img, x, y, digitTemplates[it]) }
             if (digit != null) {
                 digits[digitIndex++] = digit
                 x += 6
@@ -85,8 +89,7 @@ object KradarOcr {
         }
     }
 
-    private fun isMatch(img: Pixels, imgX: Int, template: Pixels): Boolean {
-        val imgY = 6
+    private fun isMatch(img: Pixels, imgX: Int, imgY: Int, template: Pixels): Boolean {
         var totalDiff = 0
 //        info { "art\n" + asciiArt(img, imgX, imgY, template) }
         (0 until template.height).forEach { y ->

@@ -23,8 +23,7 @@ import android.widget.RemoteViews
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
-import com.belotron.weatherradarhr.KradarOcr.ocrKradarTimestamp
-import com.belotron.weatherradarhr.LradarOcr.ocrLradarTimestamp
+import com.belotron.weatherradarhr.SloOcr.ocrSloTimestamp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
@@ -49,28 +48,28 @@ private const val KRADAR_CROP_Y_HEIGHT = 719
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 private val widgetDescriptors = arrayOf(
-        WidgetDescriptor("LRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
-                LradarWidgetProvider::class.java,
+        WidgetDescriptor("SloRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
+                SloWidgetProvider::class.java,
                 R.drawable.lradar_widget_preview,
-                lradarShape,
+                SloMapShape,
                 cropLeft = 0,
                 cropTop = LRADAR_CROP_Y_TOP,
                 toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
-                            ocrLradarTimestamp(bitmap.asPixels()),
+                            ocrSloTimestamp(bitmap.asPixels()),
                             isOffline,
                             bitmap.crop(LRADAR_CROP_X_LEFT, LRADAR_CROP_Y_TOP,
                                     LRADAR_CROP_WIDTH, LRADAR_CROP_HEIGHT)
             )}),
-        WidgetDescriptor("KRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
-                KradarWidgetProvider::class.java,
-                R.drawable.kradar_widget_preview,
-                kradarShape,
+        WidgetDescriptor("HrRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
+                HrKompozitWidgetProvider::class.java,
+                R.drawable.hr_kompozit_widget_preview,
+                HrKompozitShape,
                 cropLeft = 0,
                 cropTop = 0,
                 toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
-                            ocrKradarTimestamp(bitmap.asPixels()),
+                            HrOcr.ocrTimestampKompozit(bitmap.asPixels()),
                             isOffline,
                             bitmap.crop(0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
 )
@@ -135,13 +134,13 @@ private fun onEachWidget(action: WidgetContext.() -> Unit) {
             .forEach { it.action() }
 }
 
-class LradarWidgetProvider : AppWidgetProvider() {
+class SloWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         WidgetContext(context, widgetDescriptors[0]).onUpdateWidget()
     }
 }
 
-class KradarWidgetProvider : AppWidgetProvider() {
+class HrKompozitWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         WidgetContext(context, widgetDescriptors[1]).onUpdateWidget()
     }

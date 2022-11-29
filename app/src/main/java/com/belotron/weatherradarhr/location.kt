@@ -46,7 +46,7 @@ const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
 private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
 
-val lradarShape = MapShape(
+val SloMapShape = MapShape(
     topLat = 47.40,
     botLat = 44.71,
     topLeftLon = 12.10,
@@ -59,7 +59,7 @@ val lradarShape = MapShape(
     botImageY = 649
 )
 
-val kradarShape = MapShape(
+val HrKompozitShape = MapShape(
     topLat = 47.8,
     botLat = 41.52,
     topLeftLon = 11.73,

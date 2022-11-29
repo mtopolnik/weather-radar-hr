@@ -63,7 +63,7 @@ class RadarImageViewModel : ViewModel() {
 
     var isTrackingTouch = false
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
-    val imgBundles: List<ImageBundle> = (0..1).map { ImageBundle() }
+    val imgBundles: List<ImageBundle> = frameSequenceLoaders.indices.map { ImageBundle() }
     val locationState = LocationState()
     val fullScreenBundle = ImageBundle()
     var stashedImgBundle = ImageBundle()

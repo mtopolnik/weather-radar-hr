@@ -37,7 +37,7 @@
                   android:parentActivityName=".MainActivity">
         </activity>
 
-        <receiver android:name=".LradarWidgetProvider"
+        <receiver android:name=".SloWidgetProvider"
                   android:label="@string/widget_slo"
                   android:exported="false">
             <intent-filter>
@@ -47,7 +47,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/lradar_widget_info"/>
         </receiver>
-        <receiver android:name=".KradarWidgetProvider"
+        <receiver android:name=".HrKompozitWidgetProvider"
                   android:label="@string/widget_hr"
                   android:exported="false">
             <intent-filter>

@@ -24,7 +24,13 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 
-val frameSequenceLoaders = arrayOf(KradarSequenceLoader(), LradarSequenceLoader())
+@Suppress("MoveLambdaOutsideParentheses")
+val frameSequenceLoaders = arrayOf(
+    HrSequenceLoader("https://vrijeme.hr/radari/anim_kompozit%d.png",
+                    "HR Kompozit", HrKompozitShape, HrOcr::ocrTimestampKompozit),
+    HrSequenceLoader("https://vrijeme.hr/radari/anim_debeljak%d.png",
+                    "HR Debeljak", HrKompozitShape, HrOcr::ocrTimestampSingle),
+    SloSequenceLoader())
 
 const val MILLIS_IN_MINUTE = 60_000
 private const val INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS = 900_000L
@@ -84,13 +90,17 @@ private fun frameTimestampsString(frames: List<Frame?>): String {
     return b.toString()
 }
 
-class KradarSequenceLoader : FrameSequenceLoader(
-    title = "HR",
+class HrSequenceLoader(
+    private val urlTemplate: String,
+    title: String,
+    mapShape: MapShape,
+    ocrTimestamp: (Pixels) -> Long,
+) : FrameSequenceLoader(
+    title,
     minutesPerFrame = 5,
-    mapShape = kradarShape,
-    ocrTimestamp = KradarOcr::ocrKradarTimestamp
+    mapShape,
+    ocrTimestamp
 ) {
-    private val urlTemplate = "https://vrijeme.hr/radari/anim_kompozit%d.png"
     private val lowestIndexAtServer = 1
     private val highestIndexAtServer = 25
 
@@ -481,11 +491,11 @@ private enum class DstTransition {
     SUMMER_TO_WINTER,
 }
 
-class LradarSequenceLoader : FrameSequenceLoader(
+class SloSequenceLoader : FrameSequenceLoader(
     title = "SLO",
     minutesPerFrame = 5,
-    mapShape = lradarShape,
-    ocrTimestamp = LradarOcr::ocrLradarTimestamp
+    mapShape = SloMapShape,
+    ocrTimestamp = SloOcr::ocrSloTimestamp
 ) {
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
 
