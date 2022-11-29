@@ -24,14 +24,6 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 
-@Suppress("MoveLambdaOutsideParentheses")
-val frameSequenceLoaders = arrayOf(
-    HrSequenceLoader("https://vrijeme.hr/radari/anim_kompozit%d.png",
-                    "HR Kompozit", HrKompozitShape, HrOcr::ocrTimestampKompozit),
-    HrSequenceLoader("https://vrijeme.hr/radari/anim_debeljak%d.png",
-                    "HR Debeljak", HrKompozitShape, HrOcr::ocrTimestampSingle),
-    SloSequenceLoader())
-
 const val MILLIS_IN_MINUTE = 60_000
 private const val INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS = 900_000L
 private const val FRAME_RETRY_TIME_BUDGET_MILLIS = 5_000L
@@ -45,9 +37,7 @@ enum class Outcome {
 }
 
 sealed class FrameSequenceLoader(
-    val title: String,
     val minutesPerFrame: Int,
-    val mapShape: MapShape,
     val ocrTimestamp: (Pixels) -> Long
 ) {
     fun correctFrameCount(animationCoversMinutes: Int): Int =
@@ -91,16 +81,13 @@ private fun frameTimestampsString(frames: List<Frame?>): String {
 }
 
 class HrSequenceLoader(
-    private val urlTemplate: String,
-    title: String,
-    mapShape: MapShape,
+    urlKeyword: String,
     ocrTimestamp: (Pixels) -> Long,
 ) : FrameSequenceLoader(
-    title,
     minutesPerFrame = 5,
-    mapShape,
     ocrTimestamp
 ) {
+    private val urlTemplate = "https://vrijeme.hr/radari/anim_${urlKeyword}%d.png"
     private val lowestIndexAtServer = 1
     private val highestIndexAtServer = 25
 
@@ -492,9 +479,7 @@ private enum class DstTransition {
 }
 
 class SloSequenceLoader : FrameSequenceLoader(
-    title = "SLO",
     minutesPerFrame = 5,
-    mapShape = SloMapShape,
     ocrTimestamp = SloOcr::ocrSloTimestamp
 ) {
     private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"

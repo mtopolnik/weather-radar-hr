@@ -63,7 +63,7 @@ class RadarImageViewModel : ViewModel() {
 
     var isTrackingTouch = false
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
-    val imgBundles: List<ImageBundle> = frameSequenceLoaders.indices.map { ImageBundle() }
+    val imgBundles: List<ImageBundle> = RadarSource.values().indices.map { ImageBundle() }
     val locationState = LocationState()
     val fullScreenBundle = ImageBundle()
     var stashedImgBundle = ImageBundle()
@@ -151,7 +151,7 @@ class RadarImageFragment : Fragment() {
                 }
             }
         }
-        frameSequenceLoaders.forEachIndexed { i, loader ->
+        RadarSource.values().forEachIndexed { i, radar ->
             val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
             val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
             radarList.addView(radarGroup)
@@ -172,7 +172,7 @@ class RadarImageFragment : Fragment() {
                             setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
                         }
                     },
-                    mapShape = loader.mapShape,
+                    mapShape = radar.mapShape,
                     seekBar = null,
                     brokenImgView = brokenImgView.apply {
                         visibility = GONE
@@ -316,6 +316,7 @@ class RadarImageFragment : Fragment() {
         vmodel.possibleStateLoss = true
     }
 
+    @Deprecated("Overrides a deprecated Java method")
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         info { "RadarImageFragment.onCreateOptionsMenu" }
         val tb = rootView.findViewById<Toolbar>(R.id.toolbar)
@@ -324,6 +325,7 @@ class RadarImageFragment : Fragment() {
         tb.setOnMenuItemClickListener(this::onOptionsItemSelected)
     }
 
+    @Deprecated("Overrides a deprecated Java method")
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         info { "RadarImageFragment.onOptionsItemSelected" }
         val activity = activity as AppCompatActivity
@@ -424,17 +426,18 @@ class RadarImageFragment : Fragment() {
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
-        frameSequenceLoaders.indices.map { vmodel.imgBundles[it] }.forEach { it.status = LOADING }
+        RadarSource.values().indices.map { vmodel.imgBundles[it] }.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         vmodel.reloadJob?.cancel()
         vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
-                frameSequenceLoaders.forEachIndexed { positionInUI, loader ->
+                RadarSource.values().forEachIndexed { positionInUI, radar ->
                     val bundle = vmodel.imgBundles[positionInUI]
                     launch {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
+                            val loader = radar.frameSequenceLoader
                             loader.incrementallyFetchFrameSequence(
                                 context, animationCoversMinutes, fetchPolicy
                             ).collect { frameSequence ->
@@ -452,7 +455,7 @@ class RadarImageFragment : Fragment() {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            severe(CC_PRIVATE, e) { "Failed to load animation for ${loader.title}" }
+                            severe(CC_PRIVATE, e) { "Failed to load animation for ${radar.title}" }
                             bundle.status = BROKEN
                         }
                         bundle.status = SHOWING

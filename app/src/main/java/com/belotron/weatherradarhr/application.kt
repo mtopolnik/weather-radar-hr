@@ -40,6 +40,16 @@ private const val KEY_SAVED_AT = "instance-state-saved-at"
 lateinit var appContext: Context
 lateinit var appCoroScope: CoroutineScope
 
+enum class RadarSource(
+    val title: String,
+    val mapShape: MapShape,
+    val frameSequenceLoader: FrameSequenceLoader
+) {
+    HR_KOMPOZIT("DHMZ Kompozit", HrKompozitShape, HrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
+    HR_DEBELJAK("DHMZ Debeljak", HrKompozitShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
+    SLO_ARSO("ARSO", SloMapShape, SloSequenceLoader()),
+}
+
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
