@@ -32,6 +32,7 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.children
 import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
@@ -154,7 +155,7 @@ class RadarImageFragment : Fragment() {
             }
         }
         val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
-        radarList.removeAllViews()
+        radarList.removeViews(1, radarList.childCount - 1)
         vmodel.imgBundles.forEachIndexed { i, imgBundle ->
             val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
             radarList.addView(radarGroup)
@@ -196,13 +197,20 @@ class RadarImageFragment : Fragment() {
                 if (vmodel.isInFullScreen || scaleFactor <= 1) {
                     return true
                 }
-                val textView = vmodel.imgBundles[1].textView ?: return true
-                if (!textView.isDescendantOf(scrollView)) {
+                val textViews = vmodel.imgBundles.map { it.textView ?: return true }
+                if (textViews.any { ! it.isDescendantOf(scrollView) }) {
                     return true
                 }
-                scrollView.offsetDescendantRectToMyCoords(textView, rect.reset())
-                val focusY = scrollView.scrollY + focusY
-                val imgIndex = if (focusY <= rect.top) 0 else 1
+                // drop(1) shifts the indices down by one, aligning with the check
+                // `focusY <= rect.top`, which determines whether the view above the
+                // current one is in the focus of the scale gesture
+                val imgIndex = textViews.drop(1).mapIndexed { i, textView ->
+                    scrollView.offsetDescendantRectToMyCoords(textView, rect.reset())
+                    val focusY = scrollView.scrollY + focusY
+                    Pair(i, focusY <= rect.top)
+                }.find { (_, hasFocus) -> hasFocus }
+                    ?.component1()
+                    ?: textViews.lastIndex
                 val imgView = vmodel
                         .imgBundles[imgIndex]
                         .takeIf { it.status in ImageBundle.loadingOrShowing }
