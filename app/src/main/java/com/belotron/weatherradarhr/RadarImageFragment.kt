@@ -52,6 +52,8 @@ import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
+val radarsInUse = mutableListOf(RadarSource.HR_KOMPOZIT, RadarSource.SLO_ARSO, RadarSource.HR_DEBELJAK)
+
 class RadarImageViewModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
         set(value) {
@@ -63,7 +65,7 @@ class RadarImageViewModel : ViewModel() {
 
     var isTrackingTouch = false
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
-    val imgBundles: List<ImageBundle> = RadarSource.values().indices.map { ImageBundle() }
+    val imgBundles: List<ImageBundle> = List(radarsInUse.size) { ImageBundle() }
     val locationState = LocationState()
     val fullScreenBundle = ImageBundle()
     var stashedImgBundle = ImageBundle()
@@ -151,8 +153,9 @@ class RadarImageFragment : Fragment() {
                 }
             }
         }
-        RadarSource.values().forEachIndexed { i, radar ->
-            val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
+        val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
+        radarList.removeAllViews()
+        vmodel.imgBundles.forEachIndexed { i, imgBundle ->
             val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
             radarList.addView(radarGroup)
             val viewGroup = radarGroup.findViewById<ViewGroup>(R.id.radar_image_group)
@@ -160,7 +163,7 @@ class RadarImageFragment : Fragment() {
             val textView = radarGroup.findViewById<TextView>(R.id.radar_img_title_text)
             val brokenImgView = radarGroup.findViewById<ImageView>(R.id.radar_broken_img)
             val progressBar = radarGroup.findViewById<ProgressBar>(R.id.radar_progress_bar)
-            vmodel.imgBundles[i].restoreViews(
+            imgBundle.restoreViews(
                     viewGroup = viewGroup,
                     textView = textView.apply {
                         GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
@@ -171,8 +174,8 @@ class RadarImageFragment : Fragment() {
                         GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
                             setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
                         }
+                        mapShape = radarsInUse[i].mapShape
                     },
-                    mapShape = radar.mapShape,
                     seekBar = null,
                     brokenImgView = brokenImgView.apply {
                         visibility = GONE
@@ -426,14 +429,14 @@ class RadarImageFragment : Fragment() {
     private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
-        RadarSource.values().indices.map { vmodel.imgBundles[it] }.forEach { it.status = LOADING }
+        vmodel.imgBundles.forEach { it.status = LOADING }
         val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
         val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
         vmodel.reloadJob?.cancel()
         vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
-                RadarSource.values().forEachIndexed { positionInUI, radar ->
-                    val bundle = vmodel.imgBundles[positionInUI]
+                vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
+                    val radar = radarsInUse[positionInUI]
                     launch {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes

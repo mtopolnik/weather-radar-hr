@@ -84,7 +84,6 @@ class ImageBundle {
             viewGroup: ViewGroup,
             textView: TextView,
             imgView: ImageViewWithLocation,
-            mapShape: MapShape? = null,
             seekBar: ThumbSeekBar?,
             brokenImgView: ImageView,
             progressBar: ProgressBar
@@ -92,7 +91,6 @@ class ImageBundle {
         this.viewGroup = viewGroup
         this.textView = textView
         this.imgView = imgView
-        mapShape?.also { imgView.mapShape = it }
         this.seekBar = seekBar
         seekBar?.progress = animationProgress
         this.brokenImgView = brokenImgView
