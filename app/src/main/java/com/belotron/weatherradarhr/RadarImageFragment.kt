@@ -73,6 +73,7 @@ class RadarImageViewModel : ViewModel() {
     var stashedImgBundle = ImageBundle()
     var reloadJob: Job? = null
     var lastReloadedTimestamp = 0L
+    var lastAnimationCoversMinutes = 0
     // Serves to avoid IllegalStateException in DialogFragment.show()
     var possibleStateLoss = false
 
@@ -231,8 +232,8 @@ class RadarImageFragment : Fragment() {
         super.onResume()
         vmodel.possibleStateLoss = false
         val activity = requireActivity()
-        val mainPrefs = activity.mainPrefs
         val oldRadarsInUse = vmodel.radarsInUse
+        val mainPrefs = activity.mainPrefs
         vmodel.radarsInUse = mainPrefs.configuredRadarSources()
 //        vmodel.radarsInUse = RadarSource.values().toMutableList().shuffled().take(3)
         val radarsChanged = vmodel.radarsInUse != oldRadarsInUse
@@ -247,11 +248,7 @@ class RadarImageFragment : Fragment() {
         } else {
             vmodel.ensureAnimationLooper()
         }
-        val localPrefs = activity.localPrefs
-        vmodel.lastReloadedTimestamp = localPrefs.lastReloadedTimestamp
-        val lastAnimationCoversMinutes = localPrefs.lastAnimationCoversMinutes
-        val currAnimationCoversMinutes = mainPrefs.animationCoversMinutes
-        val animationLengthChanged = (currAnimationCoversMinutes != lastAnimationCoversMinutes)
+        val animationLengthChanged = (mainPrefs.animationCoversMinutes != vmodel.lastAnimationCoversMinutes)
         val timeToReload = vmodel.lastReloadedTimestamp < aWhileAgo
         val animationIsShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
         info {
@@ -259,7 +256,7 @@ class RadarImageFragment : Fragment() {
             "animationLengthChanged $animationLengthChanged wasFastResume $wasFastResume timeToReload $timeToReload"
         }
         if (animationIsShowing && !(radarsChanged || animationLengthChanged) && (wasFastResume || !timeToReload)) {
-            with (activity.mainPrefs) {
+            with (mainPrefs) {
                 vmodel.animationLooper!!.resume(activity,
                         newAnimationCoversMinutes = animationCoversMinutes,
                         newRateMinsPerSec = rateMinsPerSec,
@@ -343,11 +340,7 @@ class RadarImageFragment : Fragment() {
             if (!anyWidgetInUse()) {
                 stopReceivingLocationUpdatesBg()
             }
-            val lastAnimationCoversMinutes = mainPrefs.animationCoversMinutes
-            localPrefs.applyUpdate {
-                setLastReloadedTimestamp(vmodel.lastReloadedTimestamp)
-                setLastAnimationCoversMinutes(lastAnimationCoversMinutes)
-            }
+            vmodel.lastAnimationCoversMinutes = mainPrefs.animationCoversMinutes
         }
     }
 

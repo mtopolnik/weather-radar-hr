@@ -44,10 +44,6 @@ val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeas
 
 val SharedPreferences.animationCoversMinutes: Int get() =
     MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
-val SharedPreferences.lastAnimationCoversMinutes: Int get() =
-    getInt(KEY_LAST_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES)
-fun SharedPreferences.Editor.setLastAnimationCoversMinutes(value: Int): SharedPreferences.Editor =
-    putInt(KEY_LAST_ANIMATION_MINUTES, value)
 
 fun SharedPreferences.configuredRadarSources(): List<RadarSource> =
     getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
@@ -56,10 +52,6 @@ fun SharedPreferences.configuredRadarSources(): List<RadarSource> =
     }
         .sortedBy { (index, _) -> index }
         .map { (_, radarSource) -> radarSource }
-
-val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
-fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =
-        putLong(KEY_LAST_RELOADED_TIMESTAMP, value)
 
 val SharedPreferences.lastInvalidatedCacheTimestamp: Long get() = getLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastInvalidatedCacheTimestamp(value: Long): SharedPreferences.Editor =
