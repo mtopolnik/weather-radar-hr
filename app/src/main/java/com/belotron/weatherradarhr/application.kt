@@ -47,7 +47,8 @@ enum class RadarSource(
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", HrKompozitShape, HrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
     HR_DEBELJAK("DHMZ Debeljak", HrKompozitShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
-    SLO_ARSO("ARSO", SloMapShape, SloSequenceLoader()),
+    HR_BILOGORA("DHMZ Bilogora", HrKompozitShape, HrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
+    SLO_ARSO("ARSO Kompozit", SloMapShape, SloSequenceLoader()),
 }
 
 class MyApplication : Application() {

@@ -67,11 +67,11 @@ class ImageBundle {
     }
 
     fun clear() {
-        destroyViews()
+        removeViews()
         status = HIDDEN
     }
 
-    fun destroyViews() {
+    fun removeViews() {
         this.viewGroup = null
         this.textView = null
         this.imgView = null
