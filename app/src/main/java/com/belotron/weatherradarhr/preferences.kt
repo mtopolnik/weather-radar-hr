@@ -12,6 +12,7 @@ private const val KEY_LAST_ANIMATION_MINUTES = "last_animation_covers_minutes"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_ANIMATION_MINUTES = "animation_covers_minutes"
+private const val KEY_RADAR_SOURCES = "radar_sources"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
 private const val KEY_SHOULD_SHOW_FG_LOCATION_NOTICE = "should_show_fg_location_notice"
 private const val KEY_SHOULD_SHOW_BG_LOCATION_NOTICE = "should_show_bg_location_notice"
@@ -29,6 +30,8 @@ const val MIN_ANIMATION_RATE = 10
 const val MIN_ANIMATION_MINUTES = 5
 const val MIN_FREEZE_TIME = 100
 
+private val DEFAULT_RADAR_SOURCES = setOf("0 ${RadarSource.HR_KOMPOZIT.name}", "1 ${RadarSource.HR_BILOGORA.name}")
+
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
 val Context.localPrefs: SharedPreferences get() = getSharedPreferences(NAME_LOCAL_PREFS, MODE_PRIVATE)
@@ -41,11 +44,18 @@ val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeas
 
 val SharedPreferences.animationCoversMinutes: Int get() =
     MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
-
 val SharedPreferences.lastAnimationCoversMinutes: Int get() =
     getInt(KEY_LAST_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES)
 fun SharedPreferences.Editor.setLastAnimationCoversMinutes(value: Int): SharedPreferences.Editor =
     putInt(KEY_LAST_ANIMATION_MINUTES, value)
+
+fun SharedPreferences.configuredRadarSources(): List<RadarSource> =
+    getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
+        val parts = str.split(" ")
+        Pair(parts[0].toInt(), RadarSource.valueOf(parts[1]))
+    }
+        .sortedBy { (index, _) -> index }
+        .map { (_, radarSource) -> radarSource }
 
 val SharedPreferences.lastReloadedTimestamp: Long get() = getLong(KEY_LAST_RELOADED_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastReloadedTimestamp(value: Long): SharedPreferences.Editor =

@@ -32,7 +32,6 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.view.children
 import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
@@ -53,8 +52,6 @@ import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
-val radarsInUse = mutableListOf(RadarSource.HR_KOMPOZIT, RadarSource.SLO_ARSO, RadarSource.HR_DEBELJAK)
-
 class RadarImageViewModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
         set(value) {
@@ -64,22 +61,35 @@ class RadarImageViewModel : ViewModel() {
             }
         }
 
-    var isTrackingTouch = false
     val isInFullScreen: Boolean get() = indexOfImgInFullScreen != null
-    val imgBundles: List<ImageBundle> = List(radarsInUse.size) { ImageBundle() }
     val locationState = LocationState()
     val fullScreenBundle = ImageBundle()
+
+    var isTrackingTouch = false
+    var radarsInUse = listOf<RadarSource>()
+    var imgBundles = listOf<ImageBundle>()
+    var animationLooper: AnimationLooper? = null
+        private set
     var stashedImgBundle = ImageBundle()
-    val animationLooper = AnimationLooper(this)
     var reloadJob: Job? = null
     var lastReloadedTimestamp = 0L
     // Serves to avoid IllegalStateException in DialogFragment.show()
     var possibleStateLoss = false
 
     fun destroyImgBundles() {
-        imgBundles.forEach { it.destroyViews() }
-        fullScreenBundle.destroyViews()
-        stashedImgBundle.destroyViews()
+        imgBundles.forEach { it.removeViews() }
+        fullScreenBundle.removeViews()
+        stashedImgBundle.removeViews()
+    }
+
+    fun ensureAnimationLooper() {
+        animationLooper ?: resetAnimationLooper()
+    }
+
+    fun resetAnimationLooper() {
+        animationLooper?.dispose()
+        animationLooper = AnimationLooper(this)
+        fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
     }
 }
 
@@ -107,7 +117,7 @@ class RadarImageFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
-        vmodel = ViewModelProvider(this).get(RadarImageViewModel::class.java)
+        vmodel = ViewModelProvider(this)[RadarImageViewModel::class.java]
         setHasOptionsMenu(true)
         lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
     }
@@ -145,49 +155,10 @@ class RadarImageFragment : Fragment() {
                 brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
                 progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
-        with(vmodel.fullScreenBundle.seekBar!!) {
-            setOnSeekBarChangeListener(vmodel.animationLooper)
-            if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
-                with(layoutParams as FrameLayout.LayoutParams) {
-                    gravity = Gravity.BOTTOM or Gravity.END
-                    rightMargin = resources.getDimensionPixelOffset(R.dimen.seekbar_landscape_right_margin)
-                }
-            }
-        }
-        val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
-        radarList.removeViews(1, radarList.childCount - 1)
-        vmodel.imgBundles.forEachIndexed { i, imgBundle ->
-            val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
-            radarList.addView(radarGroup)
-            val viewGroup = radarGroup.findViewById<ViewGroup>(R.id.radar_image_group)
-            val imgView = radarGroup.findViewById<ImageViewWithLocation>(R.id.radar_img)
-            val textView = radarGroup.findViewById<TextView>(R.id.radar_img_title_text)
-            val brokenImgView = radarGroup.findViewById<ImageView>(R.id.radar_broken_img)
-            val progressBar = radarGroup.findViewById<ProgressBar>(R.id.radar_progress_bar)
-            imgBundle.restoreViews(
-                    viewGroup = viewGroup,
-                    textView = textView.apply {
-                        GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
-                            setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
-                        }
-                    },
-                    imgView = imgView.apply {
-                        GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
-                            setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
-                        }
-                        mapShape = radarsInUse[i].mapShape
-                    },
-                    seekBar = null,
-                    brokenImgView = brokenImgView.apply {
-                        visibility = GONE
-                    },
-                    progressBar = progressBar
-            )
-        }
-        (vmodel.imgBundles + vmodel.fullScreenBundle).also { allBundles ->
-            vmodel.locationState.imageBundles = allBundles
-            allBundles.map { it.imgView!! }.forEach {
-                it.locationState = vmodel.locationState
+        if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
+            with(vmodel.fullScreenBundle.seekBar!!.layoutParams as FrameLayout.LayoutParams) {
+                gravity = Gravity.BOTTOM or Gravity.END
+                rightMargin = resources.getDimensionPixelOffset(R.dimen.seekbar_landscape_right_margin)
             }
         }
         val scrollView = rootView.findViewById<ScrollView>(R.id.scrollview)
@@ -240,7 +211,6 @@ class RadarImageFragment : Fragment() {
                 }
             }
         }
-        setupFullScreenBundle()
         updateFullScreenVisibility()
         return rootView
     }
@@ -262,16 +232,34 @@ class RadarImageFragment : Fragment() {
         vmodel.possibleStateLoss = false
         val activity = requireActivity()
         val mainPrefs = activity.mainPrefs
+        val oldRadarsInUse = vmodel.radarsInUse
+        vmodel.radarsInUse = mainPrefs.configuredRadarSources()
+//        vmodel.radarsInUse = RadarSource.values().toMutableList().shuffled().take(3)
+        val radarsChanged = vmodel.radarsInUse != oldRadarsInUse
+        if (radarsChanged) {
+            info { "New radars in use: " + vmodel.radarsInUse.joinToString { it.name } }
+            if (vmodel.isInFullScreen) {
+                exitFullScreen()
+            }
+            vmodel.imgBundles = List(vmodel.radarsInUse.size) { ImageBundle() }
+            recreateRadarViews(layoutInflater)
+            vmodel.resetAnimationLooper()
+        } else {
+            vmodel.ensureAnimationLooper()
+        }
         vmodel.lastReloadedTimestamp = mainPrefs.lastReloadedTimestamp
         val lastAnimationCoversMinutes = mainPrefs.lastAnimationCoversMinutes
         val currAnimationCoversMinutes = mainPrefs.animationCoversMinutes
-        val animationLengthDidntChange = (currAnimationCoversMinutes == lastAnimationCoversMinutes)
+        val animationLengthChanged = (currAnimationCoversMinutes != lastAnimationCoversMinutes)
         val timeToReload = vmodel.lastReloadedTimestamp < aWhileAgo
-        info { "lastReloadedTimestamp ${vmodel.lastReloadedTimestamp} aWhileAgo $aWhileAgo timeToReload $timeToReload" }
         val animationIsShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
-        if (animationIsShowing && animationLengthDidntChange && (wasFastResume || !timeToReload)) {
+        info {
+            "animationIsShowing $animationIsShowing radarsChanged $radarsChanged " +
+            "animationLengthChanged $animationLengthChanged wasFastResume $wasFastResume timeToReload $timeToReload"
+        }
+        if (animationIsShowing && !(radarsChanged || animationLengthChanged) && (wasFastResume || !timeToReload)) {
             with (activity.mainPrefs) {
-                vmodel.animationLooper.resume(activity,
+                vmodel.animationLooper!!.resume(activity,
                         newAnimationCoversMinutes = animationCoversMinutes,
                         newRateMinsPerSec = rateMinsPerSec,
                         newFreezeTimeMillis = freezeTimeMillis)
@@ -290,6 +278,47 @@ class RadarImageFragment : Fragment() {
         lifecycleScope.launch { vmodel.locationState.trackLocationEnablement(activity) }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
+    private fun recreateRadarViews(inflater: LayoutInflater) {
+        val radarList = rootView.findViewById<ViewGroup>(R.id.radar_img_container)
+        radarList.removeViews(1, radarList.childCount - 1)
+        vmodel.imgBundles.forEachIndexed { i, imgBundle ->
+            val radarGroup = inflater.inflate(R.layout.radar_frame, radarList, false)
+            radarList.addView(radarGroup)
+            val viewGroup = radarGroup.findViewById<ViewGroup>(R.id.radar_image_group)
+            val imgView = radarGroup.findViewById<ImageViewWithLocation>(R.id.radar_img)
+            val textView = radarGroup.findViewById<TextView>(R.id.radar_img_title_text)
+            val brokenImgView = radarGroup.findViewById<ImageView>(R.id.radar_broken_img)
+            val progressBar = radarGroup.findViewById<ProgressBar>(R.id.radar_progress_bar)
+            imgBundle.restoreViews(
+                viewGroup = viewGroup,
+                textView = textView.apply {
+                    GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
+                        setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
+                    }
+                },
+                imgView = imgView.apply {
+                    GestureDetector(activity, MainViewListener(i, imgView)).also { gd ->
+                        setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
+                    }
+                    mapShape = vmodel.radarsInUse[i].mapShape
+                },
+                seekBar = null,
+                brokenImgView = brokenImgView.apply {
+                    visibility = GONE
+                },
+                progressBar = progressBar
+            )
+        }
+        (vmodel.imgBundles + vmodel.fullScreenBundle).also { allBundles ->
+            vmodel.locationState.imageBundles = allBundles
+            allBundles.map { it.imgView!! }.forEach {
+                it.locationState = vmodel.locationState
+            }
+        }
+        setupFullScreenBundle()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         info { "RadarImageFragment.onSaveInstanceState" }
         outState.recordSavingTime()
@@ -306,7 +335,7 @@ class RadarImageFragment : Fragment() {
         info { "RadarImageFragment.onPause" }
         super.onPause()
         wasFastResume = false
-        vmodel.animationLooper.stop()
+        vmodel.animationLooper?.stop()
         with(requireActivity()) {
             stopReceivingAzimuthUpdates(vmodel.locationState)
             stopReceivingLocationUpdatesFg()
@@ -381,7 +410,7 @@ class RadarImageFragment : Fragment() {
             imgView?.let { it as TouchImageView }?.reset()
             setupFullScreenBundle()
             updateFullScreenVisibility()
-            vmodel.animationLooper.resume(activity)
+            vmodel.animationLooper!!.resume(activity)
             seekBar?.visibility = INVISIBLE
             lifecycleScope.launch {
                 imgView?.let { it as TouchImageView }?.apply {
@@ -404,7 +433,7 @@ class RadarImageFragment : Fragment() {
                 vmodel.imgBundles.forEach {
                     it.animationProgress = bundleInTransition.animationProgress
                 }
-                vmodel.animationLooper.resume(activity)
+                vmodel.animationLooper!!.resume(activity)
             }
             vmodel.stashedImgBundle.takeIf { it.imgView != null }?.apply {
                 updateFrom(bundleInTransition)
@@ -444,7 +473,7 @@ class RadarImageFragment : Fragment() {
         vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
                 vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
-                    val radar = radarsInUse[positionInUI]
+                    val radar = vmodel.radarsInUse[positionInUI]
                     launch {
                         try {
                             val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
@@ -458,7 +487,7 @@ class RadarImageFragment : Fragment() {
                                 }
                                 bundle.animationProgress =
                                     vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
-                                with(vmodel.animationLooper) {
+                                with(vmodel.animationLooper!!) {
                                     receiveNewFrames(positionInUI, loader, frameSequence)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }

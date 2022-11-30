@@ -46,6 +46,7 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewFrames(positionInUI: Int, loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>) {
+        animators[positionInUI]?.dispose()
         animators[positionInUI] = FrameAnimator(positionInUI, loader, vmodel, frameSequence)
     }
 
@@ -86,6 +87,11 @@ class AnimationLooper(
         loopingJob?.cancel()
         animatorJobs.forEach { it?.cancel() }
         animators.forEach { it?.stopSeekBarAnimation() }
+    }
+
+    fun dispose() {
+        stop()
+        animators.filterNotNull().forEach { it.dispose() }
     }
 
     override fun onStartTrackingTouch(seekBar: SeekBar) {
@@ -203,6 +209,10 @@ class FrameAnimator(
         val newFrame = suspendDecodeFrame(targetIndex, singleThread)
         showFrame(newFrame, animationProgress)
         updateAgeText()
+    }
+
+    fun dispose() {
+        allocator.dispose()
     }
 
     private fun showFrame(newFrame: Bitmap, animationProgress: Int) {
