@@ -3,12 +3,16 @@
       xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/refresh"
           android:title="@string/refresh"
-          app:showAsAction="ifRoom"/>
           android:icon="@drawable/ic_baseline_refresh_24"
+          app:showAsAction="always"/>
+    <item android:id="@+id/edit_radars"
+          android:title="@string/edit_radars"
+          android:icon="@drawable/ic_baseline_add_24"
+          app:showAsAction="always"/>
     <item android:id="@+id/settings"
           android:title="@string/settings"
-          app:showAsAction="ifRoom"/>
           android:icon="@drawable/ic_baseline_settings_24"
+          app:showAsAction="ifRoom"/>
     <item android:id="@+id/help"
           android:title="@string/help"
     />

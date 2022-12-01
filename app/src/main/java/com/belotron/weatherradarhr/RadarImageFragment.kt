@@ -361,6 +361,9 @@ class RadarImageFragment : Fragment(), MenuProvider {
         info { "RadarImageFragment.onMenuItemSelected" }
         val activity = activity as AppCompatActivity
         when (item.itemId) {
+            R.id.edit_radars -> {
+
+            }
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
                 refreshWidgetsInForeground()

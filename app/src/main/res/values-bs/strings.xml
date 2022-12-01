@@ -11,6 +11,7 @@
     <string name="rateme_menu_item">Ocijeni u trgovini Play</string>
     <string name="settings">Postavke</string>
     <string name="refresh">Osvježi</string>
+    <string name="edit_radars">Dodaj/ukloni</string>
     <string name="animation_covers_minutes">Vrijeme koje pokriva animacija*</string>
     <string name="note_on_animation_length">* Slovenska agencija ARSO objavljuje 90 minuta animacije</string>
     <string name="animation_rate">Brzina animacije</string>
