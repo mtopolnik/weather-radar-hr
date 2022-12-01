@@ -94,7 +94,7 @@ class RadarImageViewModel : ViewModel() {
     }
 }
 
-class RadarImageFragment : Fragment() {
+class RadarImageFragment : Fragment(), MenuProvider {
 
     val permissionRequest = registerForActivityResult(RequestPermission()) {
         if (it) info { "User has granted us the location permission" }
@@ -119,7 +119,7 @@ class RadarImageFragment : Fragment() {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         vmodel = ViewModelProvider(this)[RadarImageViewModel::class.java]
-        setHasOptionsMenu(true)
+        requireActivity().addMenuProvider(this, this)
         lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
     }
 
@@ -350,18 +350,15 @@ class RadarImageFragment : Fragment() {
         vmodel.possibleStateLoss = true
     }
 
-    @Deprecated("Overrides a deprecated Java method")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        info { "RadarImageFragment.onCreateOptionsMenu" }
+    override fun onCreateMenu(menu: Menu, inflater: MenuInflater) {
+        info { "RadarImageFragment.onCreateMenu" }
         val tb = rootView.findViewById<Toolbar>(R.id.toolbar)
         tb.inflateMenu(R.menu.main_menu)
         tb.menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
-        tb.setOnMenuItemClickListener(this::onOptionsItemSelected)
     }
 
-    @Deprecated("Overrides a deprecated Java method")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        info { "RadarImageFragment.onOptionsItemSelected" }
+    override fun onMenuItemSelected(item: MenuItem): Boolean {
+        info { "RadarImageFragment.onMenuItemSelected" }
         val activity = activity as AppCompatActivity
         when (item.itemId) {
             R.id.refresh -> {
