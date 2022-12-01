@@ -32,6 +32,7 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.MenuProvider
 import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
@@ -84,10 +85,10 @@ class RadarImageViewModel : ViewModel() {
     }
 
     fun ensureAnimationLooper() {
-        animationLooper ?: resetAnimationLooper()
+        animationLooper ?: recreateAnimationLooper()
     }
 
-    fun resetAnimationLooper() {
+    fun recreateAnimationLooper() {
         animationLooper?.dispose()
         animationLooper = AnimationLooper(this)
         fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
@@ -112,6 +113,7 @@ class RadarImageFragment : Fragment(), MenuProvider {
     lateinit var vmodel: RadarImageViewModel
     lateinit var rootView: View
     private var wasFastResume = false
+    private var onResumeCalled = false
     private var vGroupOverview: ViewGroup? = null
     private var vGroupFullScreen: ViewGroup? = null
 
@@ -242,12 +244,21 @@ class RadarImageFragment : Fragment(), MenuProvider {
             if (vmodel.isInFullScreen) {
                 exitFullScreen()
             }
+        }
+        var imgBundlesChanged = false
+        if (radarsChanged || vmodel.imgBundles.isEmpty()) {
             vmodel.imgBundles = List(vmodel.radarsInUse.size) { ImageBundle() }
+            imgBundlesChanged = true
+        }
+        if (!onResumeCalled || imgBundlesChanged) {
             recreateRadarViews(layoutInflater)
-            vmodel.resetAnimationLooper()
+        }
+        if (imgBundlesChanged) {
+            vmodel.recreateAnimationLooper()
         } else {
             vmodel.ensureAnimationLooper()
         }
+        onResumeCalled = true
         val animationLengthChanged = (mainPrefs.animationCoversMinutes != vmodel.lastAnimationCoversMinutes)
         val timeToReload = vmodel.lastReloadedTimestamp < aWhileAgo
         val animationIsShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
