@@ -245,17 +245,14 @@ class RadarImageFragment : Fragment(), MenuProvider {
                 exitFullScreen()
             }
         }
-        var imgBundlesChanged = false
         if (radarsChanged || vmodel.imgBundles.isEmpty()) {
             vmodel.imgBundles = List(vmodel.radarsInUse.size) { ImageBundle() }
-            imgBundlesChanged = true
-        }
-        if (!onResumeCalled || imgBundlesChanged) {
             recreateRadarViews(layoutInflater)
-        }
-        if (imgBundlesChanged) {
             vmodel.recreateAnimationLooper()
         } else {
+            if (!onResumeCalled) {
+                recreateRadarViews(layoutInflater)
+            }
             vmodel.ensureAnimationLooper()
         }
         onResumeCalled = true
