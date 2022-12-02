@@ -264,14 +264,16 @@ class RadarImageFragment : Fragment(), MenuProvider {
         val animationIsShowing = vmodel.imgBundles.all { it.status !in EnumSet.of(UNKNOWN, BROKEN) }
         info {
             "animationIsShowing $animationIsShowing radarsChanged $radarsChanged " +
-            "animationLengthChanged $animationLengthChanged wasFastResume $wasFastResume timeToReload $timeToReload"
+                    "animationLengthChanged $animationLengthChanged wasFastResume $wasFastResume timeToReload $timeToReload"
         }
         if (animationIsShowing && !(radarsChanged || animationLengthChanged) && (wasFastResume || !timeToReload)) {
-            with (mainPrefs) {
-                vmodel.animationLooper!!.resume(activity,
-                        newAnimationCoversMinutes = animationCoversMinutes,
-                        newRateMinsPerSec = rateMinsPerSec,
-                        newFreezeTimeMillis = freezeTimeMillis)
+            with(mainPrefs) {
+                vmodel.animationLooper!!.resume(
+                    activity,
+                    newAnimationCoversMinutes = animationCoversMinutes,
+                    newRateMinsPerSec = rateMinsPerSec,
+                    newFreezeTimeMillis = freezeTimeMillis
+                )
             }
         } else {
             startReloadAnimations(PREFER_CACHED)
