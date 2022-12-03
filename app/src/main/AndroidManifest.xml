@@ -24,6 +24,10 @@
                 <action android:name="android.intent.action.MAIN"/>
             </intent-filter>
         </activity>
+        <activity android:name=".AddRemoveRadarActivity"
+                  android:label="@string/edit_radars"
+                  android:parentActivityName=".MainActivity">
+        </activity>
         <activity android:name=".SettingsActivity"
                   android:label="@string/settings"
                   android:parentActivityName=".MainActivity">

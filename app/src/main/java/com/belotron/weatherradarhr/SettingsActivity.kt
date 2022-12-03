@@ -7,6 +7,7 @@ import androidx.preference.PreferenceFragmentCompat
 class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        info { "SettingsActivity.onCreate" }
         setContentView(R.layout.activity_settings)
     }
 }

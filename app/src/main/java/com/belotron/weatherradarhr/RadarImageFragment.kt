@@ -372,7 +372,7 @@ class RadarImageFragment : Fragment(), MenuProvider {
         val activity = activity as AppCompatActivity
         when (item.itemId) {
             R.id.edit_radars -> {
-
+                startActivity(Intent(activity, AddRemoveRadarActivity::class.java))
             }
             R.id.refresh -> {
                 startReloadAnimations(UP_TO_DATE)
