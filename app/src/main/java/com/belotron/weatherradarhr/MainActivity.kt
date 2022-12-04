@@ -1,6 +1,7 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 
@@ -12,13 +13,12 @@ class MainActivity : AppCompatActivity()  {
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
         recordAppUsage()
         setContentView(R.layout.activity_main)
-        if (supportFragmentManager.findFragmentById(R.id.radar_img_fragment) != null) {
-            return
-        }
-        RadarImageFragment().also {
-            supportFragmentManager.beginTransaction()
+        if (supportFragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {
+            RadarImageFragment().also {
+                supportFragmentManager.beginTransaction()
                     .add(R.id.radar_img_fragment, it)
                     .commit()
+            }
         }
     }
 
@@ -31,17 +31,6 @@ class MainActivity : AppCompatActivity()  {
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         info { "MainActivity.onRestoreInstanceState" }
         super.onRestoreInstanceState(savedInstanceState)
-    }
-
-    override fun onBackPressed() {
-        supportFragmentManager.findFragmentById(R.id.radar_img_fragment)
-                ?.let { it as RadarImageFragment? }
-                ?.takeIf { it.vmodel.isInFullScreen }
-                ?.apply {
-                    exitFullScreen()
-                    return
-                }
-        super.onBackPressed()
     }
 }
 

@@ -28,6 +28,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
@@ -124,7 +125,21 @@ class RadarImageFragment : Fragment(), MenuProvider {
         info { "RadarImageFragment.onCreate" }
         super.onCreate(savedInstanceState)
         vmodel = ViewModelProvider(this)[RadarImageViewModel::class.java]
-        requireActivity().addMenuProvider(this, this)
+        val activity = requireActivity()
+        activity.addMenuProvider(this, this)
+        activity.onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (vmodel.isInFullScreen) {
+                    exitFullScreen()
+                } else {
+                    startActivity(
+                        Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_HOME)
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                }
+            }
+        })
         lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
     }
 
