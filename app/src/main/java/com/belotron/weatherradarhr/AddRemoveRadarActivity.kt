@@ -28,8 +28,8 @@ class ItemViewAdapter : RecyclerView.Adapter<ItemViewHolder>() {
     val items = mutableListOf(*RadarSource.values())
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
-        val textView = LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_add_remove, parent, false)
-        return ItemViewHolder(textView)
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_add_remove, parent, false)
+        return ItemViewHolder(itemView)
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
@@ -39,18 +39,15 @@ class ItemViewAdapter : RecyclerView.Adapter<ItemViewHolder>() {
     override fun getItemCount() = items.size
 
     fun onRowMoved(from: Int, to: Int) {
-        val itemAtFromPos = items[from]
+        val movedItem = items[from]
         val direction = to.compareTo(from)
-        var newIndex = from
-        info { "onRowMoved($from -> $to)" }
-        while (newIndex != to) {
-            val oldIndex = newIndex
-            newIndex += direction
-            info { "items[$oldIndex] = items[$newIndex]" }
-            items[oldIndex] = items[newIndex]
+        var oldIndex = from
+        while (oldIndex != to) {
+            val newIndex = oldIndex
+            oldIndex += direction
+            items[newIndex] = items[oldIndex]
         }
-        info { "items[$to] = previous items[$from]" }
-        items[to] = itemAtFromPos
+        items[to] = movedItem
         notifyItemMoved(from, to)
     }
 }
