@@ -28,7 +28,12 @@ private const val KEY_LOCATION_LATITUDE = "location_latitude"
 private const val KEY_LOCATION_LONGITUDE = "location_longitude"
 private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 
-private val DEFAULT_RADAR_SOURCES = setOf("0 ${RadarSource.HR_KOMPOZIT.name}", "1 ${RadarSource.HR_BILOGORA.name}")
+private const val RADAR_SOURCE_DIVIDER = "DIVIDER"
+private val DEFAULT_RADAR_SOURCES: Set<String> = run {
+    val enabledSources = listOf(RadarSource.HR_KOMPOZIT, RadarSource.SLO_ARSO)
+    val availableSources = RadarSource.values().toList().filter { !enabledSources.contains(it) }
+    enabledSources.plus(null).plus(availableSources).toStringSet()
+}
 
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
 
@@ -43,13 +48,21 @@ val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeas
 val SharedPreferences.animationCoversMinutes: Int get() =
     MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
-fun SharedPreferences.configuredRadarSources(): List<RadarSource> =
+
+fun SharedPreferences.configuredRadarSources(): List<RadarSource?> =
     getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
         val parts = str.split(" ")
-        Pair(parts[0].toInt(), RadarSource.valueOf(parts[1]))
+        Pair(
+            parts[0].toInt(),
+            parts[1].let { if (it == RADAR_SOURCE_DIVIDER) null else RadarSource.valueOf(it) })
     }
         .sortedBy { (index, _) -> index }
         .map { (_, radarSource) -> radarSource }
+fun SharedPreferences.Editor.setConfiguredRadarSources(radarSources: List<RadarSource?>): SharedPreferences.Editor =
+    putStringSet(KEY_RADAR_SOURCES, radarSources.toStringSet())
+
+private fun List<RadarSource?>.toStringSet(): Set<String> =
+    mapIndexed { i, radarSource -> "$i ${radarSource?.name ?: RADAR_SOURCE_DIVIDER}" }.toSet()
 
 val SharedPreferences.lastInvalidatedCacheTimestamp: Long get() = getLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastInvalidatedCacheTimestamp(value: Long): SharedPreferences.Editor =

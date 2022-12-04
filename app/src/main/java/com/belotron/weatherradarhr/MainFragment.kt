@@ -254,8 +254,7 @@ class MainFragment : Fragment(), MenuProvider {
         val activity = requireActivity()
         val oldRadarsInUse = vmodel.radarsInUse
         val mainPrefs = activity.mainPrefs
-        vmodel.radarsInUse = mainPrefs.configuredRadarSources()
-//        vmodel.radarsInUse = RadarSource.values().toMutableList().shuffled().take(3)
+        vmodel.radarsInUse = mainPrefs.configuredRadarSources().takeWhile { it != null }.filterNotNull()
         val radarsChanged = vmodel.radarsInUse != oldRadarsInUse
         if (radarsChanged) {
             info { "New radars in use: " + vmodel.radarsInUse.joinToString { it.name } }

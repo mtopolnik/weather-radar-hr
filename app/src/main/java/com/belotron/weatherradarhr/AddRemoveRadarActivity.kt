@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 class AddRemoveRadarActivity: AppCompatActivity() {
+    private lateinit var adapter: ItemViewAdapter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         info { "AddRemoveRadarActivity.onCreate" }
@@ -18,14 +20,23 @@ class AddRemoveRadarActivity: AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.add_remove_recycler).also {
             it.layoutManager = LinearLayoutManager(this)
         }
-        val adapter = ItemViewAdapter()
+        adapter = ItemViewAdapter(mainPrefs.configuredRadarSources().toTypedArray())
         recyclerView.adapter = adapter
         ItemTouchHelper(ItemMoveCallback(adapter)).attachToRecyclerView(recyclerView)
     }
+
+    override fun onPause() {
+        super.onPause()
+        info { "AddRemoveRadarActivity.onPause" }
+        mainPrefs.applyUpdate {
+            setConfiguredRadarSources(adapter.items.toList())
+        }
+    }
 }
 
-class ItemViewAdapter : RecyclerView.Adapter<ItemViewHolder>() {
-    val items = mutableListOf(*RadarSource.values())
+class ItemViewAdapter(
+    val items: Array<RadarSource?>
+) : RecyclerView.Adapter<ItemViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
         val itemView = LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_add_remove, parent, false)
@@ -33,7 +44,7 @@ class ItemViewAdapter : RecyclerView.Adapter<ItemViewHolder>() {
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
-        holder.radarNameView.text = items[position].title
+        holder.radarNameView.text = items[position]?.run { title } ?: "==================="
     }
 
     override fun getItemCount() = items.size
