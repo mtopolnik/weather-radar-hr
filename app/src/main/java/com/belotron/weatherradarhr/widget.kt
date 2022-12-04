@@ -40,26 +40,25 @@ private const val UPDATE_AGE_PERIOD_MINUTES = 3
 private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
-private const val LRADAR_CROP_X_LEFT = 10
-private const val LRADAR_CROP_Y_TOP = 49
-private const val LRADAR_CROP_WIDTH = 800
-private const val LRADAR_CROP_HEIGHT = 600
-private const val KRADAR_CROP_Y_HEIGHT = 719
+private const val SLO_CROP_X_LEFT = 10
+private const val SLO_CROP_Y_TOP = 49
+private const val SLO_CROP_WIDTH = 800
+private const val SLO_CROP_HEIGHT = 600
+private const val HR_KOMPOZIT_CROP_Y_HEIGHT = 719
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 private val widgetDescriptors = arrayOf(
         WidgetDescriptor("SloRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
                 SloWidgetProvider::class.java,
-                R.drawable.lradar_widget_preview,
+                R.drawable.slo_widget_preview,
                 SloMapShape,
                 cropLeft = 0,
-                cropTop = LRADAR_CROP_Y_TOP,
+                cropTop = SLO_CROP_Y_TOP,
                 toTimestampedBitmap = { bitmap, isOffline ->
                     TimestampedBitmap(
                             ocrSloTimestamp(bitmap.asPixels()),
                             isOffline,
-                            bitmap.crop(LRADAR_CROP_X_LEFT, LRADAR_CROP_Y_TOP,
-                                    LRADAR_CROP_WIDTH, LRADAR_CROP_HEIGHT)
+                            bitmap.crop(SLO_CROP_X_LEFT, SLO_CROP_Y_TOP, SLO_CROP_WIDTH, SLO_CROP_HEIGHT)
             )}),
         WidgetDescriptor("HrRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
                 HrKompozitWidgetProvider::class.java,
@@ -71,7 +70,7 @@ private val widgetDescriptors = arrayOf(
                     TimestampedBitmap(
                             HrOcr.ocrTimestampKompozit(bitmap.asPixels()),
                             isOffline,
-                            bitmap.crop(0, 0, bitmap.width, KRADAR_CROP_Y_HEIGHT)) })
+                            bitmap.crop(0, 0, bitmap.width, HR_KOMPOZIT_CROP_Y_HEIGHT)) })
 )
 
 private fun Bitmap.crop(x: Int, y: Int, width: Int, height: Int) = createBitmap(this, x, y, width, height)

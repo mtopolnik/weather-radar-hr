@@ -3,7 +3,7 @@
                     android:minWidth="260dp"
                     android:minHeight="180dp"
                     android:updatePeriodMillis="0"
-                    android:previewImage="@drawable/lradar_widget_preview"
+                    android:previewImage="@drawable/slo_widget_preview"
                     android:initialLayout="@layout/app_widget"
                     android:resizeMode="horizontal|vertical"
                     android:widgetCategory="home_screen"

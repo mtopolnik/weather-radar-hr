@@ -49,7 +49,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/lradar_widget_info"/>
+                android:resource="@xml/slo_widget_info"/>
         </receiver>
         <receiver android:name=".HrKompozitWidgetProvider"
                   android:label="@string/widget_hr"
@@ -59,7 +59,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/kradar_widget_info"/>
+                android:resource="@xml/hr_kompozit_widget_info"/>
         </receiver>
         <service
             android:name=".RefreshImageService"
