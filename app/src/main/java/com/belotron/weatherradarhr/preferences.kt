@@ -53,23 +53,23 @@ fun SharedPreferences.configuredRadarSources(): List<RadarSource> =
 
 val SharedPreferences.lastInvalidatedCacheTimestamp: Long get() = getLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, 0L)
 fun SharedPreferences.Editor.setLastInvalidatedCacheTimestamp(value: Long): SharedPreferences.Editor =
-        putLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, value)
+    putLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, value)
 
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
-        putBoolean(KEY_WIDGET_LOG_ENABLED, value)
+    putBoolean(KEY_WIDGET_LOG_ENABLED, value)
 
 val SharedPreferences.shouldShowFgLocationNotice: Boolean get() = getBoolean(KEY_SHOULD_SHOW_FG_LOCATION_NOTICE, true)
 fun SharedPreferences.Editor.setShouldShowFgLocationNotice(value: Boolean): SharedPreferences.Editor =
-        putBoolean(KEY_SHOULD_SHOW_FG_LOCATION_NOTICE, value)
+    putBoolean(KEY_SHOULD_SHOW_FG_LOCATION_NOTICE, value)
 
 val SharedPreferences.shouldShowBgLocationNotice: Boolean get() = getBoolean(KEY_SHOULD_SHOW_BG_LOCATION_NOTICE, true)
 fun SharedPreferences.Editor.setShouldShowBgLocationNotice(value: Boolean): SharedPreferences.Editor =
-        putBoolean(KEY_SHOULD_SHOW_BG_LOCATION_NOTICE, value)
+    putBoolean(KEY_SHOULD_SHOW_BG_LOCATION_NOTICE, value)
 
 val SharedPreferences.shouldAskToEnableLocation: Boolean get() = getBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, true)
 fun SharedPreferences.Editor.setShouldAskToEnableLocation(value: Boolean): SharedPreferences.Editor =
-        putBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, value)
+    putBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, value)
 
 val Context.storedLocation: Triple<Double, Double, Long> get() = with(localPrefs) {
     Triple(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(),
