@@ -88,17 +88,18 @@ open class ImageViewWithLocation
     }
 
     @SuppressLint("NewApi")
+    @OptIn(ExperimentalUnsignedTypes::class)
     private fun Canvas.paintFlashlight(imageX: Float, imageY: Float) {
-        val π = PI.toFloat()
+        val pi = PI.toFloat()
         val flashlightRange = flashlightRange
         val spread = when (azimuthAccuracyRating) {
-            SENSOR_STATUS_ACCURACY_HIGH ->   1 * π / 6
-            SENSOR_STATUS_ACCURACY_MEDIUM -> 3 * π / 6
-            SENSOR_STATUS_ACCURACY_LOW ->    5 * π / 6
-            else -> 2 * π
+            SENSOR_STATUS_ACCURACY_HIGH ->   1 * pi / 6
+            SENSOR_STATUS_ACCURACY_MEDIUM -> 3 * pi / 6
+            SENSOR_STATUS_ACCURACY_LOW ->    5 * pi / 6
+            else -> 2 * pi
         }.toFloat()
         val dotRadius = locdotRadius
-        val arcCenterDist = if (spread <= π) dotRadius / sin(spread / 2.0).toFloat() else 0f
+        val arcCenterDist = if (spread <= pi) dotRadius / sin(spread / 2.0).toFloat() else 0f
         val arcCenterX = imageX - arcCenterDist
         val arcRadius = flashlightRange + arcCenterDist
         val arcPortionBeforeTouchPoint =
