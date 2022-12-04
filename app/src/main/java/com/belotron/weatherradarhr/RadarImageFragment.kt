@@ -85,13 +85,16 @@ class RadarImageViewModel : ViewModel() {
     }
 
     fun ensureAnimationLooper() {
-        animationLooper ?: recreateAnimationLooper()
+        if (animationLooper == null) {
+            animationLooper = AnimationLooper(this)
+        }
+        fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
     }
 
     fun recreateAnimationLooper() {
         animationLooper?.dispose()
-        animationLooper = AnimationLooper(this)
-        fullScreenBundle.seekBar!!.setOnSeekBarChangeListener(animationLooper)
+        animationLooper = null
+        ensureAnimationLooper()
     }
 }
 
