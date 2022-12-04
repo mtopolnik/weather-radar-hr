@@ -232,7 +232,7 @@ suspend fun Context.canAccessLocation(fromBg: Boolean) =
     else
         appHasFgLocationPermission() && locationSettingsException(locationRequestFg) == null
 
-suspend fun RadarImageFragment.checkAndCorrectPermissionsAndSettings() {
+suspend fun MainFragment.checkAndCorrectPermissionsAndSettings() {
     try {
         with(context!!) {
             if (!appHasFgLocationPermission()) {
@@ -404,11 +404,11 @@ suspend fun Context.locationSettingsException(
     e
 }
 
-fun RadarImageFragment.startIntentRequestLocationPermissionFg() = startIntentRequestLocationPermission(true)
+fun MainFragment.startIntentRequestLocationPermissionFg() = startIntentRequestLocationPermission(true)
 
-fun RadarImageFragment.startIntentRequestLocationPermissionBg() = startIntentRequestLocationPermission(false)
+fun MainFragment.startIntentRequestLocationPermissionBg() = startIntentRequestLocationPermission(false)
 
-private fun RadarImageFragment.startIntentRequestLocationPermission(requestFg: Boolean) = run {
+private fun MainFragment.startIntentRequestLocationPermission(requestFg: Boolean) = run {
     info { "startIntentRequestLocationPermission" }
     val permissionToAskFor =
         if (requestFg || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) ACCESS_COARSE_LOCATION
@@ -416,7 +416,7 @@ private fun RadarImageFragment.startIntentRequestLocationPermission(requestFg: B
     permissionRequest.launch(permissionToAskFor)
 }
 
-fun RadarImageFragment.startIntentResolveException(e: ResolvableApiException) =
+fun MainFragment.startIntentResolveException(e: ResolvableApiException) =
     resolveApiExceptionRequest.launch(IntentSenderRequest.Builder(e.resolution.intentSender).build())
 
 private val Context.sensorManager get() = getSystemService(Context.SENSOR_SERVICE) as SensorManager?

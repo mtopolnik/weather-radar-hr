@@ -99,7 +99,7 @@ class RadarImageViewModel : ViewModel() {
     }
 }
 
-class RadarImageFragment : Fragment(), MenuProvider {
+class MainFragment : Fragment(), MenuProvider {
 
     val permissionRequest = registerForActivityResult(RequestPermission()) {
         if (it) info { "User has granted us the location permission" }
@@ -122,7 +122,7 @@ class RadarImageFragment : Fragment(), MenuProvider {
     private var vGroupFullScreen: ViewGroup? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        info { "RadarImageFragment.onCreate" }
+        info { "MainFragment.onCreate" }
         super.onCreate(savedInstanceState)
         vmodel = ViewModelProvider(this)[RadarImageViewModel::class.java]
         val activity = requireActivity()
@@ -147,7 +147,7 @@ class RadarImageFragment : Fragment(), MenuProvider {
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        info { "RadarImageFragment.onCreateView" }
+        info { "MainFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
         rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         rootView.findViewById<Toolbar>(R.id.toolbar).also {
@@ -247,7 +247,7 @@ class RadarImageFragment : Fragment(), MenuProvider {
     }
 
     override fun onResume() {
-        info { "RadarImageFragment.onResume" }
+        info { "MainFragment.onResume" }
         val aWhileAgo = System.currentTimeMillis() - A_WHILE_IN_MILLIS
         super.onResume()
         vmodel.possibleStateLoss = false
@@ -346,19 +346,19 @@ class RadarImageFragment : Fragment(), MenuProvider {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        info { "RadarImageFragment.onSaveInstanceState" }
+        info { "MainFragment.onSaveInstanceState" }
         outState.recordSavingTime()
         vmodel.possibleStateLoss = true
     }
 
     override fun onDestroyView() {
-        info { "RadarImageFragment.onDestroyView" }
+        info { "MainFragment.onDestroyView" }
         super.onDestroyView()
         vmodel.destroyImgBundles()
     }
 
     override fun onPause() {
-        info { "RadarImageFragment.onPause" }
+        info { "MainFragment.onPause" }
         super.onPause()
         wasFastResume = false
         vmodel.animationLooper?.stop()
@@ -373,20 +373,20 @@ class RadarImageFragment : Fragment(), MenuProvider {
     }
 
     override fun onStop() {
-        info { "RadarImageFragment.onStop" }
+        info { "MainFragment.onStop" }
         super.onStop()
         vmodel.possibleStateLoss = true
     }
 
     override fun onCreateMenu(menu: Menu, inflater: MenuInflater) {
-        info { "RadarImageFragment.onCreateMenu" }
+        info { "MainFragment.onCreateMenu" }
         val tb = rootView.findViewById<Toolbar>(R.id.toolbar)
         tb.inflateMenu(R.menu.main_menu)
         tb.menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
     }
 
     override fun onMenuItemSelected(item: MenuItem): Boolean {
-        info { "RadarImageFragment.onMenuItemSelected" }
+        info { "MainFragment.onMenuItemSelected" }
         val activity = activity as AppCompatActivity
         when (item.itemId) {
             R.id.edit_radars -> {

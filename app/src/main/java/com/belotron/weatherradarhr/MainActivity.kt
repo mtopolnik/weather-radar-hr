@@ -1,7 +1,6 @@
 package com.belotron.weatherradarhr
 
 import android.os.Bundle
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 
@@ -13,10 +12,10 @@ class MainActivity : AppCompatActivity()  {
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
         recordAppUsage()
         setContentView(R.layout.activity_main)
-        if (supportFragmentManager.findFragmentById(R.id.radar_img_fragment) == null) {
-            RadarImageFragment().also {
+        if (supportFragmentManager.findFragmentById(R.id.main_fragment) == null) {
+            MainFragment().also {
                 supportFragmentManager.beginTransaction()
-                    .add(R.id.radar_img_fragment, it)
+                    .add(R.id.main_fragment, it)
                     .commit()
             }
         }
