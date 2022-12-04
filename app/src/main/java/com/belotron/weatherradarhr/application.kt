@@ -46,8 +46,11 @@ enum class RadarSource(
     val frameSequenceLoader: FrameSequenceLoader
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", HrKompozitShape, HrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
-    HR_DEBELJAK("DHMZ Debeljak", HrKompozitShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
+    HR_GRADISTE("DHMZ Gradište", HrKompozitShape, HrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
     HR_BILOGORA("DHMZ Bilogora", HrKompozitShape, HrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
+    HR_GOLI("DHMZ Goli", HrKompozitShape, HrSequenceLoader("goli", HrOcr::ocrTimestampSingle)),
+    HR_DEBELJAK("DHMZ Debeljak", HrKompozitShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
+    HR_ULJENJE("DHMZ Uljenje", HrKompozitShape, HrSequenceLoader("uljenje", HrOcr::ocrTimestampSingle)),
     SLO_ARSO("ARSO Kompozit", SloMapShape, SloSequenceLoader()),
 }
 
