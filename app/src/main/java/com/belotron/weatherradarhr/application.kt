@@ -51,7 +51,7 @@ enum class RadarSource(
     HR_GOLI("DHMZ Goli", HrKompozitShape, HrSequenceLoader("goli", HrOcr::ocrTimestampSingle)),
     HR_DEBELJAK("DHMZ Debeljak", HrKompozitShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
     HR_ULJENJE("DHMZ Uljenje", HrKompozitShape, HrSequenceLoader("uljenje", HrOcr::ocrTimestampSingle)),
-    SLO_ARSO("ARSO Kompozit", SloMapShape, SloSequenceLoader()),
+    SLO_ARSO("ARSO", SloMapShape, SloSequenceLoader()),
 }
 
 class MyApplication : Application() {
