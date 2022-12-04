@@ -6,9 +6,14 @@ import android.content.SharedPreferences
 import android.location.Location
 import androidx.preference.PreferenceManager
 
-private const val KEY_LAST_RELOADED_TIMESTAMP = "last-reloaded-timestamp"
+const val DEFAULT_ANIMATION_RATE = 85
+const val DEFAULT_ANIMATION_MINUTES = 90
+const val DEFAULT_FREEZE_TIME = 1500
+const val MIN_ANIMATION_RATE = 10
+const val MIN_ANIMATION_MINUTES = 5
+const val MIN_FREEZE_TIME = 100
+
 private const val KEY_LAST_INVALIDATED_CACHE_TIMESTAMP = "last_invalidated_cache_timestamp"
-private const val KEY_LAST_ANIMATION_MINUTES = "last_animation_covers_minutes"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_ANIMATION_MINUTES = "animation_covers_minutes"
@@ -22,13 +27,6 @@ private const val NAME_LOCAL_PREFS = "local"
 private const val KEY_LOCATION_LATITUDE = "location_latitude"
 private const val KEY_LOCATION_LONGITUDE = "location_longitude"
 private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
-
-const val DEFAULT_ANIMATION_RATE = 85
-const val DEFAULT_ANIMATION_MINUTES = 90
-const val DEFAULT_FREEZE_TIME = 1500
-const val MIN_ANIMATION_RATE = 10
-const val MIN_ANIMATION_MINUTES = 5
-const val MIN_FREEZE_TIME = 100
 
 private val DEFAULT_RADAR_SOURCES = setOf("0 ${RadarSource.HR_KOMPOZIT.name}", "1 ${RadarSource.HR_BILOGORA.name}")
 
