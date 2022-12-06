@@ -49,17 +49,67 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/slo_widget_info"/>
+                android:resource="@xml/widget_info_slo"/>
         </receiver>
         <receiver android:name=".HrKompozitWidgetProvider"
-                  android:label="@string/widget_hr"
+                  android:label="@string/widget_hr_kompozit"
                   android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/hr_kompozit_widget_info"/>
+                android:resource="@xml/widget_info_hr_kompozit"/>
+        </receiver>
+        <receiver android:name=".HrGradisteWidgetProvider"
+                  android:label="@string/widget_hr_gradiste"
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_hr_gradiste"/>
+        </receiver>
+        <receiver android:name=".HrBilogoraWidgetProvider"
+                  android:label="@string/widget_hr_bilogora"
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_hr_bilogora"/>
+        </receiver>
+        <receiver android:name=".HrGoliWidgetProvider"
+                  android:label="@string/widget_hr_goli"
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_hr_goli"/>
+        </receiver>
+        <receiver android:name=".HrDebeljakWidgetProvider"
+                  android:label="@string/widget_hr_debeljak"
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_hr_debeljak"/>
+        </receiver>
+        <receiver android:name=".HrUljenjeWidgetProvider"
+                  android:label="@string/widget_hr_uljenje"
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_hr_uljenje"/>
         </receiver>
         <service
             android:name=".RefreshImageService"

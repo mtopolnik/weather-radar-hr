@@ -40,37 +40,103 @@ private const val UPDATE_AGE_PERIOD_MINUTES = 3
 private const val RETRY_PERIOD_MINUTES = 10L
 private const val REFRESH_IMAGE_JOB_ID_BASE = 700713272
 private const val UPDATE_AGE_JOB_ID_BASE = 700723272
-private const val SLO_CROP_X_LEFT = 10
-private const val SLO_CROP_Y_TOP = 49
+private const val SLO_CROP_X = 10
+private const val SLO_CROP_Y = 49
 private const val SLO_CROP_WIDTH = 800
 private const val SLO_CROP_HEIGHT = 600
-private const val HR_KOMPOZIT_CROP_Y_HEIGHT = 719
+private const val HR_KOMPOZIT_CROP_HEIGHT = 719
+private const val HR_SINGLE_CROP_Y = 60
+private const val HR_SINGLE_CROP_WIDTH = 660
+private const val HR_SINGLE_CROP_HEIGHT = 660
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
+
 private val widgetDescriptors = arrayOf(
-        WidgetDescriptor("ARSO", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
-                SloWidgetProvider::class.java,
-                R.drawable.slo_widget_preview,
-                sloShape,
-                cropLeft = 0,
-                cropTop = SLO_CROP_Y_TOP,
-                toTimestampedBitmap = { bitmap, isOffline ->
-                    TimestampedBitmap(
-                            ocrSloTimestamp(bitmap.asPixels()),
-                            isOffline,
-                            bitmap.crop(SLO_CROP_X_LEFT, SLO_CROP_Y_TOP, SLO_CROP_WIDTH, SLO_CROP_HEIGHT)
+    WidgetDescriptor(RadarSource.SLO_ARSO.title,
+        "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
+        SloWidgetProvider::class.java,
+        R.drawable.widget_preview_slo,
+        sloShape,
+        cropLeft = 0,
+        cropTop = SLO_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                ocrSloTimestamp(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(SLO_CROP_X, SLO_CROP_Y, SLO_CROP_WIDTH, SLO_CROP_HEIGHT)
             )}),
-        WidgetDescriptor("DHMZ Kompozit", "https://vrijeme.hr/kompozit-stat.png", 10,
-                HrKompozitWidgetProvider::class.java,
-                R.drawable.hr_kompozit_widget_preview,
-                hrKompozitShape,
-                cropLeft = 0,
-                cropTop = 0,
-                toTimestampedBitmap = { bitmap, isOffline ->
-                    TimestampedBitmap(
-                            HrOcr.ocrTimestampKompozit(bitmap.asPixels()),
-                            isOffline,
-                            bitmap.crop(0, 0, bitmap.width, HR_KOMPOZIT_CROP_Y_HEIGHT)) })
+    WidgetDescriptor(RadarSource.HR_KOMPOZIT.title,
+        "https://vrijeme.hr/kompozit-stat.png", 10,
+        HrKompozitWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_kompozit,
+        hrKompozitShape,
+        cropLeft = 0,
+        cropTop = 0,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampKompozit(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, 0, bitmap.width, HR_KOMPOZIT_CROP_HEIGHT)) }),
+    WidgetDescriptor(RadarSource.HR_BILOGORA.title,
+        "https://vrijeme.hr/bilogora-stat.png", 10,
+        HrBilogoraWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_bilogora,
+        hrBilogoraShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
+    WidgetDescriptor(RadarSource.HR_DEBELJAK.title,
+        "https://vrijeme.hr/debeljak-stat.png", 10,
+        HrDebeljakWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_debeljak,
+        hrDebeljakShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
+    WidgetDescriptor(RadarSource.HR_GOLI.title,
+        "https://vrijeme.hr/goli-stat.png", 10,
+        HrGoliWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_goli,
+        hrGoliShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
+    WidgetDescriptor(RadarSource.HR_GRADISTE.title,
+        "https://vrijeme.hr/gradiste-stat.png", 10,
+        HrGradisteWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_gradiste,
+        hrGradisteShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
+    WidgetDescriptor(RadarSource.HR_ULJENJE.title,
+        "https://vrijeme.hr/uljenje-stat.png", 10,
+        HrUljenjeWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_uljenje,
+        hrUljenjeShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
 )
 
 private fun Bitmap.crop(x: Int, y: Int, width: Int, height: Int) = createBitmap(this, x, y, width, height)
@@ -142,6 +208,36 @@ class SloWidgetProvider : AppWidgetProvider() {
 class HrKompozitWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         WidgetContext(context, widgetDescriptors[1]).onUpdateWidget()
+    }
+}
+
+class HrBilogoraWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[2]).onUpdateWidget()
+    }
+}
+
+class HrDebeljakWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[3]).onUpdateWidget()
+    }
+}
+
+class HrGoliWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[4]).onUpdateWidget()
+    }
+}
+
+class HrGradisteWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[5]).onUpdateWidget()
+    }
+}
+
+class HrUljenjeWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[6]).onUpdateWidget()
     }
 }
 
@@ -453,7 +549,7 @@ private fun millisToNextUpdate(lastModified_mmss : Long, updateIntervalMinutes: 
             if (now_mmss >= lastModified_mmss) now_mmss - lastModified_mmss
             else (now_mmss + SECS_IN_HOUR) - lastModified_mmss
     val proposedDelay = updateIntervalMinutes * SECS_IN_MINUTE - mmss_sinceLastModified
-    return SECONDS.toMillis(proposedDelay.takeIf { it > 0 } ?: RETRY_PERIOD_MINUTES * SECS_IN_MINUTE)
+    return SECONDS.toMillis(proposedDelay.takeIf { it > 0 } ?: (RETRY_PERIOD_MINUTES * SECS_IN_MINUTE))
 }
 
 private fun currentTime_mmss() : Long {
