@@ -81,16 +81,16 @@ operator fun RectF.component3() = right
 operator fun RectF.component4() = bottom
 
 fun ImageView?.bitmapSize(p: Point) =
-        p.also { this?.drawable
-                ?.apply { it.set(intrinsicWidth, intrinsicHeight) }
-                ?: it.set(0, 0)
-        }.takeIf { it.x > 0 && it.y > 0 }
+    p.also { this?.drawable
+        ?.apply { it.set(intrinsicWidth, intrinsicHeight) }
+        ?: it.set(0, 0)
+    }.takeIf { it.x > 0 && it.y > 0 }
 
 fun ImageView?.bitmapSize(p: PointF) =
-        p.also { this?.drawable
-                ?.apply { it.set(intrinsicWidth.toFloat(), intrinsicHeight.toFloat()) }
-                ?: it.set(0f, 0f)
-        }.takeIf { it.x > 0 && it.y > 0 }
+    p.also { this?.drawable
+        ?.apply { it.set(intrinsicWidth.toFloat(), intrinsicHeight.toFloat()) }
+        ?: it.set(0f, 0f)
+    }.takeIf { it.x > 0 && it.y > 0 }
 
 fun TextView.setAgeText(timestamp: Long, dateFormat: DateFormat, timeFormat: DateFormat) {
     val now = System.currentTimeMillis()
@@ -99,11 +99,11 @@ fun TextView.setAgeText(timestamp: Long, dateFormat: DateFormat, timeFormat: Dat
             dateFormat = dateFormat, timeFormat = timeFormat)
     val isFresh = isFreshTimestamp(timestamp = timestamp, now = now)
     setTextColor(getColor(context,
-            if (isFresh) R.color.text_primary
-            else R.color.text_red))
+        if (isFresh) R.color.text_primary
+        else R.color.text_red))
     setShadowLayer(2f, 2f, 2f, getColor(context,
-            if (isFresh) R.color.text_shadow
-            else R.color.text_red_shadow))
+        if (isFresh) R.color.text_shadow
+        else R.color.text_red_shadow))
 }
 
 fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {
