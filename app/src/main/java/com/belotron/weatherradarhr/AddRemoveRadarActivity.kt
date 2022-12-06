@@ -1,8 +1,11 @@
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.View.OnTouchListener
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -29,7 +32,7 @@ class AddRemoveRadarActivity: AppCompatActivity() {
             resources.getColor(R.color.text_disabled)
         )
         recyclerView.adapter = adapter
-        ItemTouchHelper(ItemMoveCallback(adapter)).attachToRecyclerView(recyclerView)
+        adapter.itemTouchHelper.attachToRecyclerView(recyclerView)
     }
 
     override fun onPause() {
@@ -47,20 +50,30 @@ class ItemViewAdapter(
     private var textColorEnabled: Int,
     private var textColorDisabled: Int
 ) : RecyclerView.Adapter<ItemViewHolder>() {
+    val itemTouchHelper = ItemTouchHelper(ItemMoveCallback(this))
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
         val itemView = LayoutInflater.from(parent.context).inflate(
             if (viewType == VIEWTYPE_ITEM) R.layout.add_remove_recycler_item else R.layout.add_remove_divider,
             parent, false
         )
-        return ItemViewHolder(itemView)
+        val viewHolder = ItemViewHolder(itemView)
+        viewHolder.dragHandle.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                itemTouchHelper.startDrag(viewHolder)
+                true
+            } else {
+                false
+            }
+        }
+        return viewHolder
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
         items[position]?.also { holder.text = it.title }
         val positionOfSeparator = items.indexOfFirst { it == null }
         holder.textColor = if (holder.adapterPosition <= positionOfSeparator) textColorEnabled else textColorDisabled
-
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -94,15 +107,17 @@ class ItemViewAdapter(
 class ItemViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     var text: String?
         set(value) {
-            (itemView as? TextView)?.apply { text = value }
+            itemView.findViewById<TextView?>(R.id.add_remove_item_text)?.apply { text = value }
         }
         get() = (itemView as? TextView)?.run { text.toString() }
 
     var textColor: Int
         set(value) {
-            (itemView as? TextView)?.apply { setTextColor(value) }
+            itemView.findViewById<TextView?>(R.id.add_remove_item_text)?.apply { setTextColor(value) }
         }
-        get() = throw UnsupportedOperationException("Getting text color is not supported")
+        get() = TODO("Implement if the need arises")
+
+    val dragHandle: View = itemView.findViewById(R.id.add_remove_drag_handle)
 }
 
 class ItemMoveCallback(
