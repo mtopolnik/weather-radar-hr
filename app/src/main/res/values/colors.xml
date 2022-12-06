@@ -3,6 +3,7 @@
     <color name="primary">#004d40</color>
     <color name="secondary">#c6a035</color>
     <color name="text_primary">#ffffff</color>
+    <color name="text_disabled">#808080</color>
     <color name="text_shadow">#000000</color>
     <color name="text_red">#ff4444</color>
     <color name="text_red_shadow">#aa4444</color>
