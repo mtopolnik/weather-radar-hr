@@ -293,7 +293,7 @@ class MainFragment : Fragment(), MenuProvider {
             startReloadAnimations(PREFER_CACHED)
             lifecycleScope.launch {
                 vmodel.reloadJob?.join()
-                if (timeToReload) {
+                if (timeToReload || radarsChanged) {
                     info { "Time to reload animations" }
                     startReloadAnimations(UP_TO_DATE)
                 }
