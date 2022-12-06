@@ -72,17 +72,15 @@ val HrKompozitShape = MapShape(
     botImageY = 718
 )
 
-val locationRequestFg: LocationRequest = LocationRequest.create().apply {
-    interval = 1000
-    fastestInterval = 10
-    priority = Priority.PRIORITY_BALANCED_POWER_ACCURACY
-}
+val locationRequestFg: LocationRequest = LocationRequest.Builder(1000)
+    .setMinUpdateIntervalMillis(10)
+    .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
+    .build()
 
-val locationRequestBg: LocationRequest = LocationRequest.create().apply {
-    interval = MINUTE_IN_MILLIS
-    fastestInterval = MINUTE_IN_MILLIS
-    priority = Priority.PRIORITY_LOW_POWER
-}
+val locationRequestBg: LocationRequest = LocationRequest.Builder(MINUTE_IN_MILLIS)
+    .setMinUpdateIntervalMillis(MINUTE_IN_MILLIS)
+    .setPriority(Priority.PRIORITY_LOW_POWER)
+    .build()
 
 val Float.toDegrees get() = Math.toDegrees(this.toDouble()).toFloat()
 operator fun Location.component1() = latitude
