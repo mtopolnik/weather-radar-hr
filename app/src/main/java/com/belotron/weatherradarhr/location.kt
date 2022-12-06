@@ -46,7 +46,7 @@ const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
 private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
 
-val SloMapShape = MapShape(
+val sloShape = MapShape(
     topLat = 47.40,
     botLat = 44.71,
     topLeftLon = 12.10,
@@ -59,7 +59,7 @@ val SloMapShape = MapShape(
     botImageY = 649
 )
 
-val HrKompozitShape = MapShape(
+val hrKompozitShape = MapShape(
     topLat = 47.8,
     botLat = 41.52,
     topLeftLon = 11.73,
@@ -69,6 +69,71 @@ val HrKompozitShape = MapShape(
     leftImageX = 1,
     rightImageX = 718,
     topImageY = 1,
+    botImageY = 718
+)
+
+val hrGradisteShape = MapShape(
+    topLat = 47.29,
+    botLat = 43.00,
+    topLeftLon = 15.53,
+    botLeftLon = 15.76,
+    topRightLon = 21.82,
+    botRightLon = 21.63,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
+    botImageY = 718
+)
+
+val hrBilogoraShape = MapShape(
+    topLat = 48.06,
+    botLat = 43.72,
+    topLeftLon = 14.00,
+    botLeftLon = 14.19,
+    topRightLon = 20.43,
+    botRightLon = 20.19,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
+    botImageY = 718
+)
+
+val hrGoliShape = MapShape(
+    topLat = 47.16,
+    botLat = 42.87,
+    topLeftLon = 10.88,
+    botLeftLon = 11.15,
+    topRightLon = 17.28,
+    botRightLon = 17.05,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
+    botImageY = 718
+)
+
+val hrDebeljakShape = MapShape(
+    topLat = 46.20,
+    botLat = 41.91,
+    topLeftLon = 12.26,
+    botLeftLon = 12.42,
+    topRightLon = 18.52,
+    botRightLon = 18.24,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
+    botImageY = 718
+)
+
+val hrUljenjeShape = MapShape(
+    topLat = 45.03,
+    botLat = 40.75,
+    topLeftLon = 14.42,
+    botLeftLon = 14.56,
+    topRightLon = 20.52,
+    botRightLon = 20.35,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
     botImageY = 718
 )
 

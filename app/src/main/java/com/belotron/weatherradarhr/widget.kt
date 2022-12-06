@@ -51,7 +51,7 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("SloRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
                 SloWidgetProvider::class.java,
                 R.drawable.slo_widget_preview,
-                SloMapShape,
+                sloShape,
                 cropLeft = 0,
                 cropTop = SLO_CROP_Y_TOP,
                 toTimestampedBitmap = { bitmap, isOffline ->
@@ -63,7 +63,7 @@ private val widgetDescriptors = arrayOf(
         WidgetDescriptor("HrRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
                 HrKompozitWidgetProvider::class.java,
                 R.drawable.hr_kompozit_widget_preview,
-                HrKompozitShape,
+                hrKompozitShape,
                 cropLeft = 0,
                 cropTop = 0,
                 toTimestampedBitmap = { bitmap, isOffline ->
