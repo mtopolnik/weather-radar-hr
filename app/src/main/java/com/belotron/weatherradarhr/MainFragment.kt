@@ -509,7 +509,7 @@ class MainFragment : Fragment(), MenuProvider {
                                 bundle.animationProgress =
                                     vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
                                 with(vmodel.animationLooper!!) {
-                                    receiveNewFrames(positionInUI, loader, frameSequence)
+                                    receiveNewFrames(radar.title, positionInUI, loader, frameSequence)
                                     resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
                                 }
                             }

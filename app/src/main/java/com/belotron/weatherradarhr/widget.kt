@@ -48,7 +48,7 @@ private const val HR_KOMPOZIT_CROP_Y_HEIGHT = 719
 private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 private val widgetDescriptors = arrayOf(
-        WidgetDescriptor("SloRadar", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
+        WidgetDescriptor("ARSO", "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
                 SloWidgetProvider::class.java,
                 R.drawable.slo_widget_preview,
                 sloShape,
@@ -60,7 +60,7 @@ private val widgetDescriptors = arrayOf(
                             isOffline,
                             bitmap.crop(SLO_CROP_X_LEFT, SLO_CROP_Y_TOP, SLO_CROP_WIDTH, SLO_CROP_HEIGHT)
             )}),
-        WidgetDescriptor("HrRadar", "https://vrijeme.hr/kompozit-stat.png", 10,
+        WidgetDescriptor("DHMZ Kompozit", "https://vrijeme.hr/kompozit-stat.png", 10,
                 HrKompozitWidgetProvider::class.java,
                 R.drawable.hr_kompozit_widget_preview,
                 hrKompozitShape,
@@ -308,7 +308,7 @@ private class WidgetContext (
             tsBitmap?.also {
                 it.bitmap.drawLocation(context.locationIfFresh)
                 setImageViewBitmap(R.id.img_view_widget, it.bitmap)
-                setAgeText(context, it.timestamp, it.isOffline)
+                setAgeText(context, wDesc.name, it.timestamp, it.isOffline)
             } ?: run {
                 setImageViewResource(R.id.img_view_widget, wDesc.previewResourceId)
                 setRedText(context.resources.getString(R.string.img_unavailable))

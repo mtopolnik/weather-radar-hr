@@ -45,9 +45,12 @@ class AnimationLooper(
     private val animatorJobs = arrayOfNulls<Job>(vmodel.imgBundles.size)
     private var loopingJob: Job? = null
 
-    fun receiveNewFrames(positionInUI: Int, loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>) {
+    fun receiveNewFrames(
+        radarName: String, positionInUI: Int,
+        loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>
+    ) {
         animators[positionInUI]?.dispose()
-        animators[positionInUI] = FrameAnimator(positionInUI, loader, vmodel, frameSequence)
+        animators[positionInUI] = FrameAnimator(radarName, positionInUI, loader, vmodel, frameSequence)
     }
 
     fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
@@ -124,6 +127,7 @@ class AnimationLooper(
 }
 
 class FrameAnimator(
+    private val radarName: String,
     private val positionInUI: Int,
     private val frameSeqLoader: FrameSequenceLoader,
     vmodel: RadarImageViewModel,
@@ -248,7 +252,8 @@ class FrameAnimator(
 
     private fun updateAgeText() {
         imgBundle.takeIf { it.status in ImageBundle.loadingOrShowing }?.textView?.setAgeText(
-                timestamp(correctFrameCount() - 1), dateFormat = dateFormat, timeFormat = timeFormat)
+            radarName,
+            timestamp(correctFrameCount() - 1), dateFormat = dateFormat, timeFormat = timeFormat)
     }
 
     private fun timestamp(correctFrameIndex: Int) =

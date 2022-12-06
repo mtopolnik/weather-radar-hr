@@ -92,11 +92,12 @@ fun ImageView?.bitmapSize(p: PointF) =
         ?: it.set(0f, 0f)
     }.takeIf { it.x > 0 && it.y > 0 }
 
-fun TextView.setAgeText(timestamp: Long, dateFormat: DateFormat, timeFormat: DateFormat) {
+fun TextView.setAgeText(radarName: String, timestamp: Long, dateFormat: DateFormat, timeFormat: DateFormat) {
     val now = System.currentTimeMillis()
     text = ageText(
-            timestamp = timestamp, now = now, isOffline = false,
-            dateFormat = dateFormat, timeFormat = timeFormat)
+        radarName = radarName,
+        timestamp = timestamp, now = now, isOffline = false,
+        dateFormat = dateFormat, timeFormat = timeFormat)
     val isFresh = isFreshTimestamp(timestamp = timestamp, now = now)
     setTextColor(getColor(context,
         if (isFresh) R.color.text_primary
@@ -106,11 +107,12 @@ fun TextView.setAgeText(timestamp: Long, dateFormat: DateFormat, timeFormat: Dat
         else R.color.text_red_shadow))
 }
 
-fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean) {
+fun RemoteViews.setAgeText(context: Context, radarName: String, timestamp: Long, isOffline: Boolean) {
     val now = System.currentTimeMillis()
     val ageText = ageText(
-            timestamp = timestamp, now = now, isOffline = isOffline,
-            dateFormat = context.dateFormat, timeFormat = context.timeFormat)
+        radarName = radarName,
+        timestamp = timestamp, now = now, isOffline = isOffline,
+        dateFormat = context.dateFormat, timeFormat = context.timeFormat)
     if (isFreshTimestamp(timestamp, now)) {
         setBlackText(ageText)
     } else {
@@ -119,13 +121,14 @@ fun RemoteViews.setAgeText(context: Context, timestamp: Long, isOffline: Boolean
 }
 
 private fun ageText(
-        timestamp: Long, now: Long, isOffline: Boolean,
-        dateFormat: DateFormat, timeFormat: DateFormat
+    radarName: String,
+    timestamp: Long, now: Long, isOffline: Boolean,
+    dateFormat: DateFormat, timeFormat: DateFormat
 ): CharSequence {
     val format = if (timestamp > now - DAY_IN_MILLIS) timeFormat else dateFormat
     return (if (isOffline) "Offline - " else "") +
             getRelativeTimeSpanString(timestamp, now, MINUTE_IN_MILLIS, 0) +
-            ", ${format.format(timestamp)}"
+            ", ${format.format(timestamp)} - $radarName"
 }
 
 private fun isFreshTimestamp(timestamp: Long, now: Long) = timestamp > now - HOURS.toMillis(1)
