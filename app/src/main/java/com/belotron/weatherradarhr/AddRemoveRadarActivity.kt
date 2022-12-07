@@ -3,11 +3,13 @@ package com.belotron.weatherradarhr
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -22,6 +24,10 @@ class AddRemoveRadarActivity: AppCompatActivity() {
         super.onCreate(savedInstanceState)
         info { "AddRemoveRadarActivity.onCreate" }
         setContentView(R.layout.activity_add_remove)
+        findViewById<Toolbar>(R.id.toolbar).also {
+            setSupportActionBar(it)
+        }
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
         val recyclerView = findViewById<RecyclerView>(R.id.add_remove_recycler).also {
             it.layoutManager = LinearLayoutManager(this)
         }
@@ -32,6 +38,14 @@ class AddRemoveRadarActivity: AppCompatActivity() {
         )
         recyclerView.adapter = adapter
         adapter.itemTouchHelper.attachToRecyclerView(recyclerView)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == android.R.id.home) {
+            finish()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     override fun onPause() {

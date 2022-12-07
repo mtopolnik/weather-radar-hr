@@ -1,13 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+>
+
+    <androidx.appcompat.widget.Toolbar
+            android:theme="?attr/actionBarTheme"
+            android:background="@color/primary"
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+    />
+
+    <ScrollView
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
->
-    <TextView
-            android:text="@string/help_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="30dp"
-    />
-</ScrollView>
+    >
+        <TextView
+                android:text="@string/help_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="30dp"
+        />
+    </ScrollView>
+
+</LinearLayout>
