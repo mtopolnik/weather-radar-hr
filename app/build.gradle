@@ -8,8 +8,8 @@ android {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
         targetSdkVersion 33
-        versionCode 143
-        versionName '3.0.0'
+        versionCode 144
+        versionName '3.1.0'
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
