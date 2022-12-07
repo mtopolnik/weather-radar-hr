@@ -17,6 +17,7 @@ private const val KEY_LAST_INVALIDATED_CACHE_TIMESTAMP = "last_invalidated_cache
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_ANIMATION_MINUTES = "animation_covers_minutes"
+private const val KEY_SEEKBAR_VIBRATE = "seekbar_vibrate"
 private const val KEY_RADAR_SOURCES = "radar_sources"
 private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
 private const val KEY_SHOULD_SHOW_FG_LOCATION_NOTICE = "should_show_fg_location_notice"
@@ -48,6 +49,7 @@ val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeas
 val SharedPreferences.animationCoversMinutes: Int get() =
     MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
+val SharedPreferences.seekbarVibrate: Boolean get() = getBoolean(KEY_SEEKBAR_VIBRATE, true)
 
 fun SharedPreferences.configuredRadarSources(): List<RadarSource?> =
     getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->

@@ -26,4 +26,9 @@
             belotron:min="100"
             belotron:max="6000"
     />
+    <androidx.preference.CheckBoxPreference
+            android:key="seekbar_vibrate"
+            android:title="@string/seekbar_vibrate"
+            android:defaultValue="true"
+    />
 </androidx.preference.PreferenceScreen>

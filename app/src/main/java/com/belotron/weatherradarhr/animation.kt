@@ -54,7 +54,8 @@ class AnimationLooper(
     }
 
     fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
-               newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null
+               newRateMinsPerSec: Int? = null, newFreezeTimeMillis: Int? = null,
+               newSeekbarVibrate: Boolean? = null
     ) {
         info { "AnimationLooper.resume" }
         context?.also {
@@ -68,6 +69,7 @@ class AnimationLooper(
             newAnimationCoversMinutes?.also { animator.animationCoversMinutes = it }
             newRateMinsPerSec?.also { animator.rateMinsPerSec = it }
             newFreezeTimeMillis?.also { animator.freezeTimeMillis = it }
+            newSeekbarVibrate?.also { animator.seekbarVibrate = it }
         }
         if (vmodel.isTrackingTouch) {
             return
@@ -133,9 +135,10 @@ class FrameAnimator(
     vmodel: RadarImageViewModel,
     frameSequence: FrameSequence<out Frame>,
 ) {
-    var animationCoversMinutes: Int = 1
-    var rateMinsPerSec: Int = 20
-    var freezeTimeMillis: Int = 500
+    var animationCoversMinutes = 1
+    var rateMinsPerSec = 20
+    var freezeTimeMillis = 500
+    var seekbarVibrate = true
     val imgBundle: ImageBundle get() = imgBundles[positionInUI]
 
     private val viewModelScope = vmodel.viewModelScope
@@ -196,7 +199,7 @@ class FrameAnimator(
         }
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
-        if (targetIndex == 0 || targetIndex == correctFrameCount() - 1) {
+        if (seekbarVibrate && (targetIndex == 0 || targetIndex == correctFrameCount() - 1)) {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
             } else {

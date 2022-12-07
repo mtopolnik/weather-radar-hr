@@ -286,7 +286,8 @@ class MainFragment : Fragment(), MenuProvider {
                     activity,
                     newAnimationCoversMinutes = animationCoversMinutes,
                     newRateMinsPerSec = rateMinsPerSec,
-                    newFreezeTimeMillis = freezeTimeMillis
+                    newFreezeTimeMillis = freezeTimeMillis,
+                    newSeekbarVibrate = seekbarVibrate
                 )
             }
         } else {
@@ -488,8 +489,11 @@ class MainFragment : Fragment(), MenuProvider {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
         val context = appContext
         vmodel.imgBundles.forEach { it.status = LOADING }
-        val rateMinsPerSec = context.mainPrefs.rateMinsPerSec
-        val freezeTimeMillis = context.mainPrefs.freezeTimeMillis
+        val mainPrefs = context.mainPrefs
+        val animationCoversMinutes = mainPrefs.animationCoversMinutes
+        val rateMinsPerSec = mainPrefs.rateMinsPerSec
+        val freezeTimeMillis = mainPrefs.freezeTimeMillis
+        val seekbarVibrate = mainPrefs.seekbarVibrate
         vmodel.reloadJob?.cancel()
         vmodel.reloadJob = lifecycleScope.launch {
             supervisorScope {
@@ -497,7 +501,6 @@ class MainFragment : Fragment(), MenuProvider {
                     val radar = vmodel.radarsInUse[positionInUI]
                     launch {
                         try {
-                            val animationCoversMinutes = context.mainPrefs.animationCoversMinutes
                             val loader = radar.frameSequenceLoader
                             loader.incrementallyFetchFrameSequence(
                                 context, animationCoversMinutes, fetchPolicy
@@ -510,7 +513,8 @@ class MainFragment : Fragment(), MenuProvider {
                                     vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
                                 with(vmodel.animationLooper!!) {
                                     receiveNewFrames(radar.title, positionInUI, loader, frameSequence)
-                                    resume(context, animationCoversMinutes, rateMinsPerSec, freezeTimeMillis)
+                                    resume(context,
+                                        animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate)
                                 }
                             }
                         } catch (e: CancellationException) {

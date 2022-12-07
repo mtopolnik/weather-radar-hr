@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.res.TypedArray
 import android.util.AttributeSet
 import android.view.LayoutInflater
-import android.view.View.GONE
+import android.view.View.INVISIBLE
 import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
@@ -48,7 +48,7 @@ constructor(context: Context, attrs: AttributeSet)
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
-        holder.findViewById(icon_frame)?.visibility = GONE
+        holder.findViewById(icon_frame)?.visibility = INVISIBLE
         fun findSeekBar() = holder.findViewById(R.id.pref_seekbar) as SeekBar?
         if (findSeekBar() != null) {
             return
