@@ -261,7 +261,7 @@ class MainFragment : Fragment(), MenuProvider {
         vmodel.radarsInUse = mainPrefs.configuredRadarSources().takeWhile { it != null }.filterNotNull()
         val radarsChanged = vmodel.radarsInUse != oldRadarsInUse
         if (radarsChanged) {
-            info { "New radars in use: " + vmodel.radarsInUse.joinToString { it.name } }
+            info { "New radar list: " + vmodel.radarsInUse.joinToString { it.name } }
             if (vmodel.isInFullScreen) {
                 exitFullScreen()
             }
@@ -296,9 +296,13 @@ class MainFragment : Fragment(), MenuProvider {
             }
         } else {
             startReloadAnimations(PREFER_CACHED)
+            val radarAdded = run {
+                val oldRadarSet = oldRadarsInUse.toSet()
+                vmodel.radarsInUse.any { !oldRadarSet.contains(it) }
+            }
             lifecycleScope.launch {
                 vmodel.reloadJob?.join()
-                if (timeToReload || radarsChanged) {
+                if (timeToReload || radarAdded) {
                     info { "Time to reload animations" }
                     startReloadAnimations(UP_TO_DATE)
                 }
