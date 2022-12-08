@@ -5,33 +5,33 @@
         android:orientation="vertical"
         android:layout_height="match_parent"
         android:layout_width="match_parent"
->
+        >
     <FrameLayout
             android:id="@+id/overview"
             android:orientation="vertical"
             android:layout_height="match_parent"
             android:layout_width="match_parent"
             android:layout_gravity="center_horizontal"
-    >
+            >
         <com.belotron.weatherradarhr.MyScrollView
                 android:id="@+id/scrollview"
                 android:layout_height="match_parent"
                 android:layout_width="match_parent"
                 android:scrollbars="none"
-        >
+                >
             <LinearLayout
                     android:id="@+id/radar_img_container"
                     android:orientation="vertical"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-            >
+                    >
                 <androidx.appcompat.widget.Toolbar
                         android:theme="?attr/actionBarTheme"
                         android:background="@color/primary"
                         android:id="@+id/toolbar"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                />
+                        />
             </LinearLayout>
         </com.belotron.weatherradarhr.MyScrollView>
     </FrameLayout>
@@ -40,7 +40,7 @@
             android:layout_height="match_parent"
             android:layout_width="match_parent"
             android:layout_gravity="center_horizontal"
-    >
+            >
         <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/back"
                 android:layout_width="wrap_content"
