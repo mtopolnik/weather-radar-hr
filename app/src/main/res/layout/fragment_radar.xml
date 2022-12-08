@@ -44,6 +44,7 @@
             >
         <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/back"
+                android:src="?attr/homeAsUpIndicator"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
@@ -52,9 +53,6 @@
                 app:backgroundTint="@color/seekbar_background"
                 app:borderWidth="0dp"
                 app:elevation="30dp"
-                app:rippleColor="@color/rateme_button_large"
-                android:src="?attr/homeAsUpIndicator"
-        />
                 />
         <RelativeLayout
                 android:id="@+id/vg_zoomed"
