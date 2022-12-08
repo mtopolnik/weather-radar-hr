@@ -44,6 +44,7 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.ImageBundle.Status.*
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -152,6 +153,9 @@ class MainFragment : Fragment(), MenuProvider {
         rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         rootView.findViewById<Toolbar>(R.id.toolbar).also {
             (requireActivity() as AppCompatActivity).setSupportActionBar(it)
+        }
+        rootView.findViewById<FloatingActionButton>(R.id.back).apply {
+            setOnClickListener { exitFullScreen() }
         }
         vGroupOverview = rootView.findViewById<ViewGroup>(R.id.overview).also {
             it.doOnLayout { view ->

@@ -35,68 +35,88 @@
             </LinearLayout>
         </com.belotron.weatherradarhr.MyScrollView>
     </FrameLayout>
-    <LinearLayout
-            android:id="@+id/zoomed"
+    <FrameLayout
             android:orientation="vertical"
-            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:gravity="center"
+            android:layout_width="match_parent"
+            android:layout_gravity="center_horizontal"
     >
-        <RelativeLayout
-                android:id="@+id/vg_zoomed"
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/back"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_marginStart="16dp"
+                android:layout_marginBottom="7dp"
+                app:backgroundTint="@color/seekbar_background"
+                app:borderWidth="0dp"
+                app:elevation="30dp"
+                app:rippleColor="@color/rateme_button_large"
+                android:src="?attr/homeAsUpIndicator"
+        />
+        <LinearLayout
+                android:id="@+id/zoomed"
+                android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="vertical"
-        >
-            <TextView
-                    android:id="@+id/text_zoomed"
+                android:gravity="center"
+                >
+            <RelativeLayout
+                    android:id="@+id/vg_zoomed"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="4dp"
-                    android:paddingRight="4dp"
-                    android:minLines="1"
-                    android:maxLines="1"
-                    android:layout_alignParentTop="true"
-                    android:textColor="@color/text_primary"
-                    android:shadowColor="@color/text_shadow"
-                    android:shadowDx="2"
-                    android:shadowDy="2"
-                    android:shadowRadius="2"
-            />
-            <com.belotron.weatherradarhr.TouchImageView
-                    android:id="@+id/img_zoomed"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    >
+                <TextView
+                        android:id="@+id/text_zoomed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingLeft="4dp"
+                        android:paddingRight="4dp"
+                        android:minLines="1"
+                        android:maxLines="1"
+                        android:layout_alignParentTop="true"
+                        android:textColor="@color/text_primary"
+                        android:shadowColor="@color/text_shadow"
+                        android:shadowDx="2"
+                        android:shadowDy="2"
+                        android:shadowRadius="2"
+                        />
+                <com.belotron.weatherradarhr.TouchImageView
+                        android:id="@+id/img_zoomed"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_below="@id/text_zoomed"
+                        android:layout_alignParentBottom="true"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        />
+                <FrameLayout
+                        android:layout_height="115dp"
+                        android:layout_width="match_parent"
+                        android:clipChildren="false"
+                        android:layout_alignParentBottom="true"
+                        android:layout_centerHorizontal="true"
+                        >
+                    <include layout="@layout/thumb_seekbar"/>
+                </FrameLayout>
+                <ProgressBar
+                        android:id="@+id/progress_bar_zoomed"
+                        style="?android:attr/progressBarStyleLarge"
+                        android:theme="@style/ProgressBar"
+                        android:background="#0000"
+                        android:layout_width="match_parent"
+                        android:layout_height="100dp"
+                        android:layout_centerVertical="true"
+                        />
+            </RelativeLayout>
+            <ImageView
+                    android:id="@+id/broken_img_zoomed"
+                    app:srcCompat="@drawable/thunderbolt"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_below="@id/text_zoomed"
-                    android:layout_alignParentBottom="true"
-                    android:adjustViewBounds="true"
-                    android:scaleType="fitCenter"
-            />
-            <FrameLayout
-                    android:layout_height="115dp"
-                    android:layout_width="match_parent"
-                    android:clipChildren="false"
-                    android:layout_alignParentBottom="true"
-                    android:layout_centerHorizontal="true"
-            >
-                <include layout="@layout/thumb_seekbar"/>
-            </FrameLayout>
-            <ProgressBar
-                    android:id="@+id/progress_bar_zoomed"
-                    style="?android:attr/progressBarStyleLarge"
-                    android:theme="@style/ProgressBar"
-                    android:background="#0000"
-                    android:layout_width="match_parent"
-                    android:layout_height="100dp"
-                    android:layout_centerVertical="true"
-            />
-        </RelativeLayout>
-        <ImageView
-                android:id="@+id/broken_img_zoomed"
-                app:srcCompat="@drawable/thunderbolt"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:contentDescription="@string/broken_image_description"
-        />
-    </LinearLayout>
+                    android:layout_height="300dp"
+                    android:contentDescription="@string/broken_image_description"
+                    />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>
