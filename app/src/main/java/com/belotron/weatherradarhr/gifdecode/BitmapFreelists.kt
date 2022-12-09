@@ -62,13 +62,15 @@ class BitmapFreelists : Allocator {
     }
 
     override fun dispose() {
-        bitmapQueues.values.forEach { freelist ->
-            freelist.forEach { bitmap ->
-                bitmap.recycle()
-            }
-        }
-        bitmapQueues.clear()
-        byteArrayQueues.clear()
-        intArrayQueues.clear()
+        // Explicit disposal isn't needed, Android handles it with regular GC.
+        // Eager disposal seems to crash the app occasionally.
+//        bitmapQueues.values.forEach { freelist ->
+//            freelist.forEach { bitmap ->
+//                bitmap.recycle()
+//            }
+//        }
+//        bitmapQueues.clear()
+//        byteArrayQueues.clear()
+//        intArrayQueues.clear()
     }
 }
