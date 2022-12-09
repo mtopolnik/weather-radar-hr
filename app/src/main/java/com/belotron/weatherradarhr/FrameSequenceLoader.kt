@@ -5,6 +5,7 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.DstTransition.SUMMER_TO_WINTER
 import com.belotron.weatherradarhr.DstTransition.WINTER_TO_SUMMER
 import com.belotron.weatherradarhr.FetchPolicy.*
+import com.belotron.weatherradarhr.MixedTimestampsResult.*
 import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
@@ -34,6 +35,10 @@ private const val EMIT_INTERVAL_MILLIS = 4_000L
 
 enum class Outcome {
     SUCCESS, PARTIAL_SUCCESS, FAILURE
+}
+
+enum class MixedTimestampsResult {
+    ABSENT, FIXABLE, UNFIXABLE
 }
 
 sealed class FrameSequenceLoader(
@@ -137,7 +142,7 @@ class HrSequenceLoader(
                     val url = urlTemplate.format(indexAtServer)
                     val startTime = System.currentTimeMillis()
                     while (true) {
-                        info { "Kradar fetch $url with $fetchPolicy" }
+                        info { "DHMZ fetch $url with $fetchPolicy" }
                         var outcome = SUCCESS
                         try {
                             val frame: PngFrame = try {
@@ -202,6 +207,55 @@ class HrSequenceLoader(
                         urlTemplate.format(indexOfFrameZeroAtServer + indexNow),
                         urlTemplate.format(indexOfFrameZeroAtServer + indexToBe)
                     )
+                }
+
+                fun detectMixedTimestamps(
+                    frames: List<PngFrame>,
+                    dstTransition: DstTransition
+                ): MixedTimestampsResult {
+                    val millisPerFrame = minutesPerFrame * MILLIS_IN_MINUTE
+                    var expectedTimestamp = frames[0].timestamp
+                    var dstCrossed = false
+                    var mixedTimestampsDetected = false
+                    for (i in 1 until frames.size) {
+                        expectedTimestamp += millisPerFrame
+                        val actualTimestamp = frames[i].timestamp
+                        if (actualTimestamp >= expectedTimestamp + 60 * MILLIS_IN_MINUTE) {
+                            if (dstCrossed || dstTransition != WINTER_TO_SUMMER) {
+                                info(CC_PRIVATE) {
+                                    "frames[$i].timestamp >= expectedTimestamp + 1 hour, but " +
+                                            "dstTransition is $dstTransition and dstAlreadyCrossed is $dstCrossed"
+                                }
+                                return UNFIXABLE
+                            }
+                            expectedTimestamp += 60 * MILLIS_IN_MINUTE
+                            dstCrossed = true
+                        }
+                        when (actualTimestamp) {
+                            expectedTimestamp -> Unit
+                            expectedTimestamp + millisPerFrame -> {
+                                if (mixedTimestampsDetected) {
+                                    info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes, " +
+                                            "observed for the 2nd time" }
+                                    return UNFIXABLE
+                                }
+                                info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes" }
+                                mixedTimestampsDetected = true
+                                expectedTimestamp = actualTimestamp
+                            }
+                            expectedTimestamp - millisPerFrame -> {
+                                info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp - 5 minutes" }
+                                mixedTimestampsDetected = true
+                            }
+                            else -> {
+                                info(CC_PRIVATE) {
+                                    "frames[$i].timestamp != expectedTimestamp, and the diff isn't +/- 5 minutes"
+                                }
+                                return UNFIXABLE
+                            }
+                        }
+                    }
+                    return if (mixedTimestampsDetected) FIXABLE else ABSENT
                 }
 
                 var havingCompleteSuccess = true
@@ -324,8 +378,8 @@ class HrSequenceLoader(
                             // keeping the order of launching the jobs
                             delay(10)
                         }
-                    }.collect {
-                        val (frameIndex, outcome, frame) = it
+                    }.collect { tuple ->
+                        val (frameIndex, outcome, frame) = tuple
                         if (frameIndex != -1) {
                             havingCompleteSuccess = havingCompleteSuccess && outcome == SUCCESS
                             fetchedCount++
@@ -355,56 +409,40 @@ class HrSequenceLoader(
                                 info(CC_PRIVATE) { "Summer-to-winter DST transition, won't try to fix mixed timestamps" }
                                 return@withContext frames
                             }
-                            val millisPerFrame = minutesPerFrame * MILLIS_IN_MINUTE
-                            var expectedTimestamp = frames[0].timestamp
-                            var dstCrossed = false
-                            var mixedTimestampsDetected = false
-                            for (i in 1 until frames.size) {
-                                expectedTimestamp += millisPerFrame
-                                val actualTimestamp = frames[i].timestamp
-                                if (actualTimestamp >= expectedTimestamp + 60 * MILLIS_IN_MINUTE) {
-                                    if (dstCrossed || dstTransition != WINTER_TO_SUMMER) {
-                                        info(CC_PRIVATE) {
-                                            "frames[$i].timestamp >= expectedTimestamp + 1 hour, but " +
-                                            "dstTransition is $dstTransition and dstAlreadyCrossed is $dstCrossed"
-                                        }
-                                        invalidateAllInCache()
-                                        return@withContext frames
-                                    }
-                                    expectedTimestamp += 60 * MILLIS_IN_MINUTE
-                                    dstCrossed = true
+                            when (detectMixedTimestamps(frames, dstTransition)) {
+                                ABSENT -> Unit
+                                UNFIXABLE -> {
+                                    invalidateAllInCache()
+                                    frames.sortBy { it.timestamp }
                                 }
-                                when (actualTimestamp) {
-                                    expectedTimestamp -> {
-                                    }
-                                    expectedTimestamp + millisPerFrame -> {
-                                        if (mixedTimestampsDetected) {
-                                            info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes, " +
-                                                    "observed for the 2nd time" }
-                                            invalidateAllInCache()
-                                            return@withContext frames
+                                FIXABLE -> {
+                                    havingCompleteSuccess = false
+                                    val millisPerFrame = minutesPerFrame * MILLIS_IN_MINUTE
+                                    var expectedTimestamp = frames[0].timestamp
+                                    for (i in 1 until frames.size) {
+                                        expectedTimestamp += millisPerFrame
+                                        val actualTimestamp = frames[i].timestamp
+                                        if (actualTimestamp >= expectedTimestamp + 60 * MILLIS_IN_MINUTE) {
+                                            expectedTimestamp += 60 * MILLIS_IN_MINUTE
                                         }
-                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp + 5 minutes" }
-                                        mixedTimestampsDetected = true
-                                        expectedTimestamp = actualTimestamp
-                                        for (j in 1 until i) {
-                                            havingCompleteSuccess = false
-                                            frames[j - 1] = frames[j]
-                                            renameInCache(j, j - 1)
+                                        when (actualTimestamp) {
+                                            expectedTimestamp -> Unit
+                                            expectedTimestamp + millisPerFrame -> {
+                                                expectedTimestamp = actualTimestamp
+                                                for (j in 1 until i) {
+                                                    frames[j - 1] = frames[j]
+                                                    renameInCache(j, j - 1)
+                                                }
+                                            }
+                                            expectedTimestamp - millisPerFrame -> {
+                                                frames[i - 1] = frames[i]
+                                                renameInCache(i, i - 1)
+                                            }
+                                            else -> {
+                                                severe(CC_PRIVATE) { "detectMixedTimestamps() reported FIXABLE, but they aren't" }
+                                                break
+                                            }
                                         }
-                                    }
-                                    expectedTimestamp - millisPerFrame -> {
-                                        info(CC_PRIVATE) { "frames[$i].timestamp == expectedTimestamp - 5 minutes" }
-                                        mixedTimestampsDetected = true
-                                        havingCompleteSuccess = false
-                                        frames[i - 1] = frames[i]
-                                        renameInCache(i, i - 1)
-                                    }
-                                    else -> {
-                                        info(CC_PRIVATE) {
-                                            "frames[$i].timestamp != expectedTimestamp, and the diff isn't +/- 5 minutes"
-                                        }
-                                        return@withContext frames
                                     }
                                 }
                             }
