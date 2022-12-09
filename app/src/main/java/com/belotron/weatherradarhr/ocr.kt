@@ -24,7 +24,7 @@ object SloOcr {
 
     private fun initDigitPixelses() {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("lradar", "gif")
+            digitTemplates = appContext.loadDigits("arso", "gif")
         }
     }
 
@@ -60,7 +60,7 @@ object HrOcr {
 
     private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
-            digitTemplates = appContext.loadDigits("kradar", "png")
+            digitTemplates = appContext.loadDigits("dhmz", "png")
         }
     }
 
