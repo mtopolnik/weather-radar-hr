@@ -114,11 +114,11 @@ class HrSequenceLoader(
             }
         }
 
-        suspend fun invalidateAllInCache() {
+        suspend fun invalidateAllInCache(): Boolean {
             val now = System.currentTimeMillis()
             if (now < context.localPrefs.lastInvalidatedCacheTimestamp + INVALIDATE_ALL_CACHE_COOLDOWN_MILLIS) {
                 info(CC_PRIVATE) { "Asked to invalidate cache, but cooldown period is still on" }
-                return
+                return false
             }
             withContext(IO) {
                 synchronized(CACHE_LOCK) {
@@ -130,6 +130,7 @@ class HrSequenceLoader(
                     }
                 }
             }
+            return true
         }
 
         return flow {
@@ -412,7 +413,9 @@ class HrSequenceLoader(
                             when (detectMixedTimestamps(frames, dstTransition)) {
                                 ABSENT -> Unit
                                 UNFIXABLE -> {
-                                    invalidateAllInCache()
+                                    if (invalidateAllInCache()) {
+                                        havingCompleteSuccess = false
+                                    }
                                     frames.sortBy { it.timestamp }
                                 }
                                 FIXABLE -> {
