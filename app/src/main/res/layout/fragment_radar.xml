@@ -102,8 +102,10 @@
                     android:paddingTop="40dp"
                     android:paddingStart="10dp"
                     android:indeterminate="true"
-                    android:theme="@style/ProgressBar"
-                    />
+                    app:indicatorColor="@color/rateme_button_large"
+                    app:trackColor="@color/secondary"
+                    app:trackThickness="5.5dp"
+            />
         </RelativeLayout>
         <ImageView
                 android:id="@+id/broken_img_zoomed"
