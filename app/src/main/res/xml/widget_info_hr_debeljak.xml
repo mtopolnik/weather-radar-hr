@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-                    android:minWidth="180dp"
-                    android:minHeight="180dp"
-                    android:updatePeriodMillis="0"
-                    android:previewImage="@drawable/widget_preview_hr_debeljak"
-                    android:initialLayout="@layout/app_widget"
-                    android:resizeMode="horizontal|vertical"
-                    android:widgetCategory="home_screen"
-                    android:initialKeyguardLayout="@layout/app_widget">
+        android:minWidth="210dp"
+        android:minHeight="150dp"
+        android:minResizeWidth="60dp"
+        android:minResizeHeight="45dp"
+        android:updatePeriodMillis="0"
+        android:previewImage="@drawable/widget_preview_hr_debeljak"
+        android:initialLayout="@layout/app_widget"
+        android:resizeMode="horizontal|vertical"
+        android:widgetCategory="home_screen"
+        android:initialKeyguardLayout="@layout/app_widget">
 </appwidget-provider>
