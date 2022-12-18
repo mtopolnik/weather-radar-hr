@@ -16,6 +16,7 @@ const val SHORTEN_PRIVATE_LOG_TO = 49_152
 
 private val logFile get() = File(appContext.noBackupFilesDir, "app-widget-log.txt")
 private val logFileTmp get() = File(appContext.noBackupFilesDir, "app-widget-log.txt.growing")
+private val logFileLock = Object()
 
 @SuppressLint("SimpleDateFormat")
 private val timeFormat = SimpleDateFormat("MM-dd HH:mm:ss")
@@ -83,22 +84,24 @@ fun logPrivate(ccOption: CcOption, msg: String, exception: Throwable? = null) {
         ": $e"
 //        ": " + StringWriter().also { sw -> PrintWriter(sw).use { e.printStackTrace(it) } }.toString()
     } ?: ""
-    logFile.writer().use { w ->
-        w.println("${timeFormat.format(now)} $msg$exceptionMsg")
-    }
-    val logSize = logFile.length().toInt()
-    if (logSize <= MAX_PRIVATE_LOG_SIZE) return
-
-    logFileTmp.writer().use { output ->
-        BufferedReader(logFile.reader()).use { input ->
-            repeat(logSize - SHORTEN_PRIVATE_LOG_TO) {
-                input.read()
-            }
-            output.write("...")
-            input.copyTo(output)
+    synchronized(logFileLock) {
+        logFile.writer().use { w ->
+            w.println("${timeFormat.format(now)} $msg$exceptionMsg")
         }
+        val logSize = logFile.length().toInt()
+        if (logSize <= MAX_PRIVATE_LOG_SIZE) return
+
+        logFileTmp.writer().use { output ->
+            BufferedReader(logFile.reader()).use { input ->
+                repeat(logSize - SHORTEN_PRIVATE_LOG_TO) {
+                    input.read()
+                }
+                output.write("...")
+                input.copyTo(output)
+            }
+        }
+        logFileTmp.renameTo(logFile)
     }
-    logFileTmp.renameTo(logFile)
 }
 
 fun appLogString() = logFile.takeIf { it.exists() }?.readText() ?: "The log is empty."
