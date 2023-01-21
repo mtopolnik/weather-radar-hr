@@ -30,6 +30,11 @@ public class GifSequence implements FrameSequence<GifFrame> {
     }
 
     @NonNull @Override
+    public GifDecoder intoDecoder(@NonNull Allocator allocator) {
+        return new GifDecoder(allocator, this, null);
+    }
+
+    @NonNull
     public GifDecoder intoDecoder(@NonNull Allocator allocator, Function1<? super Pixels, Long> ocrTimestamp) {
         return new GifDecoder(allocator, this, ocrTimestamp);
     }

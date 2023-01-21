@@ -145,7 +145,7 @@ class FrameAnimator(
     private val imgBundles = vmodel.imgBundles
     private val frameDelayMillis get() =  1000 * frameSeqLoader.minutesPerFrame / rateMinsPerSec
     private val allocator = BitmapFreelists()
-    private val frameDecoder = frameSequence.intoDecoder(allocator, frameSeqLoader.ocrTimestamp)
+    private val frameDecoder = frameSequence.intoDecoder(allocator)
     private var currFrame: Bitmap? = null
     private var currFrameIndex = 0
     private var seekBarAnimator: ObjectAnimator? = null
@@ -265,7 +265,7 @@ class FrameAnimator(
     private suspend fun suspendDecodeFrame(correctFrameIndex: Int, coroCtx: CoroutineDispatcher = IO) =
             withContext(coroCtx) {
                 synchronized (frameDecoder) {
-                    frameDecoder.decodeFrame(adjustedFrameIndex(correctFrameIndex))
+                    frameDecoder.getBitmap(adjustedFrameIndex(correctFrameIndex))
                 }
             }
 

@@ -10,7 +10,6 @@ import com.belotron.weatherradarhr.gifdecode.GifSequence
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
@@ -49,18 +48,11 @@ enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
 class ImageFetchException(val cached : Any?) : Exception()
 
-suspend fun fetchPngFrame(context: Context, url: String, fetchPolicy: FetchPolicy): PngFrame? =
-    context.fetchImg(url, fetchPolicy, ::PngFrame).second
-
 suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): GifSequence? =
     context.fetchImg(url, fetchPolicy, GifParser::parse).second
 
 suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         context.fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
-
-suspend fun fetchPngFromCache(context: Context, url: String): PngFrame? =
-    Exchange(context, GlobalScope, url, ONLY_CACHED, ::PngFrame).proceed().second
-
 
 /**
  * The returned object may be `null` only with the [ONLY_IF_NEW] fetch
@@ -326,36 +318,6 @@ fun Context.invalidateCache(url: String) {
             // At least write a stale last-modified date to prevent retry loops
             cacheFile.dataOut().use { cachedOut ->
                 cachedOut.writeUTF(DEFAULT_LAST_MODIFIED_STR)
-            }
-        }
-    }
-}
-
-fun Context.deleteCached(url: String) {
-    synchronized(CACHE_LOCK) {
-        val cacheFile = cacheFile(url)
-        if (!cacheFile.delete() && cacheFile.exists()) {
-            severe(CC_PRIVATE) { "Failed to delete $cacheFile" }
-        }
-    }
-}
-
-fun Context.renameCached(urlNow: String, urlToBe: String) {
-    synchronized(CACHE_LOCK) {
-        warn(CC_PRIVATE) { "Rename cached ...${urlNow.takeLast(8)} to ...${urlToBe.takeLast(8)}" }
-        val cacheFileNow = cacheFile(urlNow)
-        val cacheFileToBe = cacheFile(urlToBe)
-        if (!cacheFileNow.renameTo(cacheFileToBe) && cacheFileNow.exists()) {
-            severe(CC_PRIVATE) { "Failed to rename $cacheFileNow to $cacheFileToBe" }
-        }
-    }
-}
-
-fun Context.copyCached(fromUrl: String, toUrl: String) {
-    synchronized(CACHE_LOCK) {
-        cachedDataIn(fromUrl).use { inputStream ->
-            cacheFile(toUrl).dataOut().use { outputStream ->
-                inputStream.copyTo(outputStream)
             }
         }
     }

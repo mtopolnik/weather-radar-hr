@@ -96,7 +96,7 @@ public class GifDecoder implements FrameDecoder<GifFrame>
     public GifDecoder(
         @NonNull Allocator allocator,
         @NonNull GifSequence gifSequence,
-        @NonNull Function1<? super Pixels, Long> ocrTimestamp
+        @Nullable Function1<? super Pixels, Long> ocrTimestamp
     ) {
         this.allocator = allocator;
         this.gifSequence = gifSequence;
@@ -115,19 +115,12 @@ public class GifDecoder implements FrameDecoder<GifFrame>
         isFirstFrameTransparent = null;
     }
 
-    @Override public void release(@NonNull Bitmap bitmap) {
-        allocator.release(bitmap);
+    @NonNull @Override
+    public Bitmap getBitmap(int frameIndex) {
+        gotoAndDecode(frameIndex);
+        return outPixelsToBitmap();
     }
 
-    public Bitmap decodeFrame(int frameIndex) {
-        GifDecoder gifDecoder = gotoAndDecode(frameIndex);
-        Bitmap result = gifDecoder.obtainBitmap();
-        result.setPixels(gifDecoder.outPixels, 0, gifDecoder.gifSequence.width, 0, 0, gifDecoder.gifSequence.width,
-            gifDecoder.gifSequence.height);
-        return result;
-    }
-
-    @Override
     public void assignTimestamp(int frameIndex) {
         gotoAndDecode(frameIndex);
         gifSequence.getFrames()
@@ -135,7 +128,20 @@ public class GifDecoder implements FrameDecoder<GifFrame>
                    .setTimestamp(ocrTimestamp.invoke(new IntArrayPixels(outPixels, gifSequence.width)));
     }
 
-    private GifDecoder gotoAndDecode(int frameIndex) {
+    @NonNull
+    public Bitmap assignTimestampAndGetBitmap(int frameIndex) {
+        assignTimestamp(frameIndex);
+        return outPixelsToBitmap();
+    }
+
+    @NonNull
+    private Bitmap outPixelsToBitmap() {
+        Bitmap result = obtainBitmap();
+        result.setPixels(outPixels, 0, gifSequence.width, 0, 0, gifSequence.width, gifSequence.height);
+        return result;
+    }
+
+    private void gotoAndDecode(int frameIndex) {
         if (frameIndex < 0) {
             throw new ImageDecodeException("Asked to decode frame " + frameIndex);
         }
@@ -165,7 +171,6 @@ public class GifDecoder implements FrameDecoder<GifFrame>
                 act[currentFrame.transIndex] = COLOR_TRANSPARENT_BLACK;
             }
             setPixels(currentFrame, previousFrame);
-            return this;
         } catch (ImageDecodeException e) {
             throw e;
         } catch (Exception e) {
