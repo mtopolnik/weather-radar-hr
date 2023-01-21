@@ -172,9 +172,9 @@ class MainFragment : Fragment(), MenuProvider {
                 textView = rootView.findViewById(R.id.text_zoomed),
                 imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
                     coroScope = vmodel.viewModelScope
-                    setOnDoubleTapListener(object : SimpleOnGestureListener() {
-                        override fun onDoubleTap(e: MotionEvent) = run { exitFullScreen(); true }
-                    })
+                    GestureDetector(activity, FullScreenListener()).also { gd ->
+                        setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
+                    }
                 },
                 seekBar = rootView.findViewById(R.id.radar_seekbar),
                 brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
@@ -244,8 +244,15 @@ class MainFragment : Fragment(), MenuProvider {
             private val imgIndex: Int,
             private val imgView: ImageView
     ) : SimpleOnGestureListener() {
-        override fun onDoubleTap(e: MotionEvent): Boolean {
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
             if (!vmodel.isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
+            return true
+        }
+    }
+
+    private inner class FullScreenListener() : SimpleOnGestureListener() {
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            run { exitFullScreen() }
             return true
         }
     }

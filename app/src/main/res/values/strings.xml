@@ -69,10 +69,6 @@
         \n\nApp icon by Emilija Kalajžić
     </string>
     <string name="help_text">
-        Double-tap an image to focus on it. Use the seek bar to manually
-        control the shown frame. You can pinch-zoom the image. To get back,
-        double-tap again or press the Android Back-button.
-        \n
         \nPlace the app\'s widget on your home screen to have quick access to
         the current radar image.
         \n

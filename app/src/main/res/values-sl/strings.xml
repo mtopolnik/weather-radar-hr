@@ -70,12 +70,6 @@
         \n\nSlovenščina: Sergej Zei
     </string>
     <string name="help_text">
-        Z dvojnim dotikom posamezne animacije se ta prikaže na celotnem zaslonu.
-        Z dotikom iskalnega drsnika se prevzame nadzor nad prikazovanjem slik
-        animacije. Povečava dela slike je možna z gesto “vščipanja”. Povratek na
-        prikaz obeh animacij je možen z dvojnim dotikom ali z Androidovo tipko za
-        vrnitev.
-        \n
         \nZa hiter dostop do trenutnega stanja radarja postavitvite widget
         aplikacije na začetni zaslon.
         \n

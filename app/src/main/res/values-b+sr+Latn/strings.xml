@@ -70,11 +70,6 @@
         \n\nAutor ikone aplikacije: Emilija Kalajžić
     </string>
     <string name="help_text">
-        Dvostrukim dodirom fokusiraš se na jednu animaciju. Dodirom na “sik bar”
-        preuzimaš ručno upravljanje prikazom slika. Gestom “štipanja” možeš
-        zumirati. Vraćaš se natrag dvostrukim dodirom ili Android-tasterom za
-        nazad.
-        \n
         \nPostavi si viđet aplikacije na glavni ekran tako da ti je uvek dostupno
         trenutno stanje radara.
         \n
