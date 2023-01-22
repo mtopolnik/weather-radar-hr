@@ -20,7 +20,6 @@ interface FrameSequence<T : Frame> {
 interface FrameDecoder<T : Frame> {
     val sequence: FrameSequence<T>
     fun getBitmap(frameIndex: Int): Bitmap
-    fun dispose()
 }
 
 val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
@@ -64,10 +63,6 @@ class PngDecoder(
 ) : FrameDecoder<PngFrame> {
 
     override fun getBitmap(frameIndex: Int): Bitmap = sequence.frames[frameIndex].decode(allocator)
-
-    override fun dispose() {
-        allocator.dispose()
-    }
 }
 
 fun Bitmap.toCompressedBytes(): ByteArray =

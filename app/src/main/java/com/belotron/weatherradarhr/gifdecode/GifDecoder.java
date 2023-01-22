@@ -109,12 +109,6 @@ public class GifDecoder implements FrameDecoder<GifFrame>
         return gifSequence;
     }
 
-    @Override public void dispose() {
-        gifSequence = null;
-        allocator.dispose();
-        isFirstFrameTransparent = null;
-    }
-
     @NonNull @Override
     public Bitmap getBitmap(int frameIndex) {
         gotoAndDecode(frameIndex);
