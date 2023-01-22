@@ -1,7 +1,10 @@
 package com.belotron.weatherradarhr
 
 import android.graphics.Bitmap
+import android.graphics.Bitmap.CompressFormat.PNG
+import android.graphics.Bitmap.CompressFormat.WEBP_LOSSLESS
 import android.graphics.BitmapFactory
+import android.os.Build
 import com.belotron.weatherradarhr.gifdecode.Allocator
 import java.io.ByteArrayOutputStream
 
@@ -67,8 +70,9 @@ class PngDecoder(
     }
 }
 
-fun Bitmap.toPngBytes(): ByteArray =
+fun Bitmap.toCompressedBytes(): ByteArray =
     ByteArrayOutputStream().use {
-        compress(Bitmap.CompressFormat.PNG, 100, it)
+        val compressFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) WEBP_LOSSLESS else PNG
+        compress(compressFormat, 0, it)
         it.toByteArray()
     }

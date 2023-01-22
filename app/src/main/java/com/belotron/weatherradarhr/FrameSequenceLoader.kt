@@ -83,7 +83,7 @@ class HrSequenceLoader(
                                 semaphore.acquire()
                                 pngFrameTasks.add(async {
                                     try {
-                                        PngFrame(bitmap.toPngBytes(), frames[frameIndex].timestamp)
+                                        PngFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
                                     } finally {
                                         semaphore.release()
                                         allocator.release(bitmap)
