@@ -15,6 +15,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import java.util.*
 import kotlin.math.ceil
@@ -71,14 +72,20 @@ class HrSequenceLoader(
                 val allocator = BitmapFreelists()
                 val decoder = gifSequence.intoDecoder(allocator, ocrTimestamp)
                 val pngFrames = coroutineScope {
+                    // semaphore limits the number of simultaneous bitmaps
+                    val semaphore = Semaphore(Runtime.getRuntime().availableProcessors())
                     val pngFrameTasks = mutableListOf<Deferred<PngFrame>>()
                     try {
                         val frames = gifSequence.frames
                         withContext(Default) {
                             (0 until frames.size).forEach { frameIndex ->
                                 val bitmap = decoder.assignTimestampAndGetBitmap(frameIndex)
+                                semaphore.acquire()
                                 pngFrameTasks.add(async {
-                                    PngFrame(bitmap.toPngBytes(), frames[frameIndex].timestamp).also {
+                                    try {
+                                        PngFrame(bitmap.toPngBytes(), frames[frameIndex].timestamp)
+                                    } finally {
+                                        semaphore.release()
                                         allocator.release(bitmap)
                                     }
                                 })
