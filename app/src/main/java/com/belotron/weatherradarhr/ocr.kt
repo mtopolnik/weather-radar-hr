@@ -95,7 +95,7 @@ object HrOcr {
         (0 until template.height).forEach { y ->
             (0 until template.width).forEach { x ->
                 totalDiff += abs(decodeArgbToGray(img[imgX + x, imgY + y]) - decodeArgbToGray(template[x, y]))
-                if (totalDiff > 2000) {
+                if (totalDiff > 2300) {
                     return false
                 }
             }
