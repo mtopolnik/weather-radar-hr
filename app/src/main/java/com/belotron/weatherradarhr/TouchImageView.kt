@@ -44,6 +44,7 @@ private const val SUPER_MIN_MULTIPLIER = .75f
 private const val SUPER_MAX_MULTIPLIER = 1.25f
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 128f
+private const val MAX_INITIAL_ZOOM = 1.5f
 
 private const val STATE_IMAGEVIEW = "image_view"
 private const val STATE_SCALE = "scale"
@@ -213,9 +214,10 @@ class TouchImageView
 
         val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
         loadMatrix()
-        val fitWidthScale = viewWidth.toFloat() / bitmapW
         startScale = startImgWidth.toFloat() / bitmapW
-        val toScale = max(fitWidthScale, (viewHeight.toFloat() - bottomMargin) / bitmapH)
+        val fitWidthScale = viewWidth.toFloat() / bitmapW
+        val fitHeightScale = (viewHeight.toFloat() - bottomMargin) / bitmapH
+        val toScale = max(fitHeightScale, fitWidthScale).coerceAtMost(MAX_INITIAL_ZOOM * unitScale)
         this.startImgX = startImgX - screenX
         this.startImgY = startImgY - screenY
         zoomAnimator(startScale, toScale,
