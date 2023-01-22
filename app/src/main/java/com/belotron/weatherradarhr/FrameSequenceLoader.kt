@@ -27,6 +27,7 @@ enum class Outcome {
 }
 
 sealed class FrameSequenceLoader(
+    val url: String,
     val minutesPerFrame: Int,
     val ocrTimestamp: (Pixels) -> Long
 ) {
@@ -39,146 +40,124 @@ sealed class FrameSequenceLoader(
         animationCoversMinutes: Int,
         fetchPolicy: FetchPolicy
     ): Flow<FrameSequence<out Frame>?>
+
+    protected suspend fun fetchGifSequenceWithRetrying(context: Context, fetchPolicy: FetchPolicy): GifSequence? {
+        while (true) {
+            val (outcome, gifSequence) = try {
+                Pair(SUCCESS, fetchGifSequence(context, url, fetchPolicy))
+            } catch (e: ImageFetchException) {
+                val cached = e.cached as GifSequence?
+                Pair(if (cached != null) PARTIAL_SUCCESS else FAILURE, cached)
+            }
+            if (outcome == SUCCESS) {
+                return gifSequence
+            }
+            delay(SEQUENCE_RETRY_DELAY_MILLIS)
+        }
+    }
 }
 
 class HrSequenceLoader(
     urlKeyword: String,
     ocrTimestamp: (Pixels) -> Long,
-) : FrameSequenceLoader(
-    minutesPerFrame = 5,
-    ocrTimestamp
-) {
-    private val url = "https://vrijeme.hr/anim_${urlKeyword}.gif"
+) : FrameSequenceLoader("https://vrijeme.hr/anim_${urlKeyword}.gif", 5, ocrTimestamp) {
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Flow<PngSequence?> = flow {
-
-        suspend fun fetchSequence(): PngSequence? {
-            while (true) {
-                val (outcome, gifSequence) = try {
-                    Pair(SUCCESS, fetchGifSequence(context, url, fetchPolicy))
-                } catch (e: ImageFetchException) {
-                    val cached = e.cached as GifSequence?
-                    Pair(if (cached != null) PARTIAL_SUCCESS else FAILURE, cached)
-                }
-                if (outcome != SUCCESS) {
-                    delay(SEQUENCE_RETRY_DELAY_MILLIS)
-                    continue
-                }
-                if (gifSequence == null)
-                    return null
-
-                val allocator = BitmapFreelists()
-                val decoder = gifSequence.intoDecoder(allocator, ocrTimestamp)
-                val pngFrames = coroutineScope {
-                    // semaphore limits the number of simultaneous bitmaps
-                    val semaphore = Semaphore(Runtime.getRuntime().availableProcessors())
-                    val pngFrameTasks = mutableListOf<Deferred<PngFrame>>()
-                    try {
-                        val frames = gifSequence.frames
-                        withContext(Default) {
-                            (0 until frames.size).forEach { frameIndex ->
-                                val bitmap = decoder.assignTimestampAndGetBitmap(frameIndex)
-                                semaphore.acquire()
-                                pngFrameTasks.add(async {
-                                    try {
-                                        PngFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
-                                    } finally {
-                                        semaphore.release()
-                                        allocator.release(bitmap)
-                                    }
-                                })
-                            }
-                        }
-                    } catch (e: ImageDecodeException) {
-                        severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
-                        withContext(IO) {
-                            context.invalidateCache(url)
-                        }
-                        throw e
-                    } finally {
-                        decoder.dispose()
-                    }
-                    pngFrameTasks.map { it.await() }.toMutableList()
-                }
-                // HR animated gif has repeated frames at the end, remove the duplicates
-                val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
-                    addAll(pngFrames)
-                }
-                val correctFrameCount = correctFrameCount(animationCoversMinutes)
-                val iter = sortedFrames.iterator()
-                while (sortedFrames.size > correctFrameCount && iter.hasNext()) {
-                    iter.next()
-                    iter.remove()
-                }
-                pngFrames.apply {
-                    clear()
-                    addAll(sortedFrames)
-                }
-                return PngSequence(pngFrames)
-            }
+        val gifSequence = fetchGifSequenceWithRetrying(context, fetchPolicy)
+        if (gifSequence == null) {
+            emit(null)
+            return@flow
         }
-
-        emit(fetchSequence())
+        val pngFrames = coroutineScope {
+            val pngFrameTasks = mutableListOf<Deferred<PngFrame>>()
+            val allocator = BitmapFreelists()
+            try {
+                // semaphore limits the number of simultaneous bitmaps
+                val semaphore = Semaphore(Runtime.getRuntime().availableProcessors())
+                val decoder = gifSequence.intoDecoder(allocator, ocrTimestamp)
+                val frames = gifSequence.frames
+                withContext(Default) {
+                    (0 until frames.size).forEach { frameIndex ->
+                        val bitmap = decoder.assignTimestampAndGetBitmap(frameIndex)
+                        semaphore.acquire()
+                        pngFrameTasks.add(async {
+                            try {
+                                PngFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
+                            } finally {
+                                semaphore.release()
+                                allocator.release(bitmap)
+                            }
+                        })
+                    }
+                }
+            } catch (e: ImageDecodeException) {
+                severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
+                withContext(IO) {
+                    context.invalidateCache(url)
+                }
+                throw e
+            } finally {
+                allocator.dispose()
+            }
+            pngFrameTasks.map { it.await() }.toMutableList()
+        }
+        // Deduplicate frames, sort them by timestamp, and remove unneeded ones
+        val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
+            addAll(pngFrames)
+        }
+        val correctFrameCount = correctFrameCount(animationCoversMinutes)
+        val iter = sortedFrames.iterator()
+        while (sortedFrames.size > correctFrameCount && iter.hasNext()) {
+            iter.next()
+            iter.remove()
+        }
+        pngFrames.apply {
+            clear()
+            addAll(sortedFrames)
+        }
+        emit(PngSequence(pngFrames))
     }
 }
 
 class SloSequenceLoader : FrameSequenceLoader(
-    minutesPerFrame = 5,
-    ocrTimestamp = SloOcr::ocrSloTimestamp
+    "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif", 5, SloOcr::ocrSloTimestamp
 ) {
-    private val url = "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif"
-
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
     ): Flow<GifSequence?> = flow {
-
-        suspend fun fetchSequence(): GifSequence? {
-            while (true) {
-                val (outcome, sequence) = try {
-                    Pair(SUCCESS, fetchGifSequence(context, url, fetchPolicy))
-                } catch (e: ImageFetchException) {
-                    val cached = e.cached as GifSequence?
-                    Pair(if (cached != null) PARTIAL_SUCCESS else FAILURE, cached)
-                }
-                if (outcome != SUCCESS) {
-                    delay(SEQUENCE_RETRY_DELAY_MILLIS)
-                    continue
-                }
-                if (sequence == null)
-                    return null
-
-                val allocator = BitmapFreelists()
-                val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
-                try {
-                    val frames = sequence.frames
-                    withContext(Default) {
-                        (0 until frames.size).forEach { frameIndex ->
-                            decoder.assignTimestamp(frameIndex)
-                        }
-                    }
-                } catch (e: ImageDecodeException) {
-                    severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
-                    withContext(IO) {
-                        context.invalidateCache(url)
-                    }
-                    throw e
-                } finally {
-                    decoder.dispose()
-                }
-                // SLO animated gif has repeated frames at the end, remove the duplicates
-                val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
-                    addAll(sequence.frames)
-                }
-                sequence.frames.apply {
-                    clear()
-                    addAll(sortedFrames)
-                }
-                return sequence
-            }
+        val sequence = fetchGifSequenceWithRetrying(context, fetchPolicy)
+        if (sequence == null) {
+            emit(null)
+            return@flow
         }
-
-        emit(fetchSequence())
+        val allocator = BitmapFreelists()
+        try {
+            val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
+            val frames = sequence.frames
+            withContext(Default) {
+                (0 until frames.size).forEach { frameIndex ->
+                    decoder.assignTimestamp(frameIndex)
+                }
+            }
+        } catch (e: ImageDecodeException) {
+            severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
+            withContext(IO) {
+                context.invalidateCache(url)
+            }
+            throw e
+        } finally {
+            allocator.dispose()
+        }
+        // Deduplicate frames and sort them by timestamp
+        val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
+            addAll(sequence.frames)
+        }
+        sequence.frames.apply {
+            clear()
+            addAll(sortedFrames)
+        }
+        emit(sequence)
     }
 }
