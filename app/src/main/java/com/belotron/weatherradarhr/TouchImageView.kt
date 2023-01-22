@@ -189,7 +189,7 @@ class TouchImageView
     /**
      * startImgX,Y say where on the screen the image should be at the start of
      * the zoom animation.
-     * bitmapFocusX,Y are the coordinates of the double-tap event in bitmap's
+     * bitmapFocusX,Y are the coordinates of the touch event in bitmap's
      * coordinate system.
      */
     suspend fun animateZoomEnter(
@@ -197,25 +197,30 @@ class TouchImageView
     ) {
         val (bitmapW, bitmapH) = bitmapSize(pointF) ?: return
 
-        fun targetImgCoord(viewSize: Int, bitmapSize: Float, bitmapFocus: Float, targetScale: Float): Float {
+        fun targetImgCoord(
+            viewSize: Int, bitmapSize: Float, bitmapFocus: Float, targetScale: Float,
+            preferAlignmentOnStartEdge: Boolean
+        ): Float {
             val imgSize = bitmapSize * targetScale
             val desiredImgCoord = viewSize / 2f - bitmapFocus * targetScale
-            val coordAligningOppositeEdgeWithView = viewSize - bitmapSize * targetScale
-            return if (imgSize > viewSize)
-                min(0f, max(coordAligningOppositeEdgeWithView, desiredImgCoord)) else
-                max(0f, min(coordAligningOppositeEdgeWithView, desiredImgCoord))
+            val coordAligningEndEdgeWithView = viewSize - bitmapSize * targetScale
+            return when {
+                imgSize > viewSize -> desiredImgCoord.coerceAtLeast(coordAligningEndEdgeWithView).coerceAtMost(0f)
+                preferAlignmentOnStartEdge -> 0f
+                else -> desiredImgCoord.coerceAtLeast(0f).coerceAtMost(coordAligningEndEdgeWithView)
+            }
         }
 
         val (screenX, screenY) = IntArray(2).also { getLocationInWindow(it) }
         loadMatrix()
         val fitWidthScale = viewWidth.toFloat() / bitmapW
         startScale = startImgWidth.toFloat() / bitmapW
-        val toScale = max(fitWidthScale, viewHeight.toFloat() / bitmapH)
+        val toScale = max(fitWidthScale, (viewHeight.toFloat() - bottomMargin) / bitmapH)
         this.startImgX = startImgX - screenX
         this.startImgY = startImgY - screenY
         zoomAnimator(startScale, toScale,
-                this.startImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale),
-                this.startImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale))
+                this.startImgX.toFloat(), targetImgCoord(viewWidth, bitmapW, bitmapFocusX, toScale, false),
+                this.startImgY.toFloat(), targetImgCoord(viewHeight, bitmapH, bitmapFocusY, toScale, true))
             .run()
     }
 
