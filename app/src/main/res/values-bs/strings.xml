@@ -70,6 +70,9 @@
         \n\nAutor ikone aplikacije: Emilija Kalajžić
     </string>
     <string name="help_text">
+        Dodirom jedne slike aplikacija se fokusira na nju, ponovnim dodirom vraća
+        se na početni ekran. Kad je u fokusu, slika može da se zumira.
+        \n
         \nPostavi si widget aplikacije na home screen tako da ti je uvijek dostupno
         trenutno stanje radara.
         \n

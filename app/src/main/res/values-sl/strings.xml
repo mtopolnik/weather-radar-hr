@@ -70,6 +70,10 @@
         \n\nSlovenščina: Sergej Zei
     </string>
     <string name="help_text">
+        Z dotikom posamezne animacije se ta prikaže na celotnem zaslonu.
+        Z dotikom iskalnega drsnika se prevzame nadzor nad prikazovanjem slik
+        animacije.
+        \n
         \nZa hiter dostop do trenutnega stanja radarja postavitvite widget
         aplikacije na začetni zaslon.
         \n
