@@ -33,8 +33,8 @@ class AddRemoveRadarActivity: AppCompatActivity() {
         }
         items = mainPrefs.configuredRadarSources().toTypedArray()
         val adapter = ItemViewAdapter(recyclerView, items,
-            resources.getColor(R.color.text_primary),
-            resources.getColor(R.color.text_disabled)
+            getColorCompat(R.color.text_primary),
+            getColorCompat(R.color.text_disabled)
         )
         recyclerView.adapter = adapter
         adapter.itemTouchHelper.attachToRecyclerView(recyclerView)
