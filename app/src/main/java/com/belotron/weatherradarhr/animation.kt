@@ -54,7 +54,7 @@ private lateinit var dateFormat: DateFormat
 private lateinit var timeFormat: DateFormat
 
 class AnimationLooper(
-        private val vmodel: RadarImageViewModel
+        private val vmodel: MainFragmentModel
 ) : SeekBar.OnSeekBarChangeListener {
 
     private val animators = arrayOfNulls<FrameAnimator>(vmodel.imgBundles.size)
@@ -148,7 +148,7 @@ class FrameAnimator(
     private val radarName: String,
     private val positionInUI: Int,
     private val frameSeqLoader: FrameSequenceLoader,
-    vmodel: RadarImageViewModel,
+    vmodel: MainFragmentModel,
     frameSequence: FrameSequence<out Frame>,
 ) {
     var animationCoversMinutes = 1

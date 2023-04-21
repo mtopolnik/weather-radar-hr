@@ -71,7 +71,7 @@ import kotlin.math.roundToInt
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
-class RadarImageViewModel : ViewModel() {
+class MainFragmentModel : ViewModel() {
     var indexOfImgInFullScreen: Int? = null
         set(value) {
             field = value
@@ -131,7 +131,7 @@ class MainFragment : Fragment(), MenuProvider {
         }
     }
 
-    lateinit var vmodel: RadarImageViewModel
+    lateinit var vmodel: MainFragmentModel
     lateinit var rootView: View
     private var wasFastResume = false
     private var onResumeCalled = false
@@ -141,7 +141,7 @@ class MainFragment : Fragment(), MenuProvider {
     override fun onCreate(savedInstanceState: Bundle?) {
         info { "MainFragment.onCreate" }
         super.onCreate(savedInstanceState)
-        vmodel = ViewModelProvider(this)[RadarImageViewModel::class.java]
+        vmodel = ViewModelProvider(this)[MainFragmentModel::class.java]
         val activity = requireActivity()
         activity.addMenuProvider(this, this)
         activity.onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
