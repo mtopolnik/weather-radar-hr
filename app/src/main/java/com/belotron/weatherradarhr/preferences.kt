@@ -82,10 +82,6 @@ fun SharedPreferences.Editor.setConfiguredRadarSources(radarSources: List<RadarS
 private fun List<RadarSource?>.toStringSet(): Set<String> =
     mapIndexed { i, radarSource -> "$i ${radarSource?.name ?: RADAR_SOURCE_DIVIDER}" }.toSet()
 
-val SharedPreferences.lastInvalidatedCacheTimestamp: Long get() = getLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, 0L)
-fun SharedPreferences.Editor.setLastInvalidatedCacheTimestamp(value: Long): SharedPreferences.Editor =
-    putLong(KEY_LAST_INVALIDATED_CACHE_TIMESTAMP, value)
-
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)
 fun SharedPreferences.Editor.setWidgetLogEnabled(value: Boolean): SharedPreferences.Editor =
     putBoolean(KEY_WIDGET_LOG_ENABLED, value)

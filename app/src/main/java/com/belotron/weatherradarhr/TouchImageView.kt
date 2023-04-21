@@ -617,7 +617,7 @@ private fun computeViewSize(mode: Int, requestedSize: Int, drawableSize: Int): I
 }
 
 private suspend fun ValueAnimator.run() {
-    suspendCancellableCoroutine<Unit> { cont ->
+    suspendCancellableCoroutine { cont ->
         addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(a: Animator) {
                 cont.resume(Unit)
