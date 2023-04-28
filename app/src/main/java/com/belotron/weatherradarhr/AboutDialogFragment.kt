@@ -30,18 +30,11 @@ import kotlin.coroutines.resume
 
 const val TAG_ABOUT = "dialog_about"
 
-suspend fun showAboutDialogFragment(activity: FragmentActivity) {
-    suspendCancellableCoroutine<Unit> { cont ->
-        AboutDialogFragment().apply {
-            continuation = cont
-            retainInstance = true
-        }.show(activity.supportFragmentManager, TAG_ABOUT)
-    }
+fun showAboutDialogFragment(activity: FragmentActivity) {
+    AboutDialogFragment().show(activity.supportFragmentManager, TAG_ABOUT)
 }
 
 class AboutDialogFragment : DialogFragment() {
-
-    var continuation: Continuation<Unit>? = null
 
     @SuppressLint("InflateParams")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -57,15 +50,7 @@ class AboutDialogFragment : DialogFragment() {
                 .setTitle(R.string.app_name)
                 .setIcon(R.mipmap.ic_launcher)
                 .setView(rootView)
-                .setPositiveButton(android.R.string.ok) { _, _ -> continuation?.resume(Unit) }
+                .setPositiveButton(android.R.string.ok) { _, _ -> }
                 .create()
-    }
-
-    override fun onDestroyView() {
-        // handles https://code.google.com/p/android/issues/detail?id=17423
-        dialog?.takeIf { retainInstance }?.apply {
-            setDismissMessage(null)
-        }
-        super.onDestroyView()
     }
 }
