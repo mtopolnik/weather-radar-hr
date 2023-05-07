@@ -29,7 +29,6 @@ const val MIN_ANIMATION_RATE = 10
 const val MIN_ANIMATION_MINUTES = 5
 const val MIN_FREEZE_TIME = 100
 
-private const val KEY_LAST_INVALIDATED_CACHE_TIMESTAMP = "last_invalidated_cache_timestamp"
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
 private const val KEY_ANIMATION_MINUTES = "animation_covers_minutes"
@@ -47,8 +46,8 @@ private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 
 private const val RADAR_SOURCE_DIVIDER = "DIVIDER"
 private val DEFAULT_RADAR_SOURCES: Set<String> = run {
-    val enabledSources = listOf(RadarSource.HR_KOMPOZIT, RadarSource.SLO_ARSO)
-    val availableSources = RadarSource.values().toList().filter { !enabledSources.contains(it) }
+    val enabledSources = listOf(AnimationSource.HR_KOMPOZIT, AnimationSource.AT_ZAMG)
+    val availableSources = AnimationSource.values().toList().filter { !enabledSources.contains(it) }
     enabledSources.plus(null).plus(availableSources).toStringSet()
 }
 
@@ -62,24 +61,24 @@ val SharedPreferences.rateMinsPerSec: Int get() =
 val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeast(
     getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME))
 
-val SharedPreferences.animationCoversMinutes: Int get() =
-    MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
+val SharedPreferences.animationCoversMinutes: Int get() = 120
+//    MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
 val SharedPreferences.seekbarVibrate: Boolean get() = getBoolean(KEY_SEEKBAR_VIBRATE, true)
 
-fun SharedPreferences.configuredRadarSources(): List<RadarSource?> =
+fun SharedPreferences.configuredRadarSources(): List<AnimationSource?> =
     getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
         val parts = str.split(" ")
         Pair(
             parts[0].toInt(),
-            parts[1].let { if (it == RADAR_SOURCE_DIVIDER) null else RadarSource.valueOf(it) })
+            parts[1].let { if (it == RADAR_SOURCE_DIVIDER) null else AnimationSource.valueOf(it) })
     }
         .sortedBy { (index, _) -> index }
         .map { (_, radarSource) -> radarSource }
-fun SharedPreferences.Editor.setConfiguredRadarSources(radarSources: List<RadarSource?>): SharedPreferences.Editor =
-    putStringSet(KEY_RADAR_SOURCES, radarSources.toStringSet())
+fun SharedPreferences.Editor.setConfiguredRadarSources(animationSources: List<AnimationSource?>): SharedPreferences.Editor =
+    putStringSet(KEY_RADAR_SOURCES, animationSources.toStringSet())
 
-private fun List<RadarSource?>.toStringSet(): Set<String> =
+private fun List<AnimationSource?>.toStringSet(): Set<String> =
     mapIndexed { i, radarSource -> "$i ${radarSource?.name ?: RADAR_SOURCE_DIVIDER}" }.toSet()
 
 val SharedPreferences.widgetLogEnabled: Boolean get() = getBoolean(KEY_WIDGET_LOG_ENABLED, false)

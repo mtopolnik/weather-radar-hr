@@ -72,6 +72,9 @@ open class ImageViewWithLocation
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (mapShape === zamgShape) {
+            return
+        }
         location?.also { location ->
             mapShape.locationToPixel(location, point)
             with(mx) {

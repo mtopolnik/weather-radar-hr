@@ -68,7 +68,7 @@ private const val EXTRA_WIDGET_DESC_INDEX = "widgetDescIndex"
 
 
 private val widgetDescriptors = arrayOf(
-    WidgetDescriptor(RadarSource.SLO_ARSO.title,
+    WidgetDescriptor(AnimationSource.SLO_ARSO.title,
         "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif", 5,
         SloWidgetProvider::class.java,
         R.drawable.widget_preview_slo,
@@ -81,7 +81,7 @@ private val widgetDescriptors = arrayOf(
                 isOffline,
                 bitmap.crop(SLO_CROP_X, SLO_CROP_Y, SLO_CROP_WIDTH, SLO_CROP_HEIGHT)
             )}),
-    WidgetDescriptor(RadarSource.HR_KOMPOZIT.title,
+    WidgetDescriptor(AnimationSource.HR_KOMPOZIT.title,
         "https://vrijeme.hr/kompozit-stat.png", 10,
         HrKompozitWidgetProvider::class.java,
         R.drawable.widget_preview_hr_kompozit,
@@ -93,7 +93,7 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampKompozit(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, 0, bitmap.width, HR_KOMPOZIT_CROP_HEIGHT)) }),
-    WidgetDescriptor(RadarSource.HR_BILOGORA.title,
+    WidgetDescriptor(AnimationSource.HR_BILOGORA.title,
         "https://vrijeme.hr/bilogora-stat.png", 10,
         HrBilogoraWidgetProvider::class.java,
         R.drawable.widget_preview_hr_bilogora,
@@ -105,7 +105,7 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampSingle(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
-    WidgetDescriptor(RadarSource.HR_DEBELJAK.title,
+    WidgetDescriptor(AnimationSource.HR_DEBELJAK.title,
         "https://vrijeme.hr/debeljak-stat.png", 10,
         HrDebeljakWidgetProvider::class.java,
         R.drawable.widget_preview_hr_debeljak,
@@ -117,7 +117,7 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampSingle(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
-    WidgetDescriptor(RadarSource.HR_GOLI.title,
+    WidgetDescriptor(AnimationSource.HR_GOLI.title,
         "https://vrijeme.hr/goli-stat.png", 10,
         HrGoliWidgetProvider::class.java,
         R.drawable.widget_preview_hr_goli,
@@ -129,7 +129,7 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampSingle(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
-    WidgetDescriptor(RadarSource.HR_GRADISTE.title,
+    WidgetDescriptor(AnimationSource.HR_GRADISTE.title,
         "https://vrijeme.hr/gradiste-stat.png", 10,
         HrGradisteWidgetProvider::class.java,
         R.drawable.widget_preview_hr_gradiste,
@@ -141,7 +141,7 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampSingle(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
-    WidgetDescriptor(RadarSource.HR_ULJENJE.title,
+    WidgetDescriptor(AnimationSource.HR_ULJENJE.title,
         "https://vrijeme.hr/uljenje-stat.png", 10,
         HrUljenjeWidgetProvider::class.java,
         R.drawable.widget_preview_hr_uljenje,
@@ -474,6 +474,9 @@ private class WidgetContext (
     private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>?) {
         if (location == null) {
             warn { "Location not present, not drawing on bitmap" }
+            return
+        }
+        if (wDesc.mapShape === zamgShape) {
             return
         }
         val (lat, lon, timestamp) = location

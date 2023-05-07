@@ -85,7 +85,7 @@ class MainFragmentModel : ViewModel() {
     val fullScreenBundle = ImageBundle()
 
     var isTrackingTouch = false
-    var radarsInUse = listOf<RadarSource>()
+    var radarsInUse = listOf<AnimationSource>()
     var imgBundles = listOf<ImageBundle>()
     var animationLooper: AnimationLooper? = null
         private set

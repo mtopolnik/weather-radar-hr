@@ -62,13 +62,20 @@ private val LimitedIO = IO.limitedParallelism(4)
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
-class ImageFetchException(val cached : Any?) : Exception()
+class ImageFetchException(val cached: Any?, cause: Throwable? = null) : Exception() {
+    val httpResponseCode = if (cause is HttpErrorResponse) cause.responseCode else 0
+}
+
+class HttpErrorResponse(val responseCode: Int) : Exception()
 
 suspend fun fetchGifSequence(context: Context, url: String, fetchPolicy: FetchPolicy): GifSequence? =
     context.fetchImg(url, fetchPolicy, GifParser::parse).second
 
 suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, Bitmap?> =
         context.fetchImg(url, fetchPolicy) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+
+suspend fun fetchBytes(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, ByteArray?> =
+        context.fetchImg(url, fetchPolicy) { it }
 
 /**
  * The returned object may be `null` only with the [ONLY_IF_NEW] fetch
@@ -94,6 +101,7 @@ private suspend fun <T> Context.fetchImg(
                 info { "Request cancelled, closing connection to $url" }
                 withContext(NonCancellable + IO) {
                     try {
+                        @Suppress("BlockingMethodInNonBlockingContext")
                         inputStream.close()
                     } catch (e: Exception) {
                         severe(e) { "Error on asynchronous inputStream.close()" }
@@ -132,11 +140,13 @@ class Exchange<out T>(
         return withContext(LimitedIO) {
             var conn: HttpURLConnection? = null
             try {
+                @Suppress("BlockingMethodInNonBlockingContext")
                 conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = CONNECT_TIMEOUT_MILLIS
                 conn.readTimeout = RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS
                 val ifModifiedSince = loadCachedLastModified(url)
                 ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
+                @Suppress("BlockingMethodInNonBlockingContext")
                 conn.connect()
                 if (!coroScope.isActive) {
                     throw CancellationException()
@@ -146,7 +156,7 @@ class Exchange<out T>(
                         conn.handleSuccessResponse()
                     }
                     conn.responseCode != 304 ->
-                        throw HttpErrorResponse()
+                        throw HttpErrorResponse(conn.responseCode)
                     fetchPolicy == ONLY_IF_NEW -> // responseCode == 304, but onlyIfNew is set so don't fetch from cache
                         Pair(0L, null)
                     else -> { // responseCode == 304, fetch from cache
@@ -163,8 +173,9 @@ class Exchange<out T>(
                     severe(CC_PRIVATE, e) { "Error fetching $url" }
                 }
                 throw ImageFetchException(
-                    if (fetchPolicy == ONLY_IF_NEW) null
-                    else runOrNull { loadCachedImage() })
+                    if (fetchPolicy == ONLY_IF_NEW) null else runOrNull { loadCachedImage() },
+                    e
+                )
             } finally {
                 try {
                     conn?.disconnect()
@@ -349,4 +360,7 @@ private fun Context.cacheFile(url: String): File {
     return file
 }
 
-private class HttpErrorResponse : Exception()
+fun Context.cacheDirFilesStartingWith(url: String): Sequence<File> {
+    val fname = filenameCharsToAvoidRegex.replace(url, FILENAME_SUBSTITUTE_CHAR)
+    return fileInCache(HTTP_CACHE_DIR).walkTopDown().filter { it.isFile && it.name.startsWith(fname) }
+}

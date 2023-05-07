@@ -153,6 +153,19 @@ val hrUljenjeShape = MapShape(
     botImageY = 718
 )
 
+val zamgShape = MapShape(
+    topLat = 63.3,
+    botLat = 27.0,
+    topLeftLon = -46.0,
+    botLeftLon = -25.6,
+    topRightLon = 57.6,
+    botRightLon = 29.4,
+    leftImageX = 7,
+    rightImageX = 472,
+    topImageY = 7,
+    botImageY = 358
+)
+
 val locationRequestFg: LocationRequest = LocationRequest.Builder(1000)
     .setMinUpdateIntervalMillis(10)
     .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)

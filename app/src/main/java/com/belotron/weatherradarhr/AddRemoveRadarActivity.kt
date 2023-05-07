@@ -34,7 +34,7 @@ private const val VIEWTYPE_ITEM = 1
 private const val VIEWTYPE_DIVIDER = 2
 
 class AddRemoveRadarActivity: AppCompatActivity() {
-    private lateinit var items: Array<RadarSource?>
+    private lateinit var items: Array<AnimationSource?>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,7 +75,7 @@ class AddRemoveRadarActivity: AppCompatActivity() {
 
 class ItemViewAdapter(
     private val recyclerView: RecyclerView,
-    private val items: Array<RadarSource?>,
+    private val items: Array<AnimationSource?>,
     private var textColorEnabled: Int,
     private var textColorDisabled: Int
 ) : RecyclerView.Adapter<ItemViewHolder>() {

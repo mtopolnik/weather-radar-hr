@@ -16,8 +16,11 @@
  */
 package com.belotron.weatherradarhr
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
+import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifFrame
@@ -33,6 +36,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
+import java.lang.IllegalArgumentException
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.ceil
 
@@ -80,14 +85,14 @@ class HrSequenceLoader(
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Flow<PngSequence?> = flow {
+    ): Flow<StdSequence?> = flow {
         val gifSequence = fetchGifSequenceWithRetrying(context, fetchPolicy)
         if (gifSequence == null) {
             emit(null)
             return@flow
         }
         val pngFrames = coroutineScope {
-            val pngFrameTasks = mutableListOf<Deferred<PngFrame>>()
+            val pngFrameTasks = mutableListOf<Deferred<StdFrame>>()
             val allocator = BitmapFreelists()
             try {
                 // semaphore limits the number of simultaneous bitmaps
@@ -100,7 +105,7 @@ class HrSequenceLoader(
                         semaphore.acquire()
                         pngFrameTasks.add(async {
                             try {
-                                PngFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
+                                StdFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
                             } finally {
                                 semaphore.release()
                                 allocator.release(bitmap)
@@ -120,7 +125,7 @@ class HrSequenceLoader(
             pngFrameTasks.map { it.await() }.toMutableList()
         }
         // Deduplicate frames, sort them by timestamp, and remove unneeded ones
-        val sortedFrames = TreeSet(compareBy(PngFrame::timestamp)).apply {
+        val sortedFrames = TreeSet(compareBy(StdFrame::timestamp)).apply {
             addAll(pngFrames)
         }
         val correctFrameCount = correctFrameCount(animationCoversMinutes)
@@ -133,7 +138,7 @@ class HrSequenceLoader(
             clear()
             addAll(sortedFrames)
         }
-        emit(PngSequence(pngFrames))
+        emit(StdSequence(pngFrames))
     }
 }
 
@@ -175,5 +180,76 @@ class SloSequenceLoader : FrameSequenceLoader(
             addAll(sortedFrames)
         }
         emit(sequence)
+    }
+}
+
+class ZamgSequenceLoader : FrameSequenceLoader(
+    // Hack: reports 5 mins per frame where it's actually 30 mins.
+    // This speeds it up 6x and covers 6x more time, appropriate for a satellite animation.
+    "https://www.zamg.ac.at/dyn/pictures/Hsatimg", 5, { 0 }
+) {
+    override fun incrementallyFetchFrameSequence(
+        context: Context,
+        animationCoversMinutes: Int,
+        fetchPolicy: FetchPolicy
+    ): Flow<StdSequence> = flow {
+        if (fetchPolicy == ONLY_IF_NEW || fetchPolicy == ONLY_CACHED) {
+            throw IllegalArgumentException("This function supports only UP_TO_DATE and PREFER_CACHED fetch policies")
+        }
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val frames = mutableListOf<StdFrame>()
+        val frameCount = correctFrameCount(animationCoversMinutes)
+
+        suspend fun fetchNextFrame() {
+            calendar.gotoPreviousHalfHour()
+            val (_, bytes) = fetchBytes(context, calendar.toGifUrl(), PREFER_CACHED)
+            frames += StdFrame(bytes!!, calendar.timeInMillis)
+        }
+
+        val maxStepsToGoBack = 12
+        for (i in 1..maxStepsToGoBack) {
+            try {
+                fetchNextFrame()
+                break
+            } catch (e: ImageFetchException) {
+                if (e.httpResponseCode == 404 && i < maxStepsToGoBack) {
+                    continue
+                }
+                throw e
+            }
+        }
+        for (i in 1..frameCount) {
+            fetchNextFrame()
+        }
+
+        fun String.timeCode() = substring(length - 14, length - 4).toLong()
+
+        val earliestFrameTimeCode = calendar.toGifUrl().timeCode()
+        Log.i("zamg", "earliestFrameTimeCode $earliestFrameTimeCode")
+        for (file in context.cacheDirFilesStartingWith(url)) {
+            if (file.path.timeCode() < earliestFrameTimeCode) {
+                Log.i("zamg", "delete stale ${file.path}")
+                file.delete()
+            }
+        }
+        frames.reverse()
+        emit(StdSequence(frames))
+    }
+
+    @SuppressLint("SimpleDateFormat")
+    private fun Calendar.toGifUrl(): String {
+        return SimpleDateFormat("yyMMddHHmm").run {
+            timeZone = TimeZone.getTimeZone("UTC")
+            "$url/H${format(time)}.gif"
+        }
+    }
+
+    private fun Calendar.gotoPreviousHalfHour() {
+        val publishLagMinutes = 1
+        // Add 30 in order to avoid negative numbers, otherwise adding 30 is neutral modulo-30
+        add(Calendar.MINUTE, -((get(Calendar.MINUTE) + 30 - publishLagMinutes) % 30 + publishLagMinutes))
     }
 }

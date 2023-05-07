@@ -40,8 +40,8 @@ interface FrameDecoder<T : Frame> {
 
 val <T : Frame> FrameDecoder<T>.frameCount: Int get() = sequence.frames.size
 
-class PngFrame(
-    private val pngBytes: ByteArray,
+class StdFrame(
+    private val imgBytes: ByteArray,
     override val timestamp: Long
 ) : Frame {
     private val width: Int
@@ -49,7 +49,7 @@ class PngFrame(
 
     init {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
-        BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size, opts)
+        BitmapFactory.decodeByteArray(imgBytes, 0, imgBytes.size, opts)
         opts.apply {
             if (outWidth <= 0 || outHeight <= 0) {
                 throw ImageDecodeException("Image has no pixels. width: $outWidth height: $outHeight")
@@ -60,23 +60,23 @@ class PngFrame(
     }
 
     fun decode(allocator: Allocator): Bitmap {
-        return BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size, BitmapFactory.Options().apply {
+        return BitmapFactory.decodeByteArray(imgBytes, 0, imgBytes.size, BitmapFactory.Options().apply {
             inMutable = true
             inBitmap = allocator.obtain(width, height, Bitmap.Config.ARGB_8888)
         })
     }
 }
 
-class PngSequence(
-    override val frames: MutableList<PngFrame>,
-) : FrameSequence<PngFrame> {
-    override fun intoDecoder(allocator: Allocator) = PngDecoder(allocator, this)
+class StdSequence(
+    override val frames: MutableList<StdFrame>,
+) : FrameSequence<StdFrame> {
+    override fun intoDecoder(allocator: Allocator) = StdDecoder(allocator, this)
 }
 
-class PngDecoder(
+class StdDecoder(
     private val allocator: Allocator,
-    override val sequence: PngSequence,
-) : FrameDecoder<PngFrame> {
+    override val sequence: StdSequence,
+) : FrameDecoder<StdFrame> {
 
     override fun getBitmap(frameIndex: Int): Bitmap = sequence.frames[frameIndex].decode(allocator)
 }
