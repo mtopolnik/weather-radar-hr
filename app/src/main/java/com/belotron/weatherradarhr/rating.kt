@@ -70,6 +70,8 @@ fun Context.openAppRating() {
                     Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
 }
 
+fun Context.isFirstUse() = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getLong(KEY_TIMESTAMP_FIRST_USE, 0) == 0L
+
 fun Context.recordAppUsage() {
     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     prefs.applyUpdate {

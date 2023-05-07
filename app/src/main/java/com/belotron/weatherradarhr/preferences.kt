@@ -20,6 +20,7 @@ import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import android.location.Location
+import android.util.Log
 import androidx.preference.PreferenceManager
 
 const val DEFAULT_ANIMATION_RATE = 85
@@ -28,7 +29,7 @@ const val DEFAULT_ANIMATION_MINUTES = 90
 const val MIN_ANIMATION_MINUTES = 5
 const val DEFAULT_FREEZE_TIME = 1500
 const val MIN_FREEZE_TIME = 100
-const val NEW_RADAR_INDICATOR_CURRENT_ID = 2
+const val NEW_RADAR_INDICATOR_CURRENT_ID = 1
 
 
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
@@ -51,7 +52,7 @@ private const val RADAR_SOURCE_DIVIDER = "DIVIDER"
 private val DEFAULT_RADAR_SOURCES: Set<String> = run {
     val enabledSources = listOf(AnimationSource.HR_KOMPOZIT, AnimationSource.AT_ZAMG)
     val availableSources = AnimationSource.values().toList().filter { !enabledSources.contains(it) }
-    enabledSources.plus(null).plus(availableSources).toStringSet()
+    (enabledSources + null + availableSources).toStringSet()
 }
 
 val Context.mainPrefs: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(this)
@@ -80,6 +81,21 @@ fun SharedPreferences.configuredRadarSources(): List<AnimationSource?> =
         .map { (_, radarSource) -> radarSource }
 fun SharedPreferences.Editor.setConfiguredRadarSources(animationSources: List<AnimationSource?>): SharedPreferences.Editor =
     putStringSet(KEY_RADAR_SOURCES, animationSources.toStringSet())
+
+fun SharedPreferences.ensureAllRadarSourcesAvailable() {
+    val currSources = configuredRadarSources()
+    val missingSources = AnimationSource.values().toSet() - currSources.toSet()
+    if (missingSources.isEmpty()) {
+        return
+    }
+    Log.i("zamg", "missingSources $missingSources")
+    val newSources = currSources.takeWhile { it != null } +
+            null +
+            missingSources +
+            currSources.takeLastWhile { it != null }
+    Log.i("zamg", "newSources $newSources")
+    applyUpdate { setConfiguredRadarSources(newSources) }
+}
 
 private fun List<AnimationSource?>.toStringSet(): Set<String> =
     mapIndexed { i, radarSource -> "$i ${radarSource?.name ?: RADAR_SOURCE_DIVIDER}" }.toSet()

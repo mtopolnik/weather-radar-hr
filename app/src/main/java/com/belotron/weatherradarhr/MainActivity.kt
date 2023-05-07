@@ -26,9 +26,13 @@ class MainActivity : AppCompatActivity()  {
         super.onCreate(savedInstanceState)
         info { "MainActivity.onCreate" }
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
-        recordAppUsage()
-        if (mainPrefs.newRadarIndicatorConsumedId == 0) {
-            mainPrefs.applyUpdate { setNewRadarIndicatorConsumedId(NEW_RADAR_INDICATOR_CURRENT_ID) }
+        if (savedInstanceState?.savedStateRecently != true) {
+            if (isFirstUse()) {
+                mainPrefs.applyUpdate { setNewRadarIndicatorConsumedId(NEW_RADAR_INDICATOR_CURRENT_ID) }
+            } else if (mainPrefs.newRadarIndicatorConsumedId != NEW_RADAR_INDICATOR_CURRENT_ID) {
+                mainPrefs.ensureAllRadarSourcesAvailable()
+            }
+            recordAppUsage()
         }
         setContentView(R.layout.activity_main)
         if (supportFragmentManager.findFragmentById(R.id.main_fragment) == null) {

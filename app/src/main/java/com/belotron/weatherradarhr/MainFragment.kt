@@ -158,7 +158,6 @@ class MainFragment : Fragment(), MenuProvider {
                 }
             }
         })
-        lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -167,6 +166,9 @@ class MainFragment : Fragment(), MenuProvider {
     ): View {
         info { "MainFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
+        if (!wasFastResume) {
+            lifecycleScope.launch { checkAndCorrectPermissionsAndSettings() }
+        }
         rootView = inflater.inflate(R.layout.fragment_radar, container, false)
         rootView.findViewById<Toolbar>(R.id.toolbar).also {
             (requireActivity() as AppCompatActivity).setSupportActionBar(it)
