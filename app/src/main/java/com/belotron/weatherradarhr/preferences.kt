@@ -40,6 +40,7 @@ private const val KEY_WIDGET_LOG_ENABLED = "widget_log_enabled"
 private const val KEY_SHOULD_SHOW_FG_LOCATION_NOTICE = "should_show_fg_location_notice"
 private const val KEY_SHOULD_SHOW_BG_LOCATION_NOTICE = "should_show_bg_location_notice"
 private const val KEY_SHOULD_ASK_ENABLE_LOCATION = "should_ask_to_enable_location"
+private const val KEY_NEW_RADAR_INDICATOR_CONSUMED_ID = "new_radar_indicator_consumed_id"
 
 private const val NAME_LOCAL_PREFS = "local"
 private const val KEY_LOCATION_LATITUDE = "location_latitude"
@@ -98,6 +99,10 @@ fun SharedPreferences.Editor.setShouldShowBgLocationNotice(value: Boolean): Shar
 val SharedPreferences.shouldAskToEnableLocation: Boolean get() = getBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, true)
 fun SharedPreferences.Editor.setShouldAskToEnableLocation(value: Boolean): SharedPreferences.Editor =
     putBoolean(KEY_SHOULD_ASK_ENABLE_LOCATION, value)
+
+val SharedPreferences.newRadarIndicatorConsumedId: Int get() = getInt(KEY_NEW_RADAR_INDICATOR_CONSUMED_ID, 0)
+fun SharedPreferences.Editor.setNewRadarIndicatorConsumedId(value: Int): SharedPreferences.Editor =
+    putInt(KEY_NEW_RADAR_INDICATOR_CONSUMED_ID, value)
 
 val Context.storedLocation: Triple<Double, Double, Long> get() = with(localPrefs) {
     Triple(getFloat(KEY_LOCATION_LATITUDE, 0f).toDouble(),

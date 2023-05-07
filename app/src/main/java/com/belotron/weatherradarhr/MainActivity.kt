@@ -27,6 +27,9 @@ class MainActivity : AppCompatActivity()  {
         info { "MainActivity.onCreate" }
         PreferenceManager.setDefaultValues(this, R.xml.preference_screen, false)
         recordAppUsage()
+        if (mainPrefs.newRadarIndicatorConsumedId == 0) {
+            mainPrefs.applyUpdate { setNewRadarIndicatorConsumedId(NEW_RADAR_INDICATOR_CURRENT_ID) }
+        }
         setContentView(R.layout.activity_main)
         if (supportFragmentManager.findFragmentById(R.id.main_fragment) == null) {
             MainFragment().also {

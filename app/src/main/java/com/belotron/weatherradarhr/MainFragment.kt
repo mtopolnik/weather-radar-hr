@@ -36,8 +36,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View
-import android.view.View.GONE
-import android.view.View.INVISIBLE
+import android.view.View.*
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -49,8 +48,10 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.app.ActivityCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.doOnLayout
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -414,6 +415,15 @@ class MainFragment : Fragment(), MenuProvider {
         val tb = rootView.findViewById<Toolbar>(R.id.toolbar)
         tb.inflateMenu(R.menu.main_menu)
         tb.menu.findItem(R.id.widget_log_enabled).isChecked = privateLogEnabled
+        menu.findItem(R.id.edit_radars).also { item ->
+            item.actionView!!.apply {
+                setOnClickListener { onMenuItemSelected(item) }
+                findViewById<TextView>(R.id.new_indicator).visibility =
+                    if (appContext.mainPrefs.newRadarIndicatorConsumedId != NEW_RADAR_INDICATOR_CURRENT_ID) VISIBLE
+                    else GONE
+            }
+        }
+
     }
 
     override fun onMenuItemSelected(item: MenuItem): Boolean {
@@ -421,6 +431,10 @@ class MainFragment : Fragment(), MenuProvider {
         val activity = activity as AppCompatActivity
         when (item.itemId) {
             R.id.edit_radars -> {
+                if (item.actionView!!.findViewById<TextView>(R.id.new_indicator).isVisible) {
+                    appContext.mainPrefs.applyUpdate { setNewRadarIndicatorConsumedId(NEW_RADAR_INDICATOR_CURRENT_ID) }
+                }
+                requireActivity().invalidateOptionsMenu()
                 startActivity(Intent(activity, AddRemoveRadarActivity::class.java))
             }
             R.id.refresh -> {
