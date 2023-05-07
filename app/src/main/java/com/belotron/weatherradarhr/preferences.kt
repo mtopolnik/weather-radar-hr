@@ -23,11 +23,13 @@ import android.location.Location
 import androidx.preference.PreferenceManager
 
 const val DEFAULT_ANIMATION_RATE = 85
-const val DEFAULT_ANIMATION_MINUTES = 90
-const val DEFAULT_FREEZE_TIME = 1500
 const val MIN_ANIMATION_RATE = 10
+const val DEFAULT_ANIMATION_MINUTES = 90
 const val MIN_ANIMATION_MINUTES = 5
+const val DEFAULT_FREEZE_TIME = 1500
 const val MIN_FREEZE_TIME = 100
+const val NEW_RADAR_INDICATOR_CURRENT_ID = 2
+
 
 private const val KEY_FREEZE_TIME = "freeze_time_millis"
 private const val KEY_ANIMATION_RATE = "animation_rate_mins_per_sec"
