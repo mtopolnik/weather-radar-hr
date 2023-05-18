@@ -64,8 +64,9 @@
     <string name="about_text">
         Version %1$s
         \n© 2018-2023 Marko Topolnik
-        \n\nRadar image SLO © Slovenian Environment Agency
-        \n\nRadar image HR © Meteorological and Hydrological Service
+        \n\nRadar image ARSO © Agencija Republike Slovenije za okolje
+        \n\nRadar image DHMZ © Državni hidrometeorološki zavod
+        \n\nSatellite image ZAMG © Zentralanstalt für Meteorologie und Geodynamik
         \n\nApp icon by Emilija Kalajžić
     </string>
     <string name="help_text">
