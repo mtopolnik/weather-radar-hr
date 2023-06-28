@@ -200,30 +200,37 @@ class ZamgSequenceLoader : FrameSequenceLoader(
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        val frames = mutableListOf<StdFrame>()
+        val frames = mutableListOf<StdFrame?>()
         val frameCount = correctFrameCount(animationCoversMinutes)
 
-        suspend fun fetchNextFrame() {
+        suspend fun fetchNextFrame(): StdFrame {
             calendar.gotoPreviousHalfHour()
             val (_, bytes) = fetchBytes(context, calendar.toGifUrl(), PREFER_CACHED)
-            frames += StdFrame(bytes!!, calendar.timeInMillis)
+            return StdFrame(bytes!!, calendar.timeInMillis)
         }
 
-        val maxStepsToGoBack = 12
-        for (i in 1..maxStepsToGoBack) {
-            try {
-                fetchNextFrame()
-                break
-            } catch (e: ImageFetchException) {
-                if (e.httpResponseCode == 404 && i < maxStepsToGoBack) {
-                    continue
+        suspend fun fetchNewestFrame(): StdFrame {
+            val maxStepsToGoBack = 12
+            for (i in 1..maxStepsToGoBack) {
+                try {
+                    return fetchNextFrame()
+                } catch (e: ImageFetchException) {
+                    if (e.httpResponseCode != 404 || i == maxStepsToGoBack) {
+                        throw e
+                    }
                 }
-                throw e
             }
+            throw AssertionError("Should be unreachable")
         }
+
+        val newestFrame = fetchNewestFrame()
         for (i in 1..frameCount) {
-            fetchNextFrame()
+            frames +=
+                try { fetchNextFrame() }
+                catch (e: ImageFetchException) { null }
         }
+        frames.reverse()
+        val nonNullFrames = withGapsFilledIn(frames, newestFrame)
 
         fun String.timeCode() = substring(length - 14, length - 4).toLong()
 
@@ -235,8 +242,7 @@ class ZamgSequenceLoader : FrameSequenceLoader(
                 file.delete()
             }
         }
-        frames.reverse()
-        emit(StdSequence(frames))
+        emit(StdSequence(nonNullFrames.toMutableList()))
     }
 
     @SuppressLint("SimpleDateFormat")
@@ -252,4 +258,14 @@ class ZamgSequenceLoader : FrameSequenceLoader(
         // Add 30 in order to avoid negative numbers, otherwise adding 30 is neutral modulo-30
         add(Calendar.MINUTE, -((get(Calendar.MINUTE) + 30 - publishLagMinutes) % 30 + publishLagMinutes))
     }
+
+    private fun withGapsFilledIn(frames: List<StdFrame?>, newestFrame: StdFrame): List<StdFrame> {
+        return frames.mapIndexed { i, frame ->
+            frame
+                ?: (i - 1).downTo(0).map { frames[it] }.find { it != null }
+                ?: (i + 1).until(frames.size).map { frames[it] }.find { it != null }
+                ?: newestFrame
+        }
+    }
+
 }
