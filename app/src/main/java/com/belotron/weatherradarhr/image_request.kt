@@ -58,7 +58,6 @@ private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
 private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
 private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
-private val LimitedIO = IO.limitedParallelism(4)
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
@@ -81,7 +80,7 @@ suspend fun fetchBytes(context: Context, url: String, fetchPolicy: FetchPolicy):
  * The returned object may be `null` only with the [ONLY_IF_NEW] fetch
  * policy, if there is no new image.
  *
- * In the case of an error the function throws [ImageFetchException] which
+ * In the case of an error, the function throws [ImageFetchException] which
  * holds a cached byte array, if available.
  */
 private suspend fun <T> Context.fetchImg(
@@ -137,7 +136,7 @@ class Exchange<out T>(
                 severe(CC_PRIVATE, e) { "Error loading cached image for $url" }
             }
         }
-        return withContext(LimitedIO) {
+        return withContext(IO) {
             var conn: HttpURLConnection? = null
             try {
                 @Suppress("BlockingMethodInNonBlockingContext")
