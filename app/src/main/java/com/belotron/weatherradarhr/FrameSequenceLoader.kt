@@ -196,53 +196,82 @@ class ZamgSequenceLoader : FrameSequenceLoader(
         if (fetchPolicy == ONLY_IF_NEW || fetchPolicy == ONLY_CACHED) {
             throw IllegalArgumentException("This function supports only UP_TO_DATE and PREFER_CACHED fetch policies")
         }
-        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val frames = mutableListOf<StdFrame?>()
-        val frameCount = correctFrameCount(animationCoversMinutes)
 
-        suspend fun fetchNextFrame(): StdFrame {
-            calendar.gotoPreviousHalfHour()
-            val (_, bytes) = fetchBytes(context, calendar.toGifUrl(), PREFER_CACHED)
-            return StdFrame(bytes!!, calendar.timeInMillis)
-        }
+        suspend fun fetchFrames(fetchPolicy: FetchPolicy): MutableList<StdFrame> {
+            val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val frames = mutableListOf<StdFrame?>()
+            val frameCount = correctFrameCount(animationCoversMinutes)
 
-        suspend fun fetchNewestFrame(): StdFrame {
-            val maxStepsToGoBack = 12
-            for (i in 1..maxStepsToGoBack) {
-                try {
-                    return fetchNextFrame()
-                } catch (e: ImageFetchException) {
-                    if (e.httpResponseCode != 404 || i == maxStepsToGoBack) {
-                        throw e
+            suspend fun fetchNextFrame(): StdFrame {
+                calendar.gotoPreviousHalfHour()
+                val (_, bytes) = fetchBytes(context, calendar.toGifUrl(), fetchPolicy)
+                if (bytes == null) {
+                    throw ImageFetchException(null, HttpErrorResponse(404))
+                }
+                return StdFrame(bytes, calendar.timeInMillis)
+            }
+
+            suspend fun fetchNewestFrame(): StdFrame {
+                val maxStepsToGoBack = 12
+                for (i in 1..maxStepsToGoBack) {
+                    try {
+                        return fetchNextFrame()
+                    } catch (e: ImageFetchException) {
+                        if (e.httpResponseCode != 404 || i == maxStepsToGoBack) {
+                            throw e
+                        }
                     }
                 }
+                throw AssertionError("Should be unreachable")
             }
-            throw AssertionError("Should be unreachable")
-        }
 
-        val newestFrame = fetchNewestFrame()
-        for (i in 1..frameCount) {
-            frames +=
-                try { fetchNextFrame() }
-                catch (e: ImageFetchException) { null }
-        }
-        frames.reverse()
-        val nonNullFrames = withGapsFilledIn(frames, newestFrame)
-
-        fun String.timeCode() = substring(length - 14, length - 4).toLong()
-
-        val earliestFrameTimeCode = calendar.toGifUrl().timeCode()
-        Log.i("zamg", "earliestFrameTimeCode $earliestFrameTimeCode")
-        for (file in context.cacheDirFilesStartingWith(url)) {
-            if (file.path.timeCode() < earliestFrameTimeCode) {
-                Log.i("zamg", "delete stale ${file.path}")
-                file.delete()
+            val newestFrame = fetchNewestFrame()
+            for (i in 1..frameCount) {
+                frames +=
+                    try {
+                        fetchNextFrame()
+                    } catch (e: ImageFetchException) {
+                        null
+                    }
             }
+            frames.reverse()
+            val nonNullFrames = withGapsFilledIn(frames, newestFrame)
+
+            fun String.timeCode() = substring(length - 14, length - 4).toLong()
+
+            val earliestFrameTimeCode = calendar.toGifUrl().timeCode()
+            Log.i("zamg", "earliestFrameTimeCode $earliestFrameTimeCode")
+            for (file in context.cacheDirFilesStartingWith(url)) {
+                if (file.path.timeCode() < earliestFrameTimeCode) {
+                    Log.i("zamg", "delete stale ${file.path}")
+                    file.delete()
+                }
+            }
+            return nonNullFrames.toMutableList()
         }
-        emit(StdSequence(nonNullFrames.toMutableList()))
+
+        Log.i("zamg", "fetchPolicy $fetchPolicy")
+        val resultFrames = if (fetchPolicy == PREFER_CACHED) {
+            try {
+                fetchFrames(ONLY_CACHED).also {
+                    Log.i("zamg", "Got cached images")
+                }
+            } catch (e: ImageFetchException) {
+                Log.i("zamg", "Nothing in cache, fetching from the web")
+                fetchFrames(UP_TO_DATE).also {
+                    Log.i("zamg", "Got images from the web")
+                }
+            } catch (e: Exception) {
+                Log.e("zamg", "Unexpected error", e)
+                mutableListOf()
+            }
+        } else {
+            fetchFrames(UP_TO_DATE)
+        }
+        emit(StdSequence(resultFrames))
     }
 
     @SuppressLint("SimpleDateFormat")

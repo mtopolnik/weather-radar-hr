@@ -77,8 +77,8 @@ suspend fun fetchBytes(context: Context, url: String, fetchPolicy: FetchPolicy):
         context.fetchImg(url, fetchPolicy) { it }
 
 /**
- * The returned object may be `null` only with the [ONLY_IF_NEW] fetch
- * policy, if there is no new image.
+ * The returned object may be `null` only with the [ONLY_IF_NEW] or [ONLY_CACHED]
+ * fetch policy, if there is no new/cached image.
  *
  * In the case of an error, the function throws [ImageFetchException] which
  * holds a cached byte array, if available.

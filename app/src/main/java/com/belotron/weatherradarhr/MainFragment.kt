@@ -48,7 +48,6 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.app.ActivityCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
@@ -162,7 +161,7 @@ class MainFragment : Fragment(), MenuProvider {
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreateView(
-            inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         info { "MainFragment.onCreateView" }
         wasFastResume = savedInstanceState?.savedStateRecently ?: false
@@ -187,17 +186,17 @@ class MainFragment : Fragment(), MenuProvider {
         }
         vGroupFullScreen = rootView.findViewById(R.id.zoomed)
         vmodel.fullScreenBundle.restoreViews(
-                viewGroup = rootView.findViewById(R.id.vg_zoomed),
-                textView = rootView.findViewById(R.id.text_zoomed),
-                imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
-                    coroScope = vmodel.viewModelScope
-                    GestureDetector(activity, FullScreenListener()).also { gd ->
-                        setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
-                    }
-                },
-                seekBar = rootView.findViewById(R.id.radar_seekbar),
-                brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
-                progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
+            viewGroup = rootView.findViewById(R.id.vg_zoomed),
+            textView = rootView.findViewById(R.id.text_zoomed),
+            imgView = rootView.findViewById<TouchImageView>(R.id.img_zoomed).apply {
+                coroScope = vmodel.viewModelScope
+                GestureDetector(activity, FullScreenListener()).also { gd ->
+                    setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
+                }
+            },
+            seekBar = rootView.findViewById(R.id.radar_seekbar),
+            brokenImgView = rootView.findViewById(R.id.broken_img_zoomed),
+            progressBar = rootView.findViewById(R.id.progress_bar_zoomed)
         )
         if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
             with(vmodel.fullScreenBundle.seekBar!!.layoutParams as FrameLayout.LayoutParams) {
@@ -208,12 +207,12 @@ class MainFragment : Fragment(), MenuProvider {
         val scrollView = rootView.findViewById<ScrollView>(R.id.scrollview)
         val sl = object : SimpleOnScaleGestureListener() {
             private val rect = Rect()
-            override fun onScale(detector: ScaleGestureDetector): Boolean = with (detector) {
+            override fun onScale(detector: ScaleGestureDetector): Boolean = with(detector) {
                 if (vmodel.isInFullScreen || scaleFactor <= 1) {
                     return true
                 }
                 val textViews = vmodel.imgBundles.map { it.textView ?: return true }
-                if (textViews.any { ! it.isDescendantOf(scrollView) }) {
+                if (textViews.any { !it.isDescendantOf(scrollView) }) {
                     return true
                 }
                 // drop(1) shifts the indices down by one, aligning with the check
@@ -227,10 +226,10 @@ class MainFragment : Fragment(), MenuProvider {
                     ?.component1()
                     ?: textViews.lastIndex
                 val imgView = vmodel
-                        .imgBundles[imgIndex]
-                        .takeIf { it.status in ImageBundle.loadingOrShowing }
-                        ?.imgView
-                        ?: return true
+                    .imgBundles[imgIndex]
+                    .takeIf { it.status in ImageBundle.loadingOrShowing }
+                    ?.imgView
+                    ?: return true
                 if (!imgView.isDescendantOf(scrollView)) {
                     return true
                 }
@@ -260,8 +259,8 @@ class MainFragment : Fragment(), MenuProvider {
     }
 
     private inner class MainViewListener(
-            private val imgIndex: Int,
-            private val imgView: ImageView
+        private val imgIndex: Int,
+        private val imgView: ImageView
     ) : SimpleOnGestureListener() {
         override fun onSingleTapUp(e: MotionEvent): Boolean {
             if (!vmodel.isInFullScreen) enterFullScreen(imgIndex, imgView, e.x, e.y)
@@ -321,16 +320,16 @@ class MainFragment : Fragment(), MenuProvider {
                 )
             }
         } else {
-            startReloadAnimations(PREFER_CACHED)
             val radarAdded = run {
                 val oldRadarSet = oldRadarsInUse.toSet()
                 vmodel.radarsInUse.any { !oldRadarSet.contains(it) }
             }
             lifecycleScope.launch {
-                vmodel.reloadJob?.join()
                 if (timeToReload || radarAdded) {
                     info { "Time to reload animations" }
-                    startReloadAnimations(UP_TO_DATE)
+                    startReloadAnimations(PREFER_CACHED, UP_TO_DATE)
+                } else {
+                    startReloadAnimations(PREFER_CACHED)
                 }
             }
             refreshWidgetsInForeground()
@@ -450,9 +449,12 @@ class MainFragment : Fragment(), MenuProvider {
             R.id.about -> vmodel.viewModelScope.launch {
                 showAboutDialogFragment(activity)
             }
-            R.id.privacy_policy -> startActivity(Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://morestina.net/vnr-privacy-policy.html")
-            ))
+            R.id.privacy_policy -> startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://morestina.net/vnr-privacy-policy.html")
+                )
+            )
             R.id.rate_me -> activity.openAppRating()
             R.id.widget_log_enabled -> (!item.isChecked).also { newState ->
                 if (!newState) info(CC_PRIVATE) { "Log disabled" }
@@ -532,48 +534,56 @@ class MainFragment : Fragment(), MenuProvider {
         }
     }
 
-    private fun startReloadAnimations(fetchPolicy: FetchPolicy) {
+    private fun startReloadAnimations(vararg fetchPolicies: FetchPolicy) {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
+        vmodel.reloadJob?.cancel()
+        vmodel.reloadJob = lifecycleScope.launch {
+            supervisorScope {
+                vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
+                    launch {
+                        for (fetchPolicy in fetchPolicies) {
+                            reloadAnimation(bundle, positionInUI, fetchPolicy)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun reloadAnimation(bundle: ImageBundle, positionInUI: Int, fetchPolicy: FetchPolicy) {
         val context = appContext
-        vmodel.imgBundles.forEach { it.status = LOADING }
+        bundle.status = LOADING
         val mainPrefs = context.mainPrefs
         val animationCoversMinutes = mainPrefs.animationCoversMinutes
         val rateMinsPerSec = mainPrefs.rateMinsPerSec
         val freezeTimeMillis = mainPrefs.freezeTimeMillis
         val seekbarVibrate = mainPrefs.seekbarVibrate
-        vmodel.reloadJob?.cancel()
-        vmodel.reloadJob = lifecycleScope.launch {
-            supervisorScope {
-                vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
-                    val radar = vmodel.radarsInUse[positionInUI]
-                    launch {
-                        try {
-                            val loader = radar.frameSequenceLoader
-                            loader.incrementallyFetchFrameSequence(
-                                context, animationCoversMinutes, fetchPolicy
-                            ).collect { frameSequence ->
-                                if (frameSequence == null) {
-                                    bundle.status = BROKEN
-                                    return@collect
-                                }
-                                bundle.animationProgress =
-                                    vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
-                                with(vmodel.animationLooper!!) {
-                                    receiveNewFrames(radar.title, positionInUI, loader, frameSequence)
-                                    resume(context,
-                                        animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate)
-                                }
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            severe(CC_PRIVATE, e) { "Failed to load animation for ${radar.title}" }
-                            bundle.status = BROKEN
-                        }
-                        bundle.status = SHOWING
-                    }
+        val radar = vmodel.radarsInUse[positionInUI]
+        try {
+            val loader = radar.frameSequenceLoader
+            loader.incrementallyFetchFrameSequence(
+                context, animationCoversMinutes, fetchPolicy
+            ).collect { frameSequence ->
+                if (frameSequence == null) {
+                    bundle.status = BROKEN
+                    return@collect
+                }
+                bundle.animationProgress = vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
+                vmodel.animationLooper!!.apply {
+                    receiveNewFrames(radar.title, positionInUI, loader, frameSequence)
+                    resume(
+                        context,
+                        animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate
+                    )
                 }
             }
+        } catch (e: CancellationException) {
+            bundle.status = BROKEN
+            throw e
+        } catch (e: Exception) {
+            severe(CC_PRIVATE, e) { "Failed to load animation for ${radar.title}" }
+            bundle.status = BROKEN
         }
+        bundle.status = SHOWING
     }
 }
