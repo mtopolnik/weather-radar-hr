@@ -499,7 +499,7 @@ class TouchImageView
         // Reported velocity is that of the pointer and not of the image as the user
         // perceives it. If the image is pressing against the edge, its actual
         // velocity is zero. We correct for this here.
-        override fun onFling(e1: MotionEvent, e2: MotionEvent, rawVelocityX: Float, rawVelocityY: Float): Boolean {
+        override fun onFling(e1: MotionEvent?, e2: MotionEvent, rawVelocityX: Float, rawVelocityY: Float): Boolean {
             loadMatrix()
             val (minX, minY, maxX, maxY) = transBounds(currentZoom, true, rectF) ?: return true
             val velocityX = if (m[MTRANS_X] in (minX + tolerance)..(maxX - tolerance)) rawVelocityX else 0f
