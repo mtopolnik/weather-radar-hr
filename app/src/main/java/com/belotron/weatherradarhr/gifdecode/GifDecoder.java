@@ -44,6 +44,7 @@ import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_PREVIOUS;
 import static com.belotron.weatherradarhr.gifdecode.GifFrame.DISPOSAL_UNSPECIFIED;
 
 import android.graphics.Bitmap;
+import android.util.Log;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -193,16 +194,15 @@ public class GifDecoder implements FrameDecoder<GifFrame>
      * disposal codes).
      */
     private void setPixels(@NonNull GifFrame currentFrame, @Nullable GifFrame previousFrame) {
-        if (previousFrame != null && previousFrame.dispose == DISPOSAL_PREVIOUS) {
-            throw new ImageDecodeException("The animated GIF contains a frame with the Restore To Previous frame " +
-                "disposal method" + " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
-        }
-
-        // fill in starting image contents based on last image's dispose code
-        if (previousFrame != null && previousFrame.dispose > DISPOSAL_UNSPECIFIED) {
+        if (previousFrame != null) {
+            // Fill in starting image contents based on last image's dispose code.
             // We don't need to do anything for DISPOSAL_NONE, if it has the correct pixels so will our
             // mainScratch and therefore so will our pixels array.
-            if (previousFrame.dispose == DISPOSAL_BACKGROUND) {
+            if (previousFrame.dispose == DISPOSAL_PREVIOUS) {
+                throw new ImageDecodeException("The animated GIF contains a frame with the Restore To Previous frame " +
+                    "disposal method" + " (GIF89a standard, 23.c.iv.3, but this decoder doesn't support it");
+            } else if (previousFrame.dispose == DISPOSAL_BACKGROUND) {
+                Log.d("gif", "previousFrame.dispose == BACKGROUND");
                 // Start with a canvas filled with the background color
                 @ColorInt int c = COLOR_TRANSPARENT_BLACK;
                 if (!currentFrame.transparency) {
@@ -226,7 +226,11 @@ public class GifDecoder implements FrameDecoder<GifFrame>
                         outPixels[pointer] = c;
                     }
                 }
+            } else {
+                Log.d("gif", "previousFrame.dispose == NONE or UNSPECIFIED (" + previousFrame.dispose + ')');
             }
+        } else {
+            Log.d("gif", "previousFrame == null");
         }
 
         // Decode pixels for this frame into mainPixels.
