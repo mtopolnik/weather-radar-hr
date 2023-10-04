@@ -3,13 +3,13 @@ apply plugin: 'kotlin-android'
 
 android {
     namespace 'com.belotron.weatherradarhr'
-    compileSdkVersion 33
+    compileSdkVersion 34
     defaultConfig {
         applicationId "com.belotron.weatherradarhr"
         minSdkVersion 21
-        targetSdkVersion 33
         versionCode 159
         versionName '3.5.2'
+        targetSdkVersion 34
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
