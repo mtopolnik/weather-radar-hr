@@ -23,7 +23,6 @@ import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.Outcome.*
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
-import com.belotron.weatherradarhr.gifdecode.GifFrame
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.Pixels
 import kotlinx.coroutines.Deferred
@@ -36,7 +35,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
-import java.lang.IllegalArgumentException
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.ceil
@@ -78,10 +76,11 @@ sealed class FrameSequenceLoader(
     }
 }
 
-class HrSequenceLoader(
-    urlKeyword: String,
+class AnimatedGifLoader(
+    url: String,
+    minutesPerFrame: Int,
     ocrTimestamp: (Pixels) -> Long,
-) : FrameSequenceLoader("https://vrijeme.hr/anim_${urlKeyword}.gif", 5, ocrTimestamp) {
+) : FrameSequenceLoader(url, minutesPerFrame, ocrTimestamp) {
 
     override fun incrementallyFetchFrameSequence(
         context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
@@ -142,46 +141,12 @@ class HrSequenceLoader(
     }
 }
 
-class SloSequenceLoader : FrameSequenceLoader(
+fun hrSequenceLoader(urlKeyword: String, ocrTimestamp: (Pixels) -> Long) =
+    AnimatedGifLoader("https://vrijeme.hr/anim_${urlKeyword}.gif", 5, ocrTimestamp)
+
+fun sloSequenceLoader() = AnimatedGifLoader(
     "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif", 5, SloOcr::ocrSloTimestamp
-) {
-    override fun incrementallyFetchFrameSequence(
-        context: Context, animationCoversMinutes: Int, fetchPolicy: FetchPolicy
-    ): Flow<GifSequence?> = flow {
-        val sequence = fetchGifSequenceWithRetrying(context, fetchPolicy)
-        if (sequence == null) {
-            emit(null)
-            return@flow
-        }
-        val allocator = BitmapFreelists()
-        try {
-            val decoder = sequence.intoDecoder(allocator, ocrTimestamp)
-            val frames = sequence.frames
-            withContext(Default) {
-                (0 until frames.size).forEach { frameIndex ->
-                    decoder.assignTimestamp(frameIndex)
-                }
-            }
-        } catch (e: ImageDecodeException) {
-            severe(CC_PRIVATE) { "Error decoding animated GIF: ${e.message}" }
-            withContext(IO) {
-                context.invalidateCache(url)
-            }
-            throw e
-        } finally {
-            allocator.dispose()
-        }
-        // Deduplicate frames and sort them by timestamp
-        val sortedFrames = TreeSet(compareBy(GifFrame::timestamp)).apply {
-            addAll(sequence.frames)
-        }
-        sequence.frames.apply {
-            clear()
-            addAll(sortedFrames)
-        }
-        emit(sequence)
-    }
-}
+)
 
 class ZamgSequenceLoader : FrameSequenceLoader(
     // Hack: reports 5 mins per frame where it's actually 30 mins.
@@ -296,5 +261,4 @@ class ZamgSequenceLoader : FrameSequenceLoader(
                 ?: newestFrame
         }
     }
-
 }

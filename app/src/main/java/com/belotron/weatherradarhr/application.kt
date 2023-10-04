@@ -59,14 +59,14 @@ enum class AnimationSource(
     val mapShape: MapShape,
     val frameSequenceLoader: FrameSequenceLoader
 ) {
-    HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, HrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
+    HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, hrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
     AT_ZAMG("ZAMG Satellite", zamgShape, ZamgSequenceLoader()),
-    SLO_ARSO("ARSO", sloShape, SloSequenceLoader()),
-    HR_GRADISTE("DHMZ Gradište", hrGradisteShape, HrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
-    HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, HrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
-    HR_GOLI("DHMZ Goli", hrGoliShape, HrSequenceLoader("goli", HrOcr::ocrTimestampSingle)),
-    HR_DEBELJAK("DHMZ Debeljak", hrDebeljakShape, HrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
-    HR_ULJENJE("DHMZ Uljenje", hrUljenjeShape, HrSequenceLoader("uljenje", HrOcr::ocrTimestampSingle)),
+    SLO_ARSO("ARSO", sloShape, sloSequenceLoader()),
+    HR_GRADISTE("DHMZ Gradište", hrGradisteShape, hrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
+    HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, hrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
+    HR_GOLI("DHMZ Goli", hrGoliShape, hrSequenceLoader("goli", HrOcr::ocrTimestampSingle)),
+    HR_DEBELJAK("DHMZ Debeljak", hrDebeljakShape, hrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
+    HR_ULJENJE("DHMZ Uljenje", hrUljenjeShape, hrSequenceLoader("uljenje", HrOcr::ocrTimestampSingle)),
 }
 
 class MyApplication : Application() {
