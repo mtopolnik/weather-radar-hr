@@ -13,10 +13,6 @@ android {
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
-    compileOptions {
-        sourceCompatibility 1.8
-        targetCompatibility 1.8
-    }
     buildFeatures {
         viewBinding true
     }
@@ -25,6 +21,10 @@ android {
         proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
     sourceSets.main.res.srcDirs = ['src/main/res', 'src/main/res/menu']
+}
+
+kotlin {
+    jvmToolchain(8)
 }
 
 ext.kotlinx_coroutines_version = '1.6.4'
