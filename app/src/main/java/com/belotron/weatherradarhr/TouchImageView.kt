@@ -123,7 +123,6 @@ class TouchImageView
     private val gestureDetector: GestureDetector
     private var flingJob: Job? = null
     private var userTouchListener: OnTouchListener? = null
-    private var doubleTapListener: GestureDetector.OnDoubleTapListener? = null
 
     init {
         isClickable = true
@@ -269,10 +268,6 @@ class TouchImageView
         if (bitmapMeasured) return
         require(bitmapMeasuredContinuation == null) { "Dangling bitmapMeasuredContinuation" }
         suspendCancellableCoroutine<Unit> { bitmapMeasuredContinuation = it }
-    }
-
-    fun setOnDoubleTapListener(l: GestureDetector.OnDoubleTapListener) {
-        doubleTapListener = l
     }
 
     fun reset() {
@@ -488,10 +483,6 @@ class TouchImageView
 
     private inner class GestureListener : SimpleOnGestureListener() {
 
-        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            return doubleTapListener?.onSingleTapConfirmed(e) ?: performClick()
-        }
-
         override fun onLongPress(e: MotionEvent) {
             performLongClick()
         }
@@ -508,14 +499,6 @@ class TouchImageView
                 startFling(velocityX, velocityY)
             }
             return true
-        }
-
-        override fun onDoubleTap(e: MotionEvent): Boolean {
-            return doubleTapListener?.onDoubleTap(e) ?: false
-        }
-
-        override fun onDoubleTapEvent(e: MotionEvent): Boolean {
-            return doubleTapListener?.onDoubleTapEvent(e) ?: false
         }
     }
 
