@@ -30,9 +30,9 @@ import android.hardware.SensorManager.*
 import android.util.AttributeSet
 import androidx.appcompat.widget.AppCompatImageView
 import java.lang.Math.PI
-import java.lang.Math.sin
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 private const val PREFERRED_LOCDOT_RADIUS_METERS = 1_500
