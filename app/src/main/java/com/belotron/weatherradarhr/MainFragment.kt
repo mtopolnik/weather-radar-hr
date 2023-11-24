@@ -268,9 +268,9 @@ class MainFragment : Fragment(), MenuProvider {
         }
     }
 
-    private inner class FullScreenListener() : SimpleOnGestureListener() {
+    private inner class FullScreenListener : SimpleOnGestureListener() {
         override fun onSingleTapUp(e: MotionEvent): Boolean {
-            run { exitFullScreen() }
+            exitFullScreen()
             return true
         }
     }
