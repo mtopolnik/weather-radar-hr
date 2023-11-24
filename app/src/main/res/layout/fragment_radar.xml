@@ -53,6 +53,7 @@
                 app:backgroundTint="@color/seekbar_background"
                 app:borderWidth="0dp"
                 app:elevation="30dp"
+                android:importantForAccessibility="no"
                 />
         <RelativeLayout
                 android:id="@+id/vg_zoomed"
