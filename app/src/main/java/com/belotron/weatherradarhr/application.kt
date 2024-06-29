@@ -24,8 +24,18 @@ import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import android.media.AudioAttributes
+import android.os.Build.VERSION.SDK_INT
+import android.os.Build.VERSION_CODES
 import android.os.Bundle
-import android.text.format.DateUtils.*
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.text.format.DateUtils.DAY_IN_MILLIS
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
+import android.text.format.DateUtils.SECOND_IN_MILLIS
+import android.text.format.DateUtils.getRelativeTimeSpanString
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -206,4 +216,36 @@ fun View.isDescendantOf(that: View): Boolean {
         currParent = currParent.parent as? View
     }
     return false
+}
+
+fun Context.vibrate() {
+    val vibrator = if (SDK_INT >= VERSION_CODES.S) {
+        (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    }
+
+    val durationMilis = 20L
+    if (SDK_INT >= VERSION_CODES.TIRAMISU) {
+        vibrator.vibrate(
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
+            VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_MEDIA).build()
+        )
+    } else if (SDK_INT >= VERSION_CODES.Q) {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build()
+        )
+    } else if (SDK_INT >= VERSION_CODES.O) {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(
+            VibrationEffect.createOneShot(durationMilis, VibrationEffect.DEFAULT_AMPLITUDE),
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build()
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(durationMilis)
+    }
 }

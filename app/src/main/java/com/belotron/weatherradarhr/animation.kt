@@ -19,11 +19,6 @@ package com.belotron.weatherradarhr
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.AudioAttributes
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.view.animation.LinearInterpolator
 import android.widget.SeekBar
 import androidx.lifecycle.viewModelScope
@@ -217,22 +212,7 @@ class FrameAnimator(
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
         if (seekbarVibrate && (targetIndex == 0 || targetIndex == correctFrameCount() - 1)) {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val vibeAtts = AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .build()
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK), vibeAtts)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(20)
-            }
+            ctx.vibrate()
         }
         val newFrame = suspendDecodeFrame(targetIndex, singleThread)
         showFrame(newFrame, animationProgress)
