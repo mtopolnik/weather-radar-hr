@@ -18,7 +18,7 @@
     <string name="refresh">Refresh</string>
     <string name="edit_radars">Add/Remove</string>
     <string name="animation_covers_minutes">Time covered by the animation*</string>
-    <string name="note_on_animation_length">* Slovenian agency publishes 90 minutes of animation</string>
+    <string name="note_on_vibration_setting">* Android setting \"Media vibration\" must be enabled for vibration to work</string>
     <string name="animation_rate">Animation Rate</string>
     <string name="freeze_time">Pause before repeating</string>
     <string name="seekbar_vibrate">Vibrate on seekbar edges</string>
