@@ -19,6 +19,7 @@ package com.belotron.weatherradarhr
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Bitmap
+import android.media.AudioAttributes
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -223,7 +224,11 @@ class FrameAnimator(
                 ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+                val vibeAtts = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .build()
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK), vibeAtts)
             } else {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(20)
