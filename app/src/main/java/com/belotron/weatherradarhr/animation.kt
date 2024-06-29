@@ -120,7 +120,7 @@ class AnimationLooper(
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
         if (fromUser) vmodel.viewModelScope.launch {
-            animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress, seekBar.context)
+            animators.find { it.hasSeekBar(seekBar) }?.seekTo(progress)
         }
     }
 
@@ -204,7 +204,7 @@ class FrameAnimator(
         }
     }
 
-    suspend fun seekTo(animationProgress: Int, ctx: Context) {
+    suspend fun seekTo(animationProgress: Int) {
         val targetIndex = toFrameIndex(animationProgress)
         if (targetIndex == currFrameIndex) {
             return
@@ -212,7 +212,7 @@ class FrameAnimator(
         currFrameIndex = targetIndex
         updateSeekBarThumb(targetIndex, timestamp(targetIndex))
         if (seekbarVibrate && (targetIndex == 0 || targetIndex == correctFrameCount() - 1)) {
-            ctx.vibrate()
+            vibrate()
         }
         val newFrame = suspendDecodeFrame(targetIndex, singleThread)
         showFrame(newFrame, animationProgress)

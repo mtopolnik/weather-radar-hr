@@ -218,12 +218,12 @@ fun View.isDescendantOf(that: View): Boolean {
     return false
 }
 
-fun Context.vibrate() {
+fun vibrate() {
     val vibrator = if (SDK_INT >= VERSION_CODES.S) {
-        (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        (appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
     } else {
         @Suppress("DEPRECATION")
-        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
 
     val durationMilis = 20L
