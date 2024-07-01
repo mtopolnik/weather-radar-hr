@@ -452,7 +452,7 @@ class MainFragment : Fragment(), MenuProvider {
             R.id.privacy_policy -> startActivity(
                 Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse("https://morestina.net/vnr-privacy-policy.html")
+                    Uri.parse("https://mtopolnik.github.io/weather-radar-hr/privacy_policy.html")
                 )
             )
             R.id.rate_me -> activity.openAppRating()
