@@ -90,8 +90,8 @@ class AnimatedGifLoader(
             emit(null)
             return@flow
         }
-        val pngFrames = coroutineScope {
-            val pngFrameTasks = mutableListOf<Deferred<StdFrame>>()
+        val gifFrames = coroutineScope {
+            val gifFrameTasks = mutableListOf<Deferred<StdFrame>>()
             val allocator = BitmapFreelists()
             try {
                 // semaphore limits the number of simultaneous bitmaps
@@ -102,7 +102,7 @@ class AnimatedGifLoader(
                     (0 until frames.size).forEach { frameIndex ->
                         val bitmap = decoder.assignTimestampAndGetBitmap(frameIndex)
                         semaphore.acquire()
-                        pngFrameTasks.add(async {
+                        gifFrameTasks.add(async {
                             try {
                                 StdFrame(bitmap.toCompressedBytes(), frames[frameIndex].timestamp)
                             } finally {
@@ -121,11 +121,11 @@ class AnimatedGifLoader(
             } finally {
                 allocator.dispose()
             }
-            pngFrameTasks.map { it.await() }.toMutableList()
+            gifFrameTasks.map { it.await() }.toMutableList()
         }
         // Deduplicate frames, sort them by timestamp, and remove unneeded ones
         val sortedFrames = TreeSet(compareBy(StdFrame::timestamp)).apply {
-            addAll(pngFrames)
+            addAll(gifFrames)
         }
         val correctFrameCount = correctFrameCount(animationCoversMinutes)
         val iter = sortedFrames.iterator()
@@ -133,11 +133,11 @@ class AnimatedGifLoader(
             iter.next()
             iter.remove()
         }
-        pngFrames.apply {
+        gifFrames.apply {
             clear()
             addAll(sortedFrames)
         }
-        emit(StdSequence(pngFrames))
+        emit(StdSequence(gifFrames))
     }
 }
 
