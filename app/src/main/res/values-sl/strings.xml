@@ -7,9 +7,10 @@
     <string name="widget_hr_kompozit">2 DHMZ Kompozit</string>
     <string name="widget_hr_gradiste">3 DHMZ Gradište</string>
     <string name="widget_hr_bilogora">4 DHMZ Bilogora</string>
-    <string name="widget_hr_goli">5 DHMZ Goli</string>
-    <string name="widget_hr_debeljak">6 DHMZ Debeljak</string>
-    <string name="widget_hr_uljenje">7 DHMZ Uljenje</string>
+    <string name="widget_hr_puntijarka">5 DHMZ Bilogora</string>
+    <string name="widget_hr_goli">6 DHMZ Goli</string>
+    <string name="widget_hr_debeljak">7 DHMZ Debeljak</string>
+    <string name="widget_hr_uljenje">8 DHMZ Uljenje</string>
     <string name="help">Pomoč in nasveti</string>
     <string name="about">O aplikaciji</string>
     <string name="privacy_policy_menu_item">Pravila o zasebnosti</string>

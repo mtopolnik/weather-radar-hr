@@ -141,6 +141,18 @@ private val widgetDescriptors = arrayOf(
                 HrOcr.ocrTimestampSingle(bitmap.asPixels()),
                 isOffline,
                 bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
+    WidgetDescriptor(AnimationSource.HR_PUNTIJARKA.title,
+        "https://vrijeme.hr/puntijarka-stat.png", 10,
+        HrPuntijarkaWidgetProvider::class.java,
+        R.drawable.widget_preview_hr_puntijarka,
+        hrPuntijarkaShape,
+        cropLeft = 0,
+        cropTop = HR_SINGLE_CROP_Y,
+        toTimestampedBitmap = { bitmap, isOffline ->
+            TimestampedBitmap(
+                HrOcr.ocrTimestampSingle(bitmap.asPixels()),
+                isOffline,
+                bitmap.crop(0, HR_SINGLE_CROP_Y, HR_SINGLE_CROP_WIDTH, HR_SINGLE_CROP_HEIGHT)) }),
     WidgetDescriptor(AnimationSource.HR_ULJENJE.title,
         "https://vrijeme.hr/uljenje-stat.png", 10,
         HrUljenjeWidgetProvider::class.java,
@@ -251,9 +263,15 @@ class HrGradisteWidgetProvider : AppWidgetProvider() {
     }
 }
 
-class HrUljenjeWidgetProvider : AppWidgetProvider() {
+class HrPuntijarkaWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         WidgetContext(context, widgetDescriptors[6]).onUpdateWidget()
+    }
+}
+
+class HrUljenjeWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetContext(context, widgetDescriptors[7]).onUpdateWidget()
     }
 }
 

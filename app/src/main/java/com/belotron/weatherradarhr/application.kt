@@ -74,6 +74,7 @@ enum class AnimationSource(
     SLO_ARSO("ARSO", sloShape, sloSequenceLoader()),
     HR_GRADISTE("DHMZ Gradište", hrGradisteShape, hrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
     HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, hrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
+    HR_PUNTIJARKA("DHMZ Puntijarka", hrPuntijarkaShape, hrSequenceLoader("puntijarka", HrOcr::ocrTimestampSingle)),
     HR_GOLI("DHMZ Goli", hrGoliShape, hrSequenceLoader("goli", HrOcr::ocrTimestampSingle)),
     HR_DEBELJAK("DHMZ Debeljak", hrDebeljakShape, hrSequenceLoader("debeljak", HrOcr::ocrTimestampSingle)),
     HR_ULJENJE("DHMZ Uljenje", hrUljenjeShape, hrSequenceLoader("uljenje", HrOcr::ocrTimestampSingle)),

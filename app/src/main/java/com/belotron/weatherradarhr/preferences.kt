@@ -51,7 +51,7 @@ private const val KEY_LOCATION_TIMESTAMP = "location_timestamp"
 private const val RADAR_SOURCE_DIVIDER = "DIVIDER"
 private val DEFAULT_RADAR_SOURCES: Set<String> = run {
     val enabledSources = listOf(AnimationSource.HR_KOMPOZIT, AnimationSource.AT_ZAMG)
-    val availableSources = AnimationSource.values().toList().filter { !enabledSources.contains(it) }
+    val availableSources = AnimationSource.entries.filter { !enabledSources.contains(it) }
     (enabledSources + null + availableSources).toStringSet()
 }
 
@@ -70,8 +70,8 @@ val SharedPreferences.animationCoversMinutes: Int get() = 120
 
 val SharedPreferences.seekbarVibrate: Boolean get() = getBoolean(KEY_SEEKBAR_VIBRATE, true)
 
-fun SharedPreferences.configuredRadarSources(): List<AnimationSource?> =
-    getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
+fun SharedPreferences.configuredRadarSources(): List<AnimationSource?> {
+    val sources = getStringSet(KEY_RADAR_SOURCES, DEFAULT_RADAR_SOURCES)!!.map { str ->
         val parts = str.split(" ")
         Pair(
             parts[0].toInt(),
@@ -79,6 +79,14 @@ fun SharedPreferences.configuredRadarSources(): List<AnimationSource?> =
     }
         .sortedBy { (index, _) -> index }
         .map { (_, radarSource) -> radarSource }
+        .toMutableList()
+    for (availableSource in AnimationSource.entries) {
+        if (availableSource !in sources) {
+            sources.add(availableSource)
+        }
+    }
+    return sources
+}
 fun SharedPreferences.Editor.setConfiguredRadarSources(animationSources: List<AnimationSource?>): SharedPreferences.Editor =
     putStringSet(KEY_RADAR_SOURCES, animationSources.toStringSet())
 

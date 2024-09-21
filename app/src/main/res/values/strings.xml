@@ -7,9 +7,10 @@
     <string name="widget_hr_kompozit">2 HR Kompozit</string>
     <string name="widget_hr_gradiste">3 HR Gradište</string>
     <string name="widget_hr_bilogora">4 HR Bilogora</string>
-    <string name="widget_hr_goli">5 HR Goli</string>
-    <string name="widget_hr_debeljak">6 HR Debeljak</string>
-    <string name="widget_hr_uljenje">7 HR Uljenje</string>
+    <string name="widget_hr_puntijarka">5 HR Puntijarka</string>
+    <string name="widget_hr_goli">6 HR Goli</string>
+    <string name="widget_hr_debeljak">7 HR Debeljak</string>
+    <string name="widget_hr_uljenje">8 HR Uljenje</string>
     <string name="help">Help and Tips</string>
     <string name="about">About</string>
     <string name="privacy_policy_menu_item">Privacy Policy</string>

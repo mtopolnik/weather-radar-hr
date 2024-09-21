@@ -114,6 +114,19 @@ val hrBilogoraShape = MapShape(
     botImageY = 718
 )
 
+val hrPuntijarkaShape = MapShape(
+    topLat = 48.08,
+    botLat = 43.75,
+    topLeftLon = 12.80,
+    botLeftLon = 12.95,
+    topRightLon = 19.13,
+    botRightLon = 18.96,
+    leftImageX = 1,
+    rightImageX = 658,
+    topImageY = 61,
+    botImageY = 718
+)
+
 val hrGoliShape = MapShape(
     topLat = 47.16,
     botLat = 42.87,
