@@ -577,6 +577,7 @@ class MainFragment : Fragment(), MenuProvider {
                     )
                 }
             }
+            bundle.status = SHOWING
         } catch (e: CancellationException) {
             bundle.status = BROKEN
             throw e
@@ -584,6 +585,5 @@ class MainFragment : Fragment(), MenuProvider {
             severe(CC_PRIVATE, e) { "Failed to load animation for ${radar.title}" }
             bundle.status = BROKEN
         }
-        bundle.status = SHOWING
     }
 }
