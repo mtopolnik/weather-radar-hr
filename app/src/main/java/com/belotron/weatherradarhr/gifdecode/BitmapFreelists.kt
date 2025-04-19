@@ -19,6 +19,7 @@ package com.belotron.weatherradarhr.gifdecode
 import android.graphics.Bitmap
 import com.belotron.weatherradarhr.debug
 import java.util.*
+import androidx.core.graphics.createBitmap
 
 private val emptyByteArray = ByteArray(0)
 private val emptyIntArray = IntArray(0)
@@ -33,8 +34,8 @@ class BitmapFreelists : Allocator {
         debug { "Obtain $width x $height bitmap" }
         bitmapQueues[Pair(width, height)]
                 ?.poll()
-                ?.apply { this.config = config }
-                ?: Bitmap.createBitmap(width, height, config)
+                ?.apply { setConfig(config) }
+                ?: createBitmap(width, height, config)
     }
 
     override fun release(bitmap: Bitmap): Unit = synchronized(bitmapQueues) {
@@ -78,15 +79,5 @@ class BitmapFreelists : Allocator {
     }
 
     override fun dispose() {
-        // Explicit disposal isn't needed, Android handles it with regular GC.
-        // Eager disposal seems to crash the app occasionally.
-//        bitmapQueues.values.forEach { freelist ->
-//            freelist.forEach { bitmap ->
-//                bitmap.recycle()
-//            }
-//        }
-//        bitmapQueues.clear()
-//        byteArrayQueues.clear()
-//        intArrayQueues.clear()
     }
 }
