@@ -2,6 +2,7 @@
 .gradle
 .idea
 build
+.kotlin
 *.iml
 *.ipr
 *.iws
