@@ -40,6 +40,7 @@ import java.lang.Integer.parseInt
 import java.lang.Thread.sleep
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.coroutines.cancellation.CancellationException
@@ -75,6 +76,9 @@ suspend fun fetchBitmap(context: Context, url: String, fetchPolicy: FetchPolicy)
 
 suspend fun fetchBytes(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, ByteArray?> =
         context.fetchImg(url, fetchPolicy) { it }
+
+suspend fun fetchString(context: Context, url: String, fetchPolicy: FetchPolicy): Pair<Long, String?> =
+        context.fetchImg(url, fetchPolicy) { String(it, StandardCharsets.UTF_8) }
 
 /**
  * The returned object may be `null` only with the [ONLY_IF_NEW] or [ONLY_CACHED]

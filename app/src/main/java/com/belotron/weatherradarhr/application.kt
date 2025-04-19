@@ -70,7 +70,7 @@ enum class AnimationSource(
     val frameSequenceLoader: FrameSequenceLoader
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, hrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
-    AT_ZAMG("ZAMG Satellite", zamgShape, ZamgSequenceLoader()),
+    AT_ZAMG("ZAMG Satellite", zamgShape, EumetsatSequenceLoader()),
     SLO_ARSO("ARSO", sloShape, sloSequenceLoader()),
     HR_GRADISTE("DHMZ Gradište", hrGradisteShape, hrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
     HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, hrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
@@ -239,14 +239,11 @@ fun vibrate() {
             VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
             AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build()
         )
-    } else if (SDK_INT >= VERSION_CODES.O) {
+    } else {
         @Suppress("DEPRECATION")
         vibrator.vibrate(
             VibrationEffect.createOneShot(durationMilis, VibrationEffect.DEFAULT_AMPLITUDE),
             AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build()
         )
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(durationMilis)
     }
 }
