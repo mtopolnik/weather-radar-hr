@@ -18,7 +18,11 @@ package com.belotron.weatherradarhr
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat.Type.ime
+import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.preference.PreferenceManager
+import com.belotron.weatherradarhr.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity()  {
 
@@ -34,7 +38,13 @@ class MainActivity : AppCompatActivity()  {
             }
             recordAppUsage()
         }
-        setContentView(R.layout.activity_main)
+        val root = ActivityMainBinding.inflate(layoutInflater).root
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, windowInsets ->
+            val insets = windowInsets.getInsets(systemBars() or ime())
+            v.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+            windowInsets
+        }
+        setContentView(root)
         if (supportFragmentManager.findFragmentById(R.id.main_fragment) == null) {
             MainFragment().also {
                 supportFragmentManager.beginTransaction()
