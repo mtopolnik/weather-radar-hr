@@ -28,7 +28,7 @@ kotlin {
     jvmToolchain(8)
 }
 
-ext.kotlinx_coroutines_version = '1.7.3'
+ext.kotlinx_coroutines_version = '1.10.2'
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
