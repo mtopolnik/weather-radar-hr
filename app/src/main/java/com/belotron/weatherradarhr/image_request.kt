@@ -55,8 +55,8 @@ private const val FETCH_TIMEOUT_MILLIS = 120_000L
 private const val RESUME_DELAY_MILLIS = 2_000L
 
 val CACHE_LOCK = Object()
-private val filenameCharsToAvoidRegex = Regex("""[\\|/$?*]""")
-private val lastModifiedRegex = Regex("""\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""")
+private val filenameCharsToAvoidRegex = """[\\|/$?*]""".toRegex()
+private val lastModifiedRegex = """\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""".toRegex()
 private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
 private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
 
@@ -104,7 +104,6 @@ private suspend fun <T> Context.fetchImg(
                 info { "Request cancelled, closing connection to $url" }
                 withContext(NonCancellable + IO) {
                     try {
-                        @Suppress("BlockingMethodInNonBlockingContext")
                         inputStream.close()
                     } catch (e: Exception) {
                         severe(e) { "Error on asynchronous inputStream.close()" }
@@ -143,13 +142,11 @@ class Exchange<out T>(
         return withContext(IO) {
             var conn: HttpURLConnection? = null
             try {
-                @Suppress("BlockingMethodInNonBlockingContext")
                 conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = CONNECT_TIMEOUT_MILLIS
                 conn.readTimeout = RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS
                 val ifModifiedSince = loadCachedLastModified(url)
                 ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
-                @Suppress("BlockingMethodInNonBlockingContext")
                 conn.connect()
                 if (!coroScope.isActive) {
                     throw CancellationException()
