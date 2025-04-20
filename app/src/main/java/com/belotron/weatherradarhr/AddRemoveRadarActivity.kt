@@ -26,9 +26,12 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.belotron.weatherradarhr.databinding.ActivityAddRemoveBinding
+import com.belotron.weatherradarhr.databinding.ActivityMainBinding
 
 private const val VIEWTYPE_ITEM = 1
 private const val VIEWTYPE_DIVIDER = 2
@@ -39,7 +42,11 @@ class AddRemoveRadarActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         info { "AddRemoveRadarActivity.onCreate" }
-        setContentView(R.layout.activity_add_remove)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ActivityAddRemoveBinding.inflate(layoutInflater).root.also { root ->
+            applyInsets(root)
+            setContentView(root)
+        }
         findViewById<Toolbar>(R.id.toolbar).also {
             setSupportActionBar(it)
         }

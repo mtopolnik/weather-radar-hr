@@ -3,7 +3,34 @@
     <style name="AppTheme" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorSurface">@color/background</item>
+        <item name="colorOnSurface">@color/foreground</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/foreground</item>
     </style>
+
+    <!-- Referenced from the app bar in layout files -->
+    <style name="ActionBar" parent="AppTheme">
+        <item name="android:background">@color/background</item>
+        <item name="textAppearanceTitleLarge">@style/ActionBarTitle</item>
+        <!-- Color of the overflow icon (three dots) -->
+        <item name="android:textColorSecondary">@color/foreground</item>
+    </style>
+
+    <style name="ActionBarTitle" parent="TextAppearance.Widget.AppCompat.Toolbar.Title">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/foreground</item>
+    </style>
+
+    <!-- Fixes a bug where the overflow menu item background is different from its container -->
+    <style name="OverflowPopupTheme" parent="Widget.Material3.PopupMenu.Overflow">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+
+
     <style name="ProgressBar" parent="ThemeOverlay.AppCompat.Light">
         <item name="colorAccent">@color/secondary</item>
     </style>

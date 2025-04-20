@@ -26,11 +26,10 @@
                     android:layout_height="wrap_content"
                     >
                 <androidx.appcompat.widget.Toolbar
-                        android:theme="?attr/actionBarTheme"
-                        android:background="@color/primary"
+                        android:theme="@style/ActionBar"
                         android:id="@+id/toolbar"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="?attr/actionBarSize"
                         />
             </LinearLayout>
         </com.belotron.weatherradarhr.MyScrollView>

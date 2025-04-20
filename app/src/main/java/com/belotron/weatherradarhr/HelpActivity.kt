@@ -21,11 +21,16 @@ import android.view.MenuItem
 import android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import com.belotron.weatherradarhr.databinding.ActivityHelpBinding
+import com.belotron.weatherradarhr.databinding.ActivityMainBinding
 
 class HelpActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_help)
+        ActivityHelpBinding.inflate(layoutInflater).root.also { root ->
+            applyInsets(root)
+            setContentView(root)
+        }
         findViewById<Toolbar>(R.id.toolbar).also {
             setSupportActionBar(it)
         }

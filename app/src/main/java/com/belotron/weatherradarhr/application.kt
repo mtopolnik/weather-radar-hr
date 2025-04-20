@@ -40,9 +40,13 @@ import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.core.content.ContextCompat.getColor
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat.Type.ime
+import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import com.belotron.weatherradarhr.gifdecode.BitmapPixels
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -217,6 +221,14 @@ fun View.isDescendantOf(that: View): Boolean {
         currParent = currParent.parent as? View
     }
     return false
+}
+
+fun applyInsets(root: View) {
+    ViewCompat.setOnApplyWindowInsetsListener(root) { v, windowInsets ->
+        val insets = windowInsets.getInsets(systemBars() or ime())
+        v.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+        windowInsets
+    }
 }
 
 fun vibrate() {

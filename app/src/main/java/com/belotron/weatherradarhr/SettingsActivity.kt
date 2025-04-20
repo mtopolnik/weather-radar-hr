@@ -21,12 +21,17 @@ import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.preference.PreferenceFragmentCompat
+import com.belotron.weatherradarhr.databinding.ActivityHelpBinding
+import com.belotron.weatherradarhr.databinding.ActivitySettingsBinding
 
 class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         info { "SettingsActivity.onCreate" }
-        setContentView(R.layout.activity_settings)
+        ActivitySettingsBinding.inflate(layoutInflater).root.also { root ->
+            applyInsets(root)
+            setContentView(root)
+        }
         findViewById<Toolbar>(R.id.toolbar).also {
             setSupportActionBar(it)
         }
