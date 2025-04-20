@@ -19,7 +19,6 @@ package com.belotron.weatherradarhr
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
-import androidx.core.text.parseAsHtml
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.*
 import com.belotron.weatherradarhr.Outcome.*
@@ -154,8 +153,8 @@ fun sloSequenceLoader() = AnimatedGifLoader(
 
 
 class EumetsatSequenceLoader : FrameSequenceLoader(
-    // Hack: reports 5 mins per frame where it's actually 15 mins.
-    // This speeds it up 3x and covers 3x more time, appropriate for a satellite animation.
+    // Hack: reports 2 mins per frame where it's actually 15 mins.
+    // This speeds it up 7.5x and covers 7.5x more time, appropriate for a satellite animation.
     "https://eumetview.eumetsat.int/static-images/MSG/IMAGERY/IR108/BW/CENTRALEUROPE", 2, { 0 }
 ) {
     private val imgTsRegex = """(?<=<option value="\d\d?\d?">)[^<]+""".toRegex()
@@ -175,12 +174,12 @@ class EumetsatSequenceLoader : FrameSequenceLoader(
         val html = htmlMaybe ?: return@flow
         val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
         val imgTimestamps = imgTsRegex.findAll(html).map { dateFormat.parse(it.value) }.toList()
-        val result = imgTimestamps.zip(imgIds).reversed().take(frameCount).map { (ts, imgId) ->
+        val frames = imgTimestamps.zip(imgIds).take(frameCount).reversed().map { (ts, imgId) ->
             val tsMillis = LocalDateTime.from(ts).atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
             val (_, imgBytes) = fetchBytes(context, "$url/IMAGESDisplay/$imgId", fetchPolicy)
             StdFrame(imgBytes ?: ByteArray(0), tsMillis)
-        }.toMutableList()
-        emit(StdSequence(result))
+        }
+        emit(StdSequence(frames.toMutableList()))
     }
 }
 
