@@ -20,8 +20,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
-import com.belotron.weatherradarhr.FetchPolicy.*
-import com.belotron.weatherradarhr.Outcome.*
+import com.belotron.weatherradarhr.FetchPolicy.ONLY_CACHED
+import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
+import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
+import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
+import com.belotron.weatherradarhr.Outcome.FAILURE
+import com.belotron.weatherradarhr.Outcome.PARTIAL_SUCCESS
+import com.belotron.weatherradarhr.Outcome.SUCCESS
 import com.belotron.weatherradarhr.gifdecode.BitmapFreelists
 import com.belotron.weatherradarhr.gifdecode.GifSequence
 import com.belotron.weatherradarhr.gifdecode.Pixels
@@ -39,7 +44,10 @@ import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.*
+import java.util.Calendar
+import java.util.TimeZone
+import java.util.TreeSet
+import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 
 private const val SEQUENCE_RETRY_DELAY_MILLIS = 7_000L
@@ -157,6 +165,7 @@ class EumetsatSequenceLoader : FrameSequenceLoader(
     // This speeds it up 7.5x and covers 7.5x more time, appropriate for a satellite animation.
     "https://eumetview.eumetsat.int/static-images/MSG/IMAGERY/IR108/BW/CENTRALEUROPE", 2, { 0 }
 ) {
+    private val FIFTEEN_MINS = TimeUnit.MINUTES.toMillis(15)
     private val imgTsRegex = """(?<=<option value="\d\d?\d?">)[^<]+""".toRegex()
     private val imgIdRegex = """(?<=array_nom_imagen\[\d\d?\d?]=")[^"]+""".toRegex()
     private val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yy   HH:mm 'UTC'")
@@ -172,128 +181,32 @@ class EumetsatSequenceLoader : FrameSequenceLoader(
         val frameCount = correctFrameCount(animationCoversMinutes)
         val (_, htmlMaybe) = fetchString(context, "$url/index.htm", fetchPolicy)
         val html = htmlMaybe ?: return@flow
-        val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
-        val imgTimestamps = imgTsRegex.findAll(html).map { dateFormat.parse(it.value) }.toList()
-        val frames = imgTimestamps.zip(imgIds).take(frameCount).reversed().map { (ts, imgId) ->
-            val tsMillis = LocalDateTime.from(ts).atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val pairs = run {
+            val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
+            val imgTimestamps = imgTsRegex.findAll(html).map {
+                LocalDateTime.from(dateFormat.parse(it.value))
+                    .atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
+            }.toList()
+            val rawPairs = imgTimestamps.zip(imgIds)
+            val cleanPairs = mutableListOf<Pair<Long, String>>()
+            cleanPairs += rawPairs[0]
+            for (i in 1..< rawPairs.size) {
+                var laterTs = rawPairs[i - 1].first
+                val earlierTs = rawPairs[i].first
+                var interpolationCount = 0
+                while (laterTs - earlierTs > FIFTEEN_MINS && interpolationCount < 12) {
+                    interpolationCount += 1
+                    laterTs -= FIFTEEN_MINS
+                    cleanPairs += laterTs to rawPairs[i].second
+                }
+                cleanPairs += rawPairs[i]
+            }
+            cleanPairs.toList()
+        }
+        val frames = pairs.take(frameCount).reversed().map { (ts, imgId) ->
             val (_, imgBytes) = fetchBytes(context, "$url/IMAGESDisplay/$imgId", fetchPolicy)
-            StdFrame(imgBytes ?: ByteArray(0), tsMillis)
+            StdFrame(imgBytes ?: ByteArray(0), ts)
         }
         emit(StdSequence(frames.toMutableList()))
-    }
-}
-
-class ZamgSequenceLoader : FrameSequenceLoader(
-    // Hack: reports 5 mins per frame where it's actually 30 mins.
-    // This speeds it up 6x and covers 6x more time, appropriate for a satellite animation.
-    "https://www.zamg.ac.at/dyn/pictures/Hsatimg", 5, { 0 }
-) {
-    override fun incrementallyFetchFrameSequence(
-        context: Context,
-        animationCoversMinutes: Int,
-        fetchPolicy: FetchPolicy
-    ): Flow<StdSequence> = flow {
-        if (fetchPolicy == ONLY_IF_NEW || fetchPolicy == ONLY_CACHED) {
-            throw IllegalArgumentException("This function supports only UP_TO_DATE and PREFER_CACHED fetch policies")
-        }
-
-        suspend fun fetchFrames(fetchPolicy: FetchPolicy): MutableList<StdFrame> {
-            val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            val frames = mutableListOf<StdFrame?>()
-            val frameCount = correctFrameCount(animationCoversMinutes)
-
-            suspend fun fetchNextFrame(): StdFrame {
-                calendar.gotoPreviousHalfHour()
-                val (_, bytes) = fetchBytes(context, calendar.toGifUrl(), fetchPolicy)
-                if (bytes == null) {
-                    throw ImageFetchException(null, HttpErrorResponse(404))
-                }
-                return StdFrame(bytes, calendar.timeInMillis)
-            }
-
-            suspend fun fetchNewestFrame(): StdFrame {
-                val maxStepsToGoBack = 12
-                for (i in 1..maxStepsToGoBack) {
-                    try {
-                        return fetchNextFrame()
-                    } catch (e: ImageFetchException) {
-                        if (e.httpResponseCode != 404 || i == maxStepsToGoBack) {
-                            throw e
-                        }
-                    }
-                }
-                throw AssertionError("Should be unreachable")
-            }
-
-            val newestFrame = fetchNewestFrame()
-            for (i in 1..frameCount) {
-                frames +=
-                    try {
-                        fetchNextFrame()
-                    } catch (e: ImageFetchException) {
-                        null
-                    }
-            }
-            frames.reverse()
-            val nonNullFrames = withGapsFilledIn(frames, newestFrame)
-
-            fun String.timeCode() = substring(length - 14, length - 4).toLong()
-
-            val earliestFrameTimeCode = calendar.toGifUrl().timeCode()
-            Log.i("zamg", "earliestFrameTimeCode $earliestFrameTimeCode")
-            for (file in context.cacheDirFilesStartingWith(url)) {
-                if (file.path.timeCode() < earliestFrameTimeCode) {
-                    Log.i("zamg", "delete stale ${file.path}")
-                    file.delete()
-                }
-            }
-            return nonNullFrames.toMutableList()
-        }
-
-        Log.i("zamg", "fetchPolicy $fetchPolicy")
-        val resultFrames = if (fetchPolicy == PREFER_CACHED) {
-            try {
-                fetchFrames(ONLY_CACHED).also {
-                    Log.i("zamg", "Got cached images")
-                }
-            } catch (e: ImageFetchException) {
-                Log.i("zamg", "Nothing in cache, fetching from the web")
-                fetchFrames(UP_TO_DATE).also {
-                    Log.i("zamg", "Got images from the web")
-                }
-            } catch (e: Exception) {
-                Log.e("zamg", "Unexpected error", e)
-                mutableListOf()
-            }
-        } else {
-            fetchFrames(UP_TO_DATE)
-        }
-        emit(StdSequence(resultFrames))
-    }
-
-    @SuppressLint("SimpleDateFormat")
-    private fun Calendar.toGifUrl(): String {
-        return SimpleDateFormat("yyMMddHHmm").run {
-            timeZone = TimeZone.getTimeZone("UTC")
-            "$url/H${format(time)}.gif"
-        }
-    }
-
-    private fun Calendar.gotoPreviousHalfHour() {
-        val publishLagMinutes = 1
-        // Add 30 in order to avoid negative numbers, otherwise adding 30 is neutral modulo-30
-        add(Calendar.MINUTE, -((get(Calendar.MINUTE) + 30 - publishLagMinutes) % 30 + publishLagMinutes))
-    }
-
-    private fun withGapsFilledIn(frames: List<StdFrame?>, newestFrame: StdFrame): List<StdFrame> {
-        return frames.mapIndexed { i, frame ->
-            frame
-                ?: (i - 1).downTo(0).map { frames[it] }.find { it != null }
-                ?: (i + 1).until(frames.size).map { frames[it] }.find { it != null }
-                ?: newestFrame
-        }
     }
 }
