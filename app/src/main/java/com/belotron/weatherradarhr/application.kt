@@ -40,7 +40,6 @@ import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.core.content.ContextCompat.getColor
@@ -74,7 +73,7 @@ enum class AnimationSource(
     val frameSequenceLoader: FrameSequenceLoader
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, hrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
-    AT_ZAMG("ZAMG Satellite", zamgShape, EumetsatSequenceLoader()),
+    AT_ZAMG("Eumetsat", zamgShape, EumetsatSequenceLoader()),
     SLO_ARSO("ARSO", sloShape, sloSequenceLoader()),
     HR_GRADISTE("DHMZ Gradište", hrGradisteShape, hrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
     HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, hrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),
