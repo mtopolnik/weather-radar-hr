@@ -25,8 +25,6 @@ import androidx.preference.PreferenceManager
 
 const val DEFAULT_ANIMATION_RATE = 85
 const val MIN_ANIMATION_RATE = 10
-const val DEFAULT_ANIMATION_MINUTES = 90
-const val MIN_ANIMATION_MINUTES = 5
 const val DEFAULT_FREEZE_TIME = 1500
 const val MIN_FREEZE_TIME = 100
 const val NEW_RADAR_INDICATOR_CURRENT_ID = 1
@@ -66,7 +64,6 @@ val SharedPreferences.freezeTimeMillis: Int get() = MIN_FREEZE_TIME.coerceAtLeas
     getInt(KEY_FREEZE_TIME, DEFAULT_FREEZE_TIME))
 
 val SharedPreferences.animationCoversMinutes: Int get() = 120
-//    MIN_ANIMATION_MINUTES.coerceAtLeast(getInt(KEY_ANIMATION_MINUTES, DEFAULT_ANIMATION_MINUTES))
 
 val SharedPreferences.seekbarVibrate: Boolean get() = getBoolean(KEY_SEEKBAR_VIBRATE, true)
 
@@ -92,16 +89,16 @@ fun SharedPreferences.Editor.setConfiguredRadarSources(animationSources: List<An
 
 fun SharedPreferences.ensureAllRadarSourcesAvailable() {
     val currSources = configuredRadarSources()
-    val missingSources = AnimationSource.values().toSet() - currSources.toSet()
+    val missingSources = AnimationSource.entries.toSet() - currSources.toSet()
     if (missingSources.isEmpty()) {
         return
     }
-    Log.i("zamg", "missingSources $missingSources")
+    Log.i("eumet", "missingSources $missingSources")
     val newSources = currSources.takeWhile { it != null } +
             null +
             missingSources +
             currSources.takeLastWhile { it != null }
-    Log.i("zamg", "newSources $newSources")
+    Log.i("eumet", "newSources $newSources")
     applyUpdate { setConfiguredRadarSources(newSources) }
 }
 
