@@ -59,7 +59,7 @@ import java.io.FileOutputStream
 import java.io.FileWriter
 import java.io.PrintWriter
 import java.text.DateFormat
-import java.util.concurrent.TimeUnit.HOURS
+import java.util.concurrent.TimeUnit
 import android.text.format.DateFormat as AndroidDateFormat
 
 private const val KEY_SAVED_AT = "instance-state-saved-at"
@@ -160,7 +160,7 @@ private fun ageText(
             ", ${format.format(timestamp)} - $radarName"
 }
 
-private fun isFreshTimestamp(timestamp: Long, now: Long) = timestamp > now - HOURS.toMillis(1)
+private fun isFreshTimestamp(timestamp: Long, now: Long) = timestamp > now - TimeUnit.MINUTES.toMillis(76)
 
 fun RemoteViews.setBlackText(text: CharSequence) = setWidgetText(text, R.id.text_black, R.id.text_red)
 
