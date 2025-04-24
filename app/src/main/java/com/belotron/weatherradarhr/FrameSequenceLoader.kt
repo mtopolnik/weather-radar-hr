@@ -16,14 +16,12 @@
  */
 package com.belotron.weatherradarhr
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_CACHED
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
 import com.belotron.weatherradarhr.FetchPolicy.PREFER_CACHED
-import com.belotron.weatherradarhr.FetchPolicy.UP_TO_DATE
 import com.belotron.weatherradarhr.Outcome.FAILURE
 import com.belotron.weatherradarhr.Outcome.PARTIAL_SUCCESS
 import com.belotron.weatherradarhr.Outcome.SUCCESS
@@ -40,12 +38,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
-import java.util.TimeZone
 import java.util.TreeSet
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
@@ -175,38 +170,51 @@ class EumetsatSequenceLoader : FrameSequenceLoader(
         animationCoversMinutes: Int,
         fetchPolicy: FetchPolicy
     ): Flow<StdSequence> = flow {
+
+        suspend fun fetchFrameBytes(imgId: String): ByteArray {
+            val (_, imgBytes) = fetchBytes(context, "$url/IMAGESDisplay/$imgId", PREFER_CACHED)
+            return imgBytes ?: ByteArray(0)
+        }
+
         if (fetchPolicy == ONLY_IF_NEW || fetchPolicy == ONLY_CACHED) {
             throw IllegalArgumentException("This function supports only UP_TO_DATE and PREFER_CACHED fetch policies")
         }
-        val frameCount = correctFrameCount(animationCoversMinutes)
+        val targetFrameCount = correctFrameCount(animationCoversMinutes)
         val (_, htmlMaybe) = fetchString(context, "$url/index.htm", fetchPolicy)
         val html = htmlMaybe ?: return@flow
-        val pairs = run {
-            val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
-            val imgTimestamps = imgTsRegex.findAll(html).map {
-                LocalDateTime.from(dateFormat.parse(it.value))
-                    .atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
-            }.toList()
-            val rawPairs = imgTimestamps.zip(imgIds)
-            val cleanPairs = mutableListOf<Pair<Long, String>>()
-            cleanPairs += rawPairs[0]
-            for (i in 1..< rawPairs.size) {
-                var laterTs = rawPairs[i - 1].first
-                val earlierTs = rawPairs[i].first
+        val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
+        val imgTimestamps = imgTsRegex.findAll(html).map { LocalDateTime.from(dateFormat.parse(it.value)) }.toList()
+        val dlLists = imgTimestamps.zip(imgIds).let { rawPairs ->
+            if (fetchPolicy == PREFER_CACHED) {
+                listOf(rawPairs.filter { it.first.minute == 0 })
+            } else {
+                listOf(
+                    rawPairs.filter { it.first.minute == 0 },
+                    rawPairs.filter { it.first.minute % 30 == 0 },
+                    rawPairs,
+                )
+            }.map { list -> list.map { it.first.atZone(ZoneOffset.UTC).toInstant().toEpochMilli() to it.second } }
+        }
+        for (dlList in dlLists) {
+            val frames = mutableListOf(StdFrame(fetchFrameBytes(dlList[0].second), dlList[0].first))
+            var frameCount = 1
+            forLoop@ for (i in 1 ..< dlList.size) {
+                val frameBytes = fetchFrameBytes(dlList[i].second)
+                val earlierTs = dlList[i].first
+                var laterTs = dlList[i - 1].first
                 var interpolationCount = 0
-                while (laterTs - earlierTs > FIFTEEN_MINS && interpolationCount < 12) {
+                while (laterTs > earlierTs && interpolationCount < 12) {
+                    if (frameCount == targetFrameCount) {
+                        break@forLoop
+                    }
                     interpolationCount += 1
+                    frameCount += 1
                     laterTs -= FIFTEEN_MINS
-                    cleanPairs += laterTs to rawPairs[i].second
+                    frames += StdFrame(frameBytes, laterTs)
                 }
-                cleanPairs += rawPairs[i]
             }
-            cleanPairs.toList()
+            frames.reverse()
+            emit(StdSequence(frames))
         }
-        val frames = pairs.take(frameCount).reversed().map { (ts, imgId) ->
-            val (_, imgBytes) = fetchBytes(context, "$url/IMAGESDisplay/$imgId", fetchPolicy)
-            StdFrame(imgBytes ?: ByteArray(0), ts)
-        }
-        emit(StdSequence(frames.toMutableList()))
     }
 }
