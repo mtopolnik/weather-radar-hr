@@ -175,7 +175,7 @@ private data class WidgetDescriptor(
         val updatePeriodMinutes: Long,
         val providerClass: Class<out AppWidgetProvider>,
         val previewResourceId: Int,
-        val mapShape: MapShape,
+        val mapShape: MapProjection,
         val cropLeft: Int,
         val cropTop: Int,
         val toTimestampedBitmap: (Bitmap, Boolean) -> TimestampedBitmap
@@ -492,9 +492,6 @@ private class WidgetContext (
     private fun Bitmap.drawLocation(location: Triple<Double, Double, Long>?) {
         if (location == null) {
             warn { "Location not present, not drawing on bitmap" }
-            return
-        }
-        if (wDesc.mapShape === metnoShape) {
             return
         }
         val (lat, lon, timestamp) = location

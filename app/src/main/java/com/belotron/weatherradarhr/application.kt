@@ -69,7 +69,7 @@ lateinit var appCoroScope: CoroutineScope
 
 enum class AnimationSource(
     val title: String,
-    val mapShape: MapShape,
+    val mapShape: MapProjection,
     val frameSequenceLoader: FrameSequenceLoader
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, hrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),

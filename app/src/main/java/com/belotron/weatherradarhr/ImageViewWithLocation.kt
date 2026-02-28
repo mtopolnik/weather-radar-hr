@@ -45,7 +45,7 @@ open class ImageViewWithLocation
 @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0)
     : AppCompatImageView(context, attrs, defStyle
 ) {
-    lateinit var mapShape: MapShape
+    lateinit var mapShape: MapProjection
 
     lateinit var locationState: LocationState
     private val location get() = locationState.location
@@ -72,9 +72,6 @@ open class ImageViewWithLocation
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (mapShape === metnoShape) {
-            return
-        }
         location?.also { location ->
             mapShape.locationToPixel(location, point)
             with(mx) {

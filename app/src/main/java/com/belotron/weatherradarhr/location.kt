@@ -54,6 +54,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.properties.Delegates.observable
 import kotlin.reflect.KProperty
 
@@ -62,7 +64,7 @@ const val METERS_PER_DEGREE = 111_111
 private const val WAIT_MILLISECONDS_BEFORE_ASKING = 2 * SECOND_IN_MILLIS
 private const val CHECK_LOCATION_ENABLED_PERIOD_MILLIS = 1 * SECOND_IN_MILLIS
 
-val sloShape = MapShape(
+val sloShape = MapShapeSimple(
     topLat = 47.40,
     botLat = 44.71,
     topLeftLon = 12.10,
@@ -75,7 +77,7 @@ val sloShape = MapShape(
     botImageY = 649
 )
 
-val hrKompozitShape = MapShape(
+val hrKompozitShape = MapShapeSimple(
     topLat = 47.8,
     botLat = 41.52,
     topLeftLon = 11.73,
@@ -88,7 +90,7 @@ val hrKompozitShape = MapShape(
     botImageY = 718
 )
 
-val hrGradisteShape = MapShape(
+val hrGradisteShape = MapShapeSimple(
     topLat = 47.29,
     botLat = 43.00,
     topLeftLon = 15.53,
@@ -101,7 +103,7 @@ val hrGradisteShape = MapShape(
     botImageY = 718
 )
 
-val hrBilogoraShape = MapShape(
+val hrBilogoraShape = MapShapeSimple(
     topLat = 48.06,
     botLat = 43.72,
     topLeftLon = 14.00,
@@ -114,7 +116,7 @@ val hrBilogoraShape = MapShape(
     botImageY = 718
 )
 
-val hrPuntijarkaShape = MapShape(
+val hrPuntijarkaShape = MapShapeSimple(
     topLat = 48.08,
     botLat = 43.75,
     topLeftLon = 12.80,
@@ -127,7 +129,7 @@ val hrPuntijarkaShape = MapShape(
     botImageY = 718
 )
 
-val hrGoliShape = MapShape(
+val hrGoliShape = MapShapeSimple(
     topLat = 47.16,
     botLat = 42.87,
     topLeftLon = 10.88,
@@ -140,7 +142,7 @@ val hrGoliShape = MapShape(
     botImageY = 718
 )
 
-val hrDebeljakShape = MapShape(
+val hrDebeljakShape = MapShapeSimple(
     topLat = 46.20,
     botLat = 41.91,
     topLeftLon = 12.26,
@@ -153,7 +155,7 @@ val hrDebeljakShape = MapShape(
     botImageY = 718
 )
 
-val hrUljenjeShape = MapShape(
+val hrUljenjeShape = MapShapeSimple(
     topLat = 45.03,
     botLat = 40.75,
     topLeftLon = 14.42,
@@ -166,17 +168,13 @@ val hrUljenjeShape = MapShape(
     botImageY = 718
 )
 
-val metnoShape = MapShape(
-    topLat = 71.5,
-    botLat = 30.0,
-    topLeftLon = -35.0,
-    botLeftLon = -37.0,
-    topRightLon = 44.0,
-    botRightLon = 52.0,
-    leftImageX = 0,
-    rightImageX = 1280,
-    topImageY = 0,
-    botImageY = 720
+val metnoShape = MapShapeGeoSat(
+    stdLat1 = 26.9,
+    stdLat2 = 121.1,
+    centralMeridionDeg = 1.7,
+    affXx = 1000.7639, affXy = -35.8410, affX0 = 700.1696,
+    affYx = -58.6309, affYy = -849.4068, affY0 = -164.4235,
+    pixelSizeMeters = 7484f
 )
 
 val locationRequestFg: LocationRequest = LocationRequest.Builder(1000)
@@ -196,6 +194,14 @@ val Location.description
     get() = "lat: %.3f lon: %.3f acc: %.3f; brg: %.1f".format(latitude, longitude, accuracy, bearing) +
             (if (Build.VERSION.SDK_INT >= 26) " acc: %.1f".format(bearingAccuracyDegrees) else "")
 
+interface MapProjection {
+    val pixelSizeMeters: Float
+    fun locationToPixel(location: Location, point: FloatArray) {
+        locationToPixel(location.latitude, location.longitude, point)
+    }
+    fun locationToPixel(lat: Double, lon: Double, point: FloatArray)
+}
+
 /**
  * Transforms a lat-lon location to its corresponding pixel on the map's
  * bitmap.
@@ -207,7 +213,7 @@ val Location.description
  * The map's bitmap is a rectangle overlaid on this coordinate grid, such
  * that its top and bottom sides are segments of two parallels.
  */
-class MapShape(
+class MapShapeSimple(
     private val topLat: Double,
     private val botLat: Double,
     topLeftLon: Double,
@@ -218,8 +224,8 @@ class MapShape(
     rightImageX: Int,
     private val topImageY: Int,
     botImageY: Int
-) {
-    val pixelSizeMeters: Float
+) : MapProjection {
+    override val pixelSizeMeters: Float
 
     // zeroLon is the longitude of the "meridian" that is vertical.
     // It satisfies the following:
@@ -243,16 +249,58 @@ class MapShape(
         pixelSizeMeters = (imageHeightDegrees * METERS_PER_DEGREE / imageHeightPixels).toFloat()
     }
 
-    fun locationToPixel(location: Location, point: FloatArray) {
+    override fun locationToPixel(location: Location, point: FloatArray) {
         val (lat, lon) = location
         locationToPixel(lat, lon, point)
     }
 
-    fun locationToPixel(lat: Double, lon: Double, point: FloatArray) {
+    override fun locationToPixel(lat: Double, lon: Double, point: FloatArray) {
         val normY: Double = (topLat - lat) / (topLat - botLat)
         val xScaleAtY: Double = xScaleAtTop + (xScaleAtBot - xScaleAtTop) * normY
         point[0] = (zeroImageX + xScaleAtY * (lon - zeroLon)).toFloat()
         point[1] = topImageY + (imageHeightPixels * normY).toFloat()
+    }
+}
+
+/**
+ * Transforms a lat-lon location to a pixel on a satellite map image using an
+ * Equidistant Conic projection with an affine pixel mapping.
+ *
+ * The Equidistant Conic projection preserves distances along meridians and is
+ * suitable for continental-scale satellite imagery where the simple
+ * converging-meridians model of [MapShapeSimple] breaks down.
+ */
+class MapShapeGeoSat(
+    stdLat1: Double,
+    stdLat2: Double,
+    centralMeridionDeg: Double,
+    private val affXx: Double,
+    private val affXy: Double,
+    private val affX0: Double,
+    private val affYx: Double,
+    private val affYy: Double,
+    private val affY0: Double,
+    override val pixelSizeMeters: Float,
+) : MapProjection {
+    private val n: Double
+    private val g: Double
+    private val lam0: Double = Math.toRadians(centralMeridionDeg)
+
+    init {
+        val phi1 = Math.toRadians(stdLat1)
+        val phi2 = Math.toRadians(stdLat2)
+        n = (cos(phi1) - cos(phi2)) / (phi2 - phi1)
+        g = cos(phi1) / n + phi1
+    }
+
+    override fun locationToPixel(lat: Double, lon: Double, point: FloatArray) {
+        val phi = Math.toRadians(lat)
+        val rho = g - phi
+        val theta = n * (Math.toRadians(lon) - lam0)
+        val projX = rho * sin(theta)
+        val projY = -rho * cos(theta)
+        point[0] = (affXx * projX + affXy * projY + affX0).toFloat()
+        point[1] = (affYx * projX + affYy * projY + affY0).toFloat()
     }
 }
 
