@@ -168,6 +168,15 @@ val hrUljenjeShape = MapShapeSimple(
     botImageY = 718
 )
 
+/*
+ * Data for fitting:
+ *   City; lot, lon;  imgX, imgY
+ *   Reykyavik; 64.148, -22.024; 578, 154
+ *   Alexandria; 31.190, 29.831; 1127, 561
+ *   Lisbon; 38.705, -9.119; 595, 543
+ *   Zagreb; 45.811, 16.000; 874, 418
+ *   London; 51.494, -0.103 705, 357
+ */
 val metnoShape = MapShapeGeoSat(
     stdLat1 = 26.9,
     stdLat2 = 121.1,
