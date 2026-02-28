@@ -41,7 +41,9 @@ import java.lang.Thread.sleep
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
-import java.text.SimpleDateFormat
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.*
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.text.Charsets.UTF_8
@@ -58,8 +60,8 @@ private const val RESUME_DELAY_MILLIS = 2_000L
 val CACHE_LOCK = Object()
 private val filenameCharsToAvoidRegex = """[\\|/$?*]""".toRegex()
 private val lastModifiedRegex = """\w{3}, \d{2} \w{3} \d{4} \d{2}:(\d{2}):(\d{2}) GMT""".toRegex()
-private val lastModifiedDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
-private val defaultLastModified = lastModifiedDateFormat.parse(DEFAULT_LAST_MODIFIED_STR)!!.time
+private val lastModifiedDateFormat = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
+private val defaultLastModified = ZonedDateTime.parse(DEFAULT_LAST_MODIFIED_STR, lastModifiedDateFormat).toInstant().toEpochMilli()
 
 enum class FetchPolicy { UP_TO_DATE, PREFER_CACHED, ONLY_IF_NEW, ONLY_CACHED }
 
@@ -326,7 +328,11 @@ class Exchange<out T>(
         return 60L * parseInt(groups[1]) + parseInt(groups[2])
     }
 
-    private fun String.parseLastModified() = lastModifiedDateFormat.parse(this)?.time ?: defaultLastModified
+    private fun String.parseLastModified() = try {
+        ZonedDateTime.parse(this, lastModifiedDateFormat).toInstant().toEpochMilli()
+    } catch (_: DateTimeParseException) {
+        defaultLastModified
+    }
 
     private fun updateCache(cacheFile: File, lastModifiedStr: String, responseBody: ByteArray) {
         val growingFile = File(cacheFile.path + ".growing")
