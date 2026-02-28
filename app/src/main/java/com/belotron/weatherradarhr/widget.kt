@@ -505,9 +505,9 @@ private class WidgetContext (
         val (x, y) = point
         with(Canvas(this)) {
             val dotRadius = 0.015f * this.width
-            drawCircle(x, y, dotRadius, Paint().apply { color = context.resources.getColor(R.color.locdot) })
+            drawCircle(x, y, dotRadius, Paint().apply { color = context.getColorCompat(R.color.locdot) })
             drawCircle(x, y, 0.6f * dotRadius, Paint().apply {
-                color = context.resources.getColor(android.R.color.white)
+                color = context.getColorCompat(android.R.color.white)
                 style = Paint.Style.STROKE
                 strokeWidth = 0.25f * dotRadius
             })
