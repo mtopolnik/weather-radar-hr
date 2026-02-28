@@ -38,7 +38,7 @@ object SloOcr {
         }
     }
 
-    private fun initDigitPixelses() {
+    private fun initDigitPixelses() = synchronized(this) {
         if (digitTemplates.isEmpty()) {
             digitTemplates = appContext.loadDigits("arso", "gif")
         }
