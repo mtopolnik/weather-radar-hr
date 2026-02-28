@@ -48,7 +48,7 @@ class StdFrame(
     private val height: Int
 
     init {
-        val opts = BitmapFactory.Options().apply { inJustDecodeBounds }
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(imgBytes, 0, imgBytes.size, opts)
         opts.apply {
             if (outWidth <= 0 || outHeight <= 0) {
