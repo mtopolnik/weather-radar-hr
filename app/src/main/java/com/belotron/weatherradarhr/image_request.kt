@@ -47,6 +47,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.text.Charsets.UTF_8
 
 private const val DEFAULT_LAST_MODIFIED_STR = "Thu, 01 Jan 1970 00:00:00 GMT"
+private const val NO_CACHE_LAST_MODIFIED = "no-cache"
 private const val FILENAME_SUBSTITUTE_CHAR = ":"
 private const val HTTP_CACHE_DIR = "httpcache"
 private const val CONNECT_TIMEOUT_MILLIS = 30_000
@@ -195,6 +196,9 @@ class Exchange<out T>(
         val acceptsByteRange = (getHeaderField("Accepts-Ranges") ?: "none") == "bytes"
         val contentLength = getHeaderFieldInt("Content-Length", -1)
         val lastModifiedStr = getHeaderField("Last-Modified") ?: DEFAULT_LAST_MODIFIED_STR
+        val cacheControl = getHeaderField("Cache-Control") ?: ""
+        val noCache = "no-cache" in cacheControl
+        val lastModifiedForCache = if (noCache) NO_CACHE_LAST_MODIFIED else lastModifiedStr
         val fetchedLastModified = lastModifiedStr.parseLastModified()
         val responseBody = lazy {
             this@Exchange.inputStream = inputStream
@@ -206,15 +210,16 @@ class Exchange<out T>(
         }
         info { "Fetching content of length $contentLength, Last-Modified $lastModifiedStr: $url" }
         val cachedIn = runOrNull { context.cachedDataIn(url.toExternalForm()) }
-        val decodedImage = if (cachedIn == null) {
-            ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
+        val decodedImage = if (noCache || cachedIn == null) {
+            cachedIn?.close()
+            ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr, lastModifiedForCache)
         } else {
             // These checks are repeated in updateCache(). While the response body is being
             // loaded, another thread could write a newer cached image.
             val cachedLastModified = runOrNull { cachedIn.readUTF().parseLastModified() }
             if (cachedLastModified == null || cachedLastModified < fetchedLastModified) {
                 cachedIn.close()
-                ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr)
+                ensureFullContentAndUpdateCache(responseBody.value, contentLength, acceptsByteRange, lastModifiedStr, lastModifiedForCache)
             } else { // cachedLastModified >= fetchedLastModified, can happen with concurrent requests
                 inputStream.close()
                 cachedIn.use { it.readBytes() }.parseOrInvalidateImage()
@@ -224,12 +229,16 @@ class Exchange<out T>(
     }
 
     private fun ensureFullContentAndUpdateCache(
-        bytes: ByteArray, contentLength: Int, acceptsByteRange: Boolean, lastModifiedStr: String
+        bytes: ByteArray,
+        contentLength: Int,
+        acceptsByteRange: Boolean,
+        lastModifiedStr: String,
+        lastModifiedForCache: String
     ): T {
         if (!coroScope.isActive) throw CancellationException()
         if (bytes.size >= contentLength) {
             return decode(bytes).also {
-                updateCache(context.cacheFile(url), lastModifiedStr, bytes)
+                updateCache(context.cacheFile(url), lastModifiedForCache, bytes)
             }
         } else if (!acceptsByteRange) {
             throw IOException("Incomplete content and the server doesn't support byte ranges." +
@@ -278,13 +287,14 @@ class Exchange<out T>(
         }
         val completeBytes = bos.toByteArray()
         return decode(completeBytes).also {
-            updateCache(context.cacheFile(url), lastModifiedStr, completeBytes)
+            updateCache(context.cacheFile(url), lastModifiedForCache, completeBytes)
         }
     }
 
     private fun loadCachedResult(): Pair<Long, T>? = runOrNull {
         val (lastModifiedStr, imgBytes) = context.cachedDataIn(url).use { Pair(it.readUTF(), it.readBytes()) }
-        Pair(parseLastModified_mmss(lastModifiedStr), imgBytes.parseOrInvalidateImage())
+        val mmss = if (lastModifiedStr == NO_CACHE_LAST_MODIFIED) 0L else parseLastModified_mmss(lastModifiedStr)
+        Pair(mmss, imgBytes.parseOrInvalidateImage())
     }
 
     private fun loadCachedImage(): T? = runOrNull {
@@ -301,7 +311,9 @@ class Exchange<out T>(
         }
     }
 
-    private fun loadCachedLastModified(url: String) = runOrNull { context.cachedDataIn(url).use { it.readUTF() } }
+    private fun loadCachedLastModified(url: String) = runOrNull {
+        context.cachedDataIn(url).use { it.readUTF() }
+    }?.takeIf { it != NO_CACHE_LAST_MODIFIED }
 
     private fun HttpURLConnection.logErrorResponse() {
         val responseBody = runOrNull { '\n' + String(inputStream.use { it.readBytes() }, UTF_8) } ?: ""
@@ -320,10 +332,12 @@ class Exchange<out T>(
         val growingFile = File(cacheFile.path + ".growing")
         synchronized(CACHE_LOCK) {
             try {
-                val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
-                val fetchedLastModified = lastModifiedStr.parseLastModified()
-                cachedLastModified?.takeIf { it >= fetchedLastModified }?.also {
-                    return
+                if (lastModifiedStr != NO_CACHE_LAST_MODIFIED) {
+                    val cachedLastModified = runOrNull { cacheFile.dataIn().use { it.readUTF() }.parseLastModified() }
+                    val fetchedLastModified = lastModifiedStr.parseLastModified()
+                    cachedLastModified?.takeIf { it >= fetchedLastModified }?.also {
+                        return
+                    }
                 }
                 growingFile.dataOut().use { it.writeUTF(lastModifiedStr); it.write(responseBody) }
                 growingFile.renameTo(cacheFile).takeIf { !it }?.also {
