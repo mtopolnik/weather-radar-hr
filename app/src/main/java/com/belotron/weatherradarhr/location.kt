@@ -166,17 +166,17 @@ val hrUljenjeShape = MapShape(
     botImageY = 718
 )
 
-val zamgShape = MapShape(
-    topLat = 63.3,
-    botLat = 27.0,
-    topLeftLon = -46.0,
-    botLeftLon = -25.6,
-    topRightLon = 57.6,
-    botRightLon = 29.4,
-    leftImageX = 7,
-    rightImageX = 472,
-    topImageY = 7,
-    botImageY = 358
+val metnoShape = MapShape(
+    topLat = 71.5,
+    botLat = 30.0,
+    topLeftLon = -35.0,
+    botLeftLon = -37.0,
+    topRightLon = 44.0,
+    botRightLon = 52.0,
+    leftImageX = 0,
+    rightImageX = 1280,
+    topImageY = 0,
+    botImageY = 720
 )
 
 val locationRequestFg: LocationRequest = LocationRequest.Builder(1000)

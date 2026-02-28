@@ -154,61 +154,71 @@ fun sloSequenceLoader() = AnimatedGifLoader(
     "https://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif", 5, SloOcr::ocrSloTimestamp
 )
 
-
-class EumetsatSequenceLoader : FrameSequenceLoader(
+class MetNoSatelliteLoader : FrameSequenceLoader(
     // Hack: reports 2 mins per frame where it's actually 15 mins.
     // This speeds it up 7.5x and covers 7.5x more time, appropriate for a satellite animation.
-    "https://eumetview.eumetsat.int/static-images/MSG/IMAGERY/IR108/BW/CENTRALEUROPE", 2, { 0 }
+    "https://api.met.no/weatherapi/geosatellite/1.4", 2, { 0 }
 ) {
     private val FIFTEEN_MINS = TimeUnit.MINUTES.toMillis(15)
-    private val imgTsRegex = """(?<=<option value="\d\d?\d?">)[^<]+""".toRegex()
-    private val imgIdRegex = """(?<=array_nom_imagen\[\d\d?\d?]=")[^"]+""".toRegex()
-    private val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yy   HH:mm 'UTC'")
+    private val availableUrl = "$url/available?area=europe&type=infrared&size=normal"
+    private val timeInUriRegex = """time=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)""".toRegex()
+    private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
 
     override fun incrementallyFetchFrameSequence(
         context: Context,
         animationCoversMinutes: Int,
         fetchPolicy: FetchPolicy
     ): Flow<StdSequence> = flow {
-
-        suspend fun fetchFrameBytes(imgId: String): ByteArray {
-            val (_, imgBytes) = fetchBytes(context, "$url/IMAGESDisplay/$imgId", PREFER_CACHED)
-            return imgBytes ?: ByteArray(0)
-        }
-
         if (fetchPolicy == ONLY_IF_NEW || fetchPolicy == ONLY_CACHED) {
             throw IllegalArgumentException("This function supports only UP_TO_DATE and PREFER_CACHED fetch policies")
         }
+        val (_, xmlMaybe) = fetchString(context, availableUrl, fetchPolicy)
+        val xml = xmlMaybe ?: return@flow
+
+        data class FrameSpec(val epochMillis: Long, val timeStr: String, val minute: Int)
+
+        val allFrames = timeInUriRegex.findAll(xml)
+            .map { it.groupValues[1] }
+            .distinct()
+            .map { ts ->
+                val dt = LocalDateTime.from(dateFormat.parse(ts))
+                FrameSpec(dt.atZone(ZoneOffset.UTC).toInstant().toEpochMilli(), ts, dt.minute)
+            }
+            .sortedByDescending { it.epochMillis }
+            .toList()
+        if (allFrames.isEmpty()) return@flow
+
         val targetFrameCount = correctFrameCount(animationCoversMinutes)
-        val (_, htmlMaybe) = fetchString(context, "$url/index.htm", fetchPolicy)
-        val html = htmlMaybe ?: return@flow
-        val imgIds = imgIdRegex.findAll(html).map { it.value }.toList()
-        val imgTimestamps = imgTsRegex.findAll(html).map { LocalDateTime.from(dateFormat.parse(it.value)) }.toList()
-        val dlLists = imgTimestamps.zip(imgIds).let { rawPairs ->
-            if (fetchPolicy == PREFER_CACHED) {
-                listOf(rawPairs.filter { it.first.minute == 0 })
-            } else {
-                listOf(
-                    rawPairs.filter { it.first.minute == 0 },
-                    rawPairs.filter { it.first.minute % 30 == 0 },
-                    rawPairs,
-                )
-            }.map { list -> list.map { it.first.atZone(ZoneOffset.UTC).toInstant().toEpochMilli() to it.second } }
+        val framesToFetch = allFrames.take(targetFrameCount)
+        val dlLists = if (fetchPolicy == PREFER_CACHED) {
+            listOf(framesToFetch.filter { it.minute == 0 })
+        } else {
+            listOf(
+                framesToFetch.filter { it.minute == 0 },
+                framesToFetch.filter { it.minute % 30 == 0 },
+                framesToFetch,
+            )
         }
         for (dlList in dlLists) {
-            val frames = mutableListOf(StdFrame(fetchFrameBytes(dlList[0].second), dlList[0].first))
+            if (dlList.isEmpty()) continue
+            val imgUrl0 = "$url/?area=europe&size=normal&type=infrared&time=${dlList[0].timeStr}"
+            val (_, firstBytes) = fetchBytes(context, imgUrl0, PREFER_CACHED)
+            if (firstBytes == null || firstBytes.isEmpty()) continue
+            val frames = mutableListOf(StdFrame(firstBytes, dlList[0].epochMillis))
             var frameCount = 1
             forLoop@ for (i in 1 ..< dlList.size) {
-                val frameBytes = fetchFrameBytes(dlList[i].second)
-                val earlierTs = dlList[i].first
-                var laterTs = dlList[i - 1].first
+                val imgUrl = "$url/?area=europe&size=normal&type=infrared&time=${dlList[i].timeStr}"
+                val (_, frameBytes) = fetchBytes(context, imgUrl, PREFER_CACHED)
+                if (frameBytes == null || frameBytes.isEmpty()) continue
+                val earlierTs = dlList[i].epochMillis
+                var laterTs = dlList[i - 1].epochMillis
                 var interpolationCount = 0
                 while (laterTs > earlierTs && interpolationCount < 12) {
                     if (frameCount == targetFrameCount) {
                         break@forLoop
                     }
-                    interpolationCount += 1
-                    frameCount += 1
+                    interpolationCount++
+                    frameCount++
                     laterTs -= FIFTEEN_MINS
                     frames += StdFrame(frameBytes, laterTs)
                 }

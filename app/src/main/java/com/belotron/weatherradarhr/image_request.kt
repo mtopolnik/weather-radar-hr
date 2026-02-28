@@ -145,6 +145,7 @@ class Exchange<out T>(
                 conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = CONNECT_TIMEOUT_MILLIS
                 conn.readTimeout = RECEIVE_FIRST_BYTE_TIMEOUT_MILLIS
+                conn.setRequestProperty("User-Agent", "weather-radar-hr github.com/nicktopol/weather-radar-hr")
                 val ifModifiedSince = loadCachedLastModified(url)
                 ifModifiedSince?.let { conn.addRequestProperty("If-Modified-Since", it) }
                 conn.connect()
@@ -246,6 +247,7 @@ class Exchange<out T>(
             var conn: HttpURLConnection? = null
             try {
                 conn = URL(url).openConnection() as HttpURLConnection
+                conn.setRequestProperty("User-Agent", "weather-radar-hr github.com/nicktopol/weather-radar-hr")
                 conn.addRequestProperty("Range", "bytes=${bos.size()}-${contentLength - 1}")
                 conn.connect()
                 if (!coroScope.isActive) throw CancellationException()

@@ -73,7 +73,7 @@ enum class AnimationSource(
     val frameSequenceLoader: FrameSequenceLoader
 ) {
     HR_KOMPOZIT("DHMZ Kompozit", hrKompozitShape, hrSequenceLoader("kompozit", HrOcr::ocrTimestampKompozit)),
-    AT_ZAMG("Eumetsat", zamgShape, EumetsatSequenceLoader()),
+    AT_ZAMG("met.no", metnoShape, MetNoSatelliteLoader()),
     SLO_ARSO("ARSO", sloShape, sloSequenceLoader()),
     HR_GRADISTE("DHMZ Gradište", hrGradisteShape, hrSequenceLoader("gradiste", HrOcr::ocrTimestampSingle)),
     HR_BILOGORA("DHMZ Bilogora", hrBilogoraShape, hrSequenceLoader("bilogora", HrOcr::ocrTimestampSingle)),

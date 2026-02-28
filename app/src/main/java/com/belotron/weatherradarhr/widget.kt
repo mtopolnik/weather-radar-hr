@@ -494,7 +494,7 @@ private class WidgetContext (
             warn { "Location not present, not drawing on bitmap" }
             return
         }
-        if (wDesc.mapShape === zamgShape) {
+        if (wDesc.mapShape === metnoShape) {
             return
         }
         val (lat, lon, timestamp) = location

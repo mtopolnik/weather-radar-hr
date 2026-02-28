@@ -72,7 +72,7 @@ open class ImageViewWithLocation
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (mapShape === zamgShape) {
+        if (mapShape === metnoShape) {
             return
         }
         location?.also { location ->
