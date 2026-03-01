@@ -569,13 +569,10 @@ class MainFragment : Fragment(), MenuProvider {
                     return@collect
                 }
                 bundle.animationProgress = vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
-                vmodel.animationLooper!!.apply {
-                    receiveNewFrames(radar.title, positionInUI, loader, frameSequence)
-                    resume(
-                        context,
-                        animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate
-                    )
-                }
+                vmodel.animationLooper!!.receiveNewFrames(
+                    context, radar.title, positionInUI, loader, frameSequence,
+                    animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate
+                )
             }
             bundle.status = SHOWING
         } catch (e: CancellationException) {

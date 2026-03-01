@@ -58,11 +58,21 @@ class AnimationLooper(
     private var loopingJob: Job? = null
 
     fun receiveNewFrames(
+        context: Context,
         radarName: String, positionInUI: Int,
-        loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>
+        loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>,
+        animationCoversMinutes: Int, rateMinsPerSec: Int,
+        freezeTimeMillis: Int, seekbarVibrate: Boolean
     ) {
+        animatorJobs[positionInUI]?.cancel()
         animators[positionInUI]?.dispose()
-        animators[positionInUI] = FrameAnimator(radarName, positionInUI, loader, vmodel, frameSequence)
+        animators[positionInUI] = FrameAnimator(radarName, positionInUI, loader, vmodel, frameSequence).apply {
+            this.animationCoversMinutes = animationCoversMinutes
+            this.rateMinsPerSec = rateMinsPerSec
+            this.freezeTimeMillis = freezeTimeMillis
+            this.seekbarVibrate = seekbarVibrate
+        }
+        ensureLooping(context)
     }
 
     fun resume(context: Context? = null, newAnimationCoversMinutes: Int? = null,
@@ -87,6 +97,19 @@ class AnimationLooper(
             return
         }
         stop()
+        startLoopingJob()
+    }
+
+    private fun ensureLooping(context: Context) {
+        dateFormat = context.dateFormat
+        timeFormat = context.timeFormat
+        if (vmodel.isTrackingTouch) return
+        if (loopingJob?.isActive != true) {
+            startLoopingJob()
+        }
+    }
+
+    private fun startLoopingJob() {
         var oldLoopingJob = loopingJob
         loopingJob = vmodel.viewModelScope.launch {
             oldLoopingJob?.join()
