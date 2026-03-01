@@ -191,7 +191,7 @@ class MetNoSatelliteLoader : FrameSequenceLoader(
         val targetFrameCount = correctFrameCount(animationCoversMinutes)
         val framesToFetch = allFrames.take(targetFrameCount)
         val dlLists = if (fetchPolicy == PREFER_CACHED) {
-            listOf(framesToFetch.filter { it.minute == 0 })
+            listOf(framesToFetch)
         } else {
             listOf(
                 framesToFetch.filter { it.minute == 0 },
