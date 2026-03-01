@@ -18,6 +18,12 @@
         <item name="textAppearanceTitleLarge">@style/ActionBarTitle</item>
         <!-- Color of the overflow icon (three dots) -->
         <item name="android:textColorSecondary">@color/foreground</item>
+        <item name="actionButtonStyle">@style/ActionBar.ActionButton</item>
+    </style>
+
+    <style name="ActionBar.ActionButton" parent="Widget.AppCompat.ActionButton">
+        <item name="android:paddingStart">@dimen/action_button_padding</item>
+        <item name="android:paddingEnd">@dimen/action_button_padding</item>
     </style>
 
     <style name="ActionBarTitle" parent="TextAppearance.Widget.AppCompat.Toolbar.Title">
