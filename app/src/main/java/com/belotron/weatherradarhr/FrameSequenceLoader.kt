@@ -190,15 +190,11 @@ class MetNoSatelliteLoader : FrameSequenceLoader(
 
         val targetFrameCount = correctFrameCount(animationCoversMinutes)
         val framesToFetch = allFrames.take(targetFrameCount)
-        val dlLists = if (fetchPolicy == PREFER_CACHED) {
-            listOf(framesToFetch)
-        } else {
-            listOf(
-                framesToFetch.filter { it.minute == 0 },
-                framesToFetch.filter { it.minute % 30 == 0 },
-                framesToFetch,
-            )
-        }
+        val dlLists = listOf(
+            framesToFetch.filter { it.minute == 0 },
+            framesToFetch.filter { it.minute % 30 == 0 },
+            framesToFetch,
+        )
         for (dlList in dlLists) {
             if (dlList.isEmpty()) continue
             val imgUrl0 = "$url/?area=europe&size=normal&type=infrared&time=${dlList[0].timeStr}"

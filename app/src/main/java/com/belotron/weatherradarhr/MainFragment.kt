@@ -63,6 +63,7 @@ import com.belotron.weatherradarhr.ImageBundle.Status.*
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import java.util.*
@@ -541,8 +542,9 @@ class MainFragment : Fragment(), MenuProvider {
             supervisorScope {
                 vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
                     launch {
-                        for (fetchPolicy in fetchPolicies) {
-                            reloadAnimation(bundle, positionInUI, fetchPolicy)
+                        for ((index, fetchPolicy) in fetchPolicies.withIndex()) {
+                            reloadAnimation(bundle, positionInUI, fetchPolicy,
+                                firstOnly = index < fetchPolicies.lastIndex)
                         }
                     }
                 }
@@ -550,7 +552,9 @@ class MainFragment : Fragment(), MenuProvider {
         }
     }
 
-    private suspend fun reloadAnimation(bundle: ImageBundle, positionInUI: Int, fetchPolicy: FetchPolicy) {
+    private suspend fun reloadAnimation(
+        bundle: ImageBundle, positionInUI: Int, fetchPolicy: FetchPolicy, firstOnly: Boolean = false
+    ) {
         val context = appContext
         bundle.status = LOADING
         val mainPrefs = context.mainPrefs
@@ -561,9 +565,13 @@ class MainFragment : Fragment(), MenuProvider {
         val radar = vmodel.radarsInUse[positionInUI]
         try {
             val loader = radar.frameSequenceLoader
-            loader.incrementallyFetchFrameSequence(
+            var flow = loader.incrementallyFetchFrameSequence(
                 context, animationCoversMinutes, fetchPolicy
-            ).collect { frameSequence ->
+            )
+            if (firstOnly) {
+                flow = flow.take(1)
+            }
+            flow.collect { frameSequence ->
                 if (frameSequence == null) {
                     bundle.status = BROKEN
                     return@collect
