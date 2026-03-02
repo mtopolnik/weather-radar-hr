@@ -1,25 +1,24 @@
 apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
 
 android {
-    namespace 'com.belotron.weatherradarhr'
-    compileSdk 36
+    namespace = 'com.belotron.weatherradarhr'
+    compileSdk = 36
     defaultConfig {
-        applicationId "com.belotron.weatherradarhr"
-        minSdk 26
-        targetSdk 36
         versionCode 177
         versionName '3.8.3'
+        applicationId = "com.belotron.weatherradarhr"
+        minSdk = 26
+        targetSdk = 36
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
     }
     buildFeatures {
-        viewBinding true
-        buildConfig true
+        viewBinding = true
+        buildConfig = true
     }
     buildTypes.release {
-        minifyEnabled true
-        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        minifyEnabled = true
+        proguardFiles = [getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro']
     }
     sourceSets.main.res.srcDirs = ['src/main/res', 'src/main/res/menu']
 }
