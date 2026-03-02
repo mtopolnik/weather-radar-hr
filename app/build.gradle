@@ -4,11 +4,11 @@ android {
     namespace = 'com.belotron.weatherradarhr'
     compileSdk = 36
     defaultConfig {
-        versionCode 177
-        versionName '3.8.3'
         applicationId = "com.belotron.weatherradarhr"
         minSdk = 26
         targetSdk = 36
+        versionCode = 178
+        versionName = '3.8.4'
         resConfigs 'hr', 'sl', 'bs', 'b+sr+Latn'
         testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
     }
