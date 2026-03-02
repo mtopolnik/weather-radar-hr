@@ -574,7 +574,6 @@ class MainFragment : Fragment(), MenuProvider {
                     animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate
                 )
             }
-            bundle.status = SHOWING
         } catch (e: CancellationException) {
             bundle.status = BROKEN
             throw e
