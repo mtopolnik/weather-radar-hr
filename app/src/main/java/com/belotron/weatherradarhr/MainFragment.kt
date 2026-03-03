@@ -548,9 +548,6 @@ class MainFragment : Fragment(), MenuProvider {
                                 firstOnly = index < fetchPolicies.lastIndex
                             )
                         }
-                        if (bundle.status == LOADING) {
-                            bundle.status = SHOWING
-                        }
                     }
                 }
             }
@@ -561,7 +558,9 @@ class MainFragment : Fragment(), MenuProvider {
         bundle: ImageBundle, positionInUI: Int, fetchPolicy: FetchPolicy, firstOnly: Boolean = false
     ) {
         val context = appContext
-        bundle.status = LOADING
+        if (bundle.status != SHOWING) {
+            bundle.status = LOADING
+        }
         val mainPrefs = context.mainPrefs
         val animationCoversMinutes = mainPrefs.animationCoversMinutes
         val rateMinsPerSec = mainPrefs.rateMinsPerSec
