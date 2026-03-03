@@ -22,7 +22,6 @@ import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.PointF
 import android.graphics.Rect
-import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils.MINUTE_IN_MILLIS
 import android.view.GestureDetector
@@ -69,6 +68,7 @@ import kotlinx.coroutines.supervisorScope
 import java.util.*
 import kotlin.math.min
 import kotlin.math.roundToInt
+import androidx.core.net.toUri
 
 private const val A_WHILE_IN_MILLIS = 5 * MINUTE_IN_MILLIS
 
@@ -539,6 +539,7 @@ class MainFragment : Fragment(), MenuProvider {
         vmodel.lastReloadedTimestamp = System.currentTimeMillis()
         vmodel.reloadJob?.cancel()
         vmodel.reloadJob = lifecycleScope.launch {
+            vmodel.imgBundles.forEach { it.status = LOADING }
             supervisorScope {
                 vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
                     launch {
@@ -547,6 +548,9 @@ class MainFragment : Fragment(), MenuProvider {
                                 bundle, positionInUI, fetchPolicy,
                                 firstOnly = index < fetchPolicies.lastIndex
                             )
+                        }
+                        if (bundle.status == LOADING) {
+                            bundle.status = LOADING_COMPLETE
                         }
                     }
                 }
@@ -558,9 +562,6 @@ class MainFragment : Fragment(), MenuProvider {
         bundle: ImageBundle, positionInUI: Int, fetchPolicy: FetchPolicy, firstOnly: Boolean = false
     ) {
         val context = appContext
-        if (bundle.status != SHOWING) {
-            bundle.status = LOADING
-        }
         val mainPrefs = context.mainPrefs
         val radar = vmodel.radarsInUse[positionInUI]
         try {

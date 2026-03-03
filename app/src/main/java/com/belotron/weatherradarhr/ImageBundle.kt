@@ -27,10 +27,11 @@ import java.util.*
 
 class ImageBundle {
     enum class Status {
-        UNKNOWN, HIDDEN, LOADING, BROKEN, SHOWING
+        UNKNOWN, HIDDEN, LOADING, LOADING_COMPLETE, BROKEN, SHOWING
     }
     companion object {
-        val loadingOrShowing = EnumSet.of(LOADING, SHOWING)!!
+        val loading = EnumSet.of(LOADING, LOADING_COMPLETE)!!
+        val loadingOrShowing = EnumSet.of(LOADING, LOADING_COMPLETE, SHOWING)!!
     }
 
     var textView: TextView? = null; private set
@@ -45,7 +46,7 @@ class ImageBundle {
     var status = UNKNOWN
         set(value) {
             field = value
-            progressBar?.setVisible(value == LOADING)
+            progressBar?.setVisible(value in loading)
             viewGroup?.setVisible(value in loadingOrShowing)
             brokenImgView?.setVisible(value == BROKEN)
             if (value !in loadingOrShowing) {
