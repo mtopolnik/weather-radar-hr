@@ -59,10 +59,14 @@ class AnimationLooper(
 
     fun receiveNewFrames(
         context: Context,
-        radarName: String, positionInUI: Int,
-        loader: FrameSequenceLoader, frameSequence: FrameSequence<out Frame>,
-        animationCoversMinutes: Int, rateMinsPerSec: Int,
-        freezeTimeMillis: Int, seekbarVibrate: Boolean
+        radarName: String,
+        positionInUI: Int,
+        loader: FrameSequenceLoader,
+        frameSequence: FrameSequence<out Frame>,
+        animationCoversMinutes: Int,
+        rateMinsPerSec: Int,
+        freezeTimeMillis: Int,
+        seekbarVibrate: Boolean
     ) {
         animatorJobs[positionInUI]?.cancel()
         animators[positionInUI]?.dispose()
