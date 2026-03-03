@@ -453,7 +453,7 @@ class MainFragment : Fragment(), MenuProvider {
             R.id.privacy_policy -> startActivity(
                 Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse("https://mtopolnik.github.io/weather-radar-hr/privacy_policy.html")
+                    "https://mtopolnik.github.io/weather-radar-hr/privacy_policy.html".toUri()
                 )
             )
             R.id.rate_me -> activity.openAppRating()
@@ -562,15 +562,11 @@ class MainFragment : Fragment(), MenuProvider {
             bundle.status = LOADING
         }
         val mainPrefs = context.mainPrefs
-        val animationCoversMinutes = mainPrefs.animationCoversMinutes
-        val rateMinsPerSec = mainPrefs.rateMinsPerSec
-        val freezeTimeMillis = mainPrefs.freezeTimeMillis
-        val seekbarVibrate = mainPrefs.seekbarVibrate
         val radar = vmodel.radarsInUse[positionInUI]
         try {
             val loader = radar.frameSequenceLoader
             var flow = loader.incrementallyFetchFrameSequence(
-                context, animationCoversMinutes, fetchPolicy
+                context, mainPrefs.animationCoversMinutes, fetchPolicy
             )
             if (firstOnly) {
                 flow = flow.take(1)
@@ -583,7 +579,8 @@ class MainFragment : Fragment(), MenuProvider {
                 bundle.animationProgress = vmodel.imgBundles.maxOfOrNull { it.animationProgress } ?: 0
                 vmodel.animationLooper!!.receiveNewFrames(
                     context, radar.title, positionInUI, loader, frameSequence,
-                    animationCoversMinutes, rateMinsPerSec, freezeTimeMillis, seekbarVibrate
+                    mainPrefs.animationCoversMinutes, mainPrefs.rateMinsPerSec,
+                    mainPrefs.freezeTimeMillis, mainPrefs.seekbarVibrate
                 )
             }
         } catch (e: CancellationException) {
