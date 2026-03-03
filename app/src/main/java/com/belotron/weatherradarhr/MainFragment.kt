@@ -543,8 +543,13 @@ class MainFragment : Fragment(), MenuProvider {
                 vmodel.imgBundles.forEachIndexed { positionInUI, bundle ->
                     launch {
                         for ((index, fetchPolicy) in fetchPolicies.withIndex()) {
-                            reloadAnimation(bundle, positionInUI, fetchPolicy,
-                                firstOnly = index < fetchPolicies.lastIndex)
+                            reloadAnimation(
+                                bundle, positionInUI, fetchPolicy,
+                                firstOnly = index < fetchPolicies.lastIndex
+                            )
+                        }
+                        if (bundle.status == LOADING) {
+                            bundle.status = SHOWING
                         }
                     }
                 }

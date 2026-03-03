@@ -250,9 +250,6 @@ class FrameAnimator(
         with (imgBundle) {
             imgView?.setImageBitmap(newFrame)
             this.animationProgress = animationProgress
-            if (status == ImageBundle.Status.LOADING) {
-                status = ImageBundle.Status.SHOWING
-            }
         }
         currFrame?.dispose()
         currFrame = newFrame
