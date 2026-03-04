@@ -44,6 +44,7 @@ import com.belotron.weatherradarhr.SloOcr.ocrSloTimestamp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.Calendar
@@ -51,6 +52,7 @@ import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 
+private const val FETCH_ALREADY_IN_PROGRESS = -1L
 private const val SECS_IN_HOUR = 3600L
 private const val SECS_IN_MINUTE = 60L
 private const val MINUTES_IN_HOUR = 60L
@@ -183,6 +185,7 @@ private data class WidgetDescriptor(
         val toTimestampedBitmap: (Bitmap, Boolean) -> TimestampedBitmap
 ) {
     var refreshJobRunning = false
+    val refreshMutex = Mutex()
     val imgFilename get() = url.substringAfterLast('/')
     val timestampFilename get() = "$imgFilename.timestamp"
     val index get() = widgetDescriptors.indexOf(this)
@@ -289,10 +292,14 @@ class RefreshImageService : JobService() {
                 appCoroScope.launch {
                     try {
                         val lastModified_mmss = wCtx.fetchImageAndUpdateWidget(callingFromBg = true, onlyIfNew = true)
-                        jobFinished(params, lastModified_mmss == null)
-                        logFetchResult(logHead, lastModified_mmss)
-                        if (lastModified_mmss != null) {
-                            wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified_mmss, wDesc.updatePeriodMinutes))
+                        if (lastModified_mmss == FETCH_ALREADY_IN_PROGRESS) {
+                            jobFinished(params, false)
+                        } else {
+                            jobFinished(params, lastModified_mmss == null)
+                            logFetchResult(logHead, lastModified_mmss)
+                            if (lastModified_mmss != null) {
+                                wCtx.scheduleWidgetUpdate(millisToNextUpdate(lastModified_mmss, wDesc.updatePeriodMinutes))
+                            }
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -371,7 +378,9 @@ private class WidgetContext (
                 }
                 try {
                     val lastModified = fetchImageAndUpdateWidget(callingFromBg = true, onlyIfNew = false)
-                    if (lastModified != null) {
+                    if (lastModified == FETCH_ALREADY_IN_PROGRESS) {
+                        info(CC_PRIVATE) { "$logHead: refresh already in progress" }
+                    } else if (lastModified != null) {
                         info { "$logHead: success" }
                         scheduleWidgetUpdate(millisToNextUpdate(lastModified, wDesc.updatePeriodMinutes))
                     } else {
@@ -391,37 +400,45 @@ private class WidgetContext (
 
     // Returns the Last-Modified timestamp's mm:ss part in seconds
     suspend fun fetchImageAndUpdateWidget(callingFromBg: Boolean, onlyIfNew: Boolean): Long? {
+        if (!wDesc.refreshMutex.tryLock()) {
+            info { "${wDesc.name}: refresh already in progress, skipping" }
+            return FETCH_ALREADY_IN_PROGRESS
+        }
         try {
             try {
-                val (lastModified_mmss, bitmap) =
-                        fetchBitmap(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
-                if (bitmap == null) {
-                    // This may happen only with `onlyIfNew == true`
-                    return null
+                try {
+                    val (lastModified_mmss, bitmap) =
+                            fetchBitmap(context, wDesc.url, if (onlyIfNew) ONLY_IF_NEW else UP_TO_DATE)
+                    if (bitmap == null) {
+                        // This may happen only with `onlyIfNew == true`
+                        return null
+                    }
+                    val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
+                    info { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
+                    withContext(IO) {
+                        writeImgAndTimestamp(tsBitmap)
+                    }
+                    context.refreshLocation(callingFromBg)
+                    updateRemoteViews(tsBitmap)
+                    return lastModified_mmss
+                } catch (e: ImageFetchException) {
+                    if (e.cached != null) {
+                        updateRemoteViews(wDesc.toTimestampedBitmap(e.cached as Bitmap, true))
+                    } else if (!onlyIfNew) {
+                        warn { "Failed to fetch ${wDesc.imgFilename}" }
+                    }
+                } catch (e: ImageDecodeException) {
+                    severe { "Image decoding error for ${wDesc.name}" }
+                    context.invalidateCache(wDesc.url)
+                    throw e
                 }
-                val tsBitmap = wDesc.toTimestampedBitmap(bitmap, false)
-                info { "${wDesc.name} scan started at ${context.timeFormat.format(tsBitmap.timestamp)}" }
-                withContext(IO) {
-                    writeImgAndTimestamp(tsBitmap)
-                }
-                context.refreshLocation(callingFromBg)
-                updateRemoteViews(tsBitmap)
-                return lastModified_mmss
-            } catch (e: ImageFetchException) {
-                if (e.cached != null) {
-                    updateRemoteViews(wDesc.toTimestampedBitmap(e.cached as Bitmap, true))
-                } else if (!onlyIfNew) {
-                    warn { "Failed to fetch ${wDesc.imgFilename}" }
-                }
-            } catch (e: ImageDecodeException) {
-                severe { "Image decoding error for ${wDesc.name}" }
-                context.invalidateCache(wDesc.url)
-                throw e
+            } catch (t: Throwable) {
+                severe(CC_PRIVATE, t) { "Failed to refresh widget ${wDesc.name}" }
             }
-        } catch (t: Throwable) {
-            severe(CC_PRIVATE, t) { "Failed to refresh widget ${wDesc.name}" }
+            return null
+        } finally {
+            wDesc.refreshMutex.unlock()
         }
-        return null
     }
 
     fun ensureWidgetRefreshScheduled() {
