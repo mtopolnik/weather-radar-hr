@@ -32,9 +32,10 @@ import android.graphics.Bitmap.createBitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.os.Build
 import android.os.PersistableBundle
-import android.text.format.DateUtils.*
+import android.text.format.DateUtils.HOUR_IN_MILLIS
+import android.text.format.DateUtils.MINUTE_IN_MILLIS
+import android.text.format.DateUtils.formatElapsedTime
 import android.widget.RemoteViews
 import com.belotron.weatherradarhr.CcOption.CC_PRIVATE
 import com.belotron.weatherradarhr.FetchPolicy.ONLY_IF_NEW
@@ -45,7 +46,8 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.util.*
+import java.util.Calendar
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 
@@ -484,7 +486,7 @@ private class WidgetContext (
                 TimestampedBitmap(it.readLong(), it.readBoolean(),
                         BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inMutable = true })!!)
             }
-        } catch (e : Exception) {
+        } catch (_ : Exception) {
             null
         }
     }
@@ -529,7 +531,9 @@ private class WidgetContext (
 }
 
 private val JobParameters.widgetDescriptor: WidgetDescriptor?
-    get() = runOrNull { widgetDescriptors[extras[EXTRA_WIDGET_DESC_INDEX] as Int] }
+    get() {
+        return runOrNull { widgetDescriptors[extras.getInt(EXTRA_WIDGET_DESC_INDEX)] }
+    }
 
 private val JobParameters.widgetName get() = widgetDescriptor?.name ?: ""
 
@@ -543,8 +547,7 @@ private fun Context.intentLaunchMainActivity(): PendingIntent {
         component = ComponentName(packageName, MainActivity::class.java.name)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return PendingIntent.getActivity(this, 0, launchIntent,
-            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0))
+    return PendingIntent.getActivity(this, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE)
 }
 
 private fun logFetchResult(logHead: String, lastModified_mmss: Long?) {
