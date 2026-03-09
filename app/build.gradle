@@ -39,4 +39,6 @@ dependencies {
     implementation 'androidx.preference:preference-ktx:1.2.1'
     implementation 'com.google.android.gms:play-services-location:21.3.0'
     implementation 'com.google.android.material:material:1.13.0'
+    implementation "org.jetbrains.kotlin:kotlin-test:2.2.10"
+    testImplementation 'junit:junit:4.13.2'
 }
